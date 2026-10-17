@@ -132,6 +132,8 @@ func _die() -> void:
 		var mult := maxf(0.2, 1.0 - (diff - 4) * 0.2) if diff > 4 else 1.0
 		p.gain_xp(maxi(1, int(round(def.xp * (1 + (level - 1) * 0.25) * mult))))
 	Loot.drop_for(zone, self)
+	# дымка/искры души при гибели
+	CombatFX.burst(zone.fx_root, global_position + Vector3.UP * (2.0 if def.boss else 0.8), Color(0.85, 0.85, 1.0, 0.7), 16 if not def.boss else 40, 2.5, 0.16, 0.9, Vector3.UP, 50, 1.5)
 	if on_death.is_valid(): on_death.call(self)
 	if model and model.has_method("set_dead"): model.set_dead(true)
 	# тело остаётся на земле, затем уходит под землю

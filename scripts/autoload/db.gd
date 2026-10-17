@@ -342,10 +342,18 @@ func potion_price(level: int) -> int:
 func shop_stock(level: int, class_id: String) -> Array:
 	var out := []
 	var bonus := clampf(0.08 + level * 0.015, 0.0, 0.35)
+	var names := {}
+	var slots := [0, 1, 2, 3, randi() % 4, randi() % 4]   # каждый тип снаряжения минимум раз
 	for i in 6:
-		var ilvl := maxi(1, level + randi_range(-1, 1))
-		var it := roll_item(ilvl, class_id, bonus)
-		if it.rarity == 3: it = roll_item(ilvl, class_id, 0.0)  # уникальные — только с босса
+		var it := {}
+		for guard in 30:
+			var ilvl := maxi(1, level + randi_range(-1, 1))
+			it = roll_item(ilvl, class_id, bonus)
+			if it.rarity == 3: continue  # уникальные — только с босса
+			if int(it.slot) != slots[i] and guard < 25: continue
+			if names.has(it.name) and guard < 28: continue
+			break
+		names[it.name] = true
 		out.append(it)
 	return out
 

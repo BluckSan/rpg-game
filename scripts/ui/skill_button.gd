@@ -14,6 +14,7 @@ var pips := 0          # заполненные точки комбо
 var max_pips := 0
 var badge := ""        # число в углу (например, зелья)
 var flash := 0.0       # вспышка «готово»
+var key_hint := ""     # клавиша на ПК
 var font: Font
 var title: Font
 static var _ring: Texture2D
@@ -61,11 +62,24 @@ func _draw() -> void:
 	if text != "" and (icon == null):
 		_text_centered(text, c + Vector2(0, -2 if cd_text == "" else -r * 0.35), int(r * 0.34), title)
 	elif text != "":
-		_text_centered(text, c + Vector2(0, r * 0.62), maxi(16, int(r * 0.22)), title)
+		# подпись на тёмной плашке, шрифт ужимается под ширину кнопки
+		var fs := maxi(16, int(r * 0.24))
+		while fs > 13 and title.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > r * 1.9: fs -= 1
+		var tw := title.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var pc := c + Vector2(0, r * 0.74)
+		draw_rect(Rect2(pc - Vector2(tw / 2 + 8, fs * 0.62), Vector2(tw + 16, fs * 1.24)), Color(0.05, 0.03, 0.02, 0.72))
+		_text_centered(text, pc, fs, title)
 	if locked_text != "":
 		_text_centered(locked_text, c + Vector2(0, r * 0.1), int(r * 0.26), font)
 	elif cd_text != "":
 		_text_centered(cd_text, c, int(r * 0.5), title)
+	if key_hint != "":
+		var kf := maxi(18, int(r * 0.22))
+		var kw := maxf(kf * 1.3, font.get_string_size(key_hint, HORIZONTAL_ALIGNMENT_LEFT, -1, kf).x + 14)
+		var kp := Vector2(c.x + r * 0.78 - kw, c.y - r * 0.98)
+		draw_rect(Rect2(kp, Vector2(kw, kf * 1.35)), Color(0.08, 0.06, 0.04, 0.9))
+		draw_rect(Rect2(kp, Vector2(kw, kf * 1.35)), Color(0.95, 0.75, 0.4, 0.9), false, 2.0)
+		_text_centered(key_hint, kp + Vector2(kw, kf * 1.35) / 2, kf, font)
 	if max_pips > 0:
 		for i in max_pips:
 			var a := PI * 1.25 + (i - (max_pips - 1) / 2.0) * 0.32

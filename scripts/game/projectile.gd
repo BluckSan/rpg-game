@@ -13,11 +13,13 @@ var from_player := true
 var on_hit: Callable
 var pierce := false
 var _hit_set := {}
+var color := Color.WHITE
+var glow := false
 
 static func fire(z, origin: Vector3, d: Vector3, spd: float, rng: float, c: Color, sz: float, player_owned: bool, cb: Callable, dmg := 0.0) -> Projectile:
 	var p := Projectile.new()
 	p.zone = z; p.dir = d.normalized(); p.speed = spd; p.max_dist = rng; p.size = sz
-	p.from_player = player_owned; p.on_hit = cb; p.damage = dmg
+	p.from_player = player_owned; p.on_hit = cb; p.damage = dmg; p.color = c
 	z.fx_root.add_child(p)
 	p.global_position = origin
 	var mi := U.prim("sphere", p, Vector3.ZERO, Vector3(sz, sz, sz * (3.0 if sz < 0.3 else 1.0)), c, 0.5, 2.0)
@@ -26,7 +28,19 @@ static func fire(z, origin: Vector3, d: Vector3, spd: float, rng: float, c: Colo
 	return p
 
 ## След снаряда: частицы и (для заклинаний) свет
-func add_trail(c: Color, glow: bool) -> Projectile:
+func add_trail(c: Color, is_glow: bool) -> Projectile:
+	glow = is_glow
+	color = c
+	if is_glow:
+		# мягкий ореол вокруг ядра
+		var h := MeshInstance3D.new()
+		var q2 := QuadMesh.new(); q2.size = Vector2.ONE * size * 4.0
+		h.mesh = q2
+		var hm: StandardMaterial3D = CombatFX._mat(Color(c.r, c.g, c.b, 0.55)).duplicate()
+		h.material_override = hm
+		h.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		hm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		add_child(h)
 	var p := CPUParticles3D.new()
 	p.amount = 16 if glow else 10
 	p.lifetime = 0.35 if glow else 0.2
@@ -65,6 +79,7 @@ func _process(delta: float) -> void:
 			if e.alive and not _hit_set.has(e) and U.flat_dist(e.global_position, pos) < e.radius + size + 0.3:
 				_hit_set[e] = true
 				if on_hit.is_valid(): on_hit.call(e)
+				_impact(pos)
 				if not pierce:
 					queue_free()
 					return
@@ -72,6 +87,7 @@ func _process(delta: float) -> void:
 		var p = zone.player
 		if p and not p.dead and U.flat_dist(p.global_position, pos) < 0.6 + size:
 			p.take_damage(damage, pos)
+			_impact(pos)
 			queue_free()
 			return
 		for m in zone.minions:
@@ -79,4 +95,15 @@ func _process(delta: float) -> void:
 				m.take_damage(damage)
 				queue_free()
 				return
-	if traveled > max_dist: queue_free()
+	if traveled > max_dist:
+		if glow: _impact(pos, 0.5)
+		queue_free()
+
+## Вспышка и искры в точке попадания
+func _impact(pos: Vector3, k := 1.0) -> void:
+	if zone == null: return
+	if glow:
+		CombatFX.burst(zone.fx_root, pos, color, int(18 * k), 5.0, 0.12, 0.4, Vector3.UP, 180, -2.0)
+		CombatFX.flash(zone.fx_root, pos, color, size * 5.0 * k, 0.18)
+	else:
+		CombatFX.burst(zone.fx_root, pos, color.lightened(0.3), int(8 * k), 3.5, 0.05, 0.25, -dir, 60, -6.0)

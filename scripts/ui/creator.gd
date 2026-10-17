@@ -48,8 +48,8 @@ func setup(m, on_done: Callable) -> void:
 	drag.gui_input.connect(_on_drag_input)
 	var dp := UIK.panel(self, Color(0, 0, 0, 0.55))
 	desc_panel = dp
-	UIK.place(dp, 0.6, 0.14, 0.98, 0.33)
-	class_desc = UIK.rich(dp, "", 26)
+	UIK.place(dp, 0.52, 0.85, 0.985, 0.99)
+	class_desc = UIK.rich(dp, "", 23)
 	UIK.full(class_desc); class_desc.offset_left = 18; class_desc.offset_top = 12; class_desc.offset_right = -18; class_desc.offset_bottom = -12
 	UIK.place(UIK.button(self, "Назад", func(): menu.set_focus(false); done.call(null), UIK.BUTTON, 32), 0.02, 0.03, 0.14, 0.12)
 	UIK.place(UIK.button(self, "Случайно", randomize_look, UIK.BUTTON, 32), 0.15, 0.03, 0.3, 0.12)

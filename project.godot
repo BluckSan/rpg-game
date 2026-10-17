@@ -4,7 +4,7 @@ config_version=5
 [application]
 
 config/name="Осколки Эфира"
-config/version="0.3.0"
+config/version="0.3.1"
 run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
@@ -22,6 +22,7 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/handheld/orientation=4
 window/energy_saving/keep_screen_on=true
+window/size/mode=3
 
 [gui]
 
@@ -41,4 +42,7 @@ common/physics_ticks_per_second=60
 
 renderer/rendering_method="mobile"
 textures/vram_compression/import_etc2_astc=true
+textures/vram_compression/import_s3tc_bptc=true
 anti_aliasing/quality/msaa_3d=1
+rendering_device/fallback_to_opengl3=true
+

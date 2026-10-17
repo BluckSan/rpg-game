@@ -3,7 +3,7 @@ extends Node
 ## godot --path . --rendering-driver opengl3 --resolution 1920x1080 res://tests/screens.tscn
 ## Сохраняет в /workspace/rpg-shots/ (или в user://shots, если папки нет).
 var is_runner := false
-var out := "/workspace/rpg-shots/v030"
+var out := "/workspace/rpg-shots/v031"
 var only := ""
 
 func shot(n: String) -> void:

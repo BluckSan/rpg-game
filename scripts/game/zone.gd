@@ -89,11 +89,13 @@ func _spawn_merchant() -> void:
 	l.font = UIK.title_font(); l.text = "Торговец Борис"; l.font_size = 56; l.pixel_size = 0.006
 	l.outline_size = 10; l.modulate = UIK.ACCENT; l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	l.no_depth_test = true
-	m.add_child(l); l.position = Vector3(0, 2.35, 0)
+	l.render_priority = 10; l.outline_render_priority = 9
+	m.add_child(l); l.position = Vector3(0, 3.05, 0.6)
 	var ic := Sprite3D.new()
 	ic.texture = UIK.icon("two-coins"); ic.pixel_size = 0.0035; ic.modulate = Color(1, 0.85, 0.3)
 	ic.billboard = BaseMaterial3D.BILLBOARD_ENABLED; ic.no_depth_test = true
-	m.add_child(ic); ic.position = Vector3(0, 2.75, 0)
+	ic.render_priority = 10
+	m.add_child(ic); ic.position = Vector3(0, 3.6, 0.6)
 
 func near_merchant() -> bool:
 	return merchant != null and player != null and U.flat_dist(player.global_position, merchant_point) < 3.2

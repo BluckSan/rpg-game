@@ -8,19 +8,80 @@ var _toast_label: Label
 var _toast_panel: PanelContainer
 var _toast_time := 0.0
 var shadows_enabled := true
+## ПК-режим: клавиатура и мышь, без сенсорных кнопок. На Android всегда false.
+var desktop := false
+var fullscreen := true
+var resolution := Vector2i(1920, 1080)
+var quality := 1          # 0 низкое, 1 среднее, 2 высокое
+var ui_scale := 1.0
+const RESOLUTIONS := [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440), Vector2i(3840, 2160)]
+const QUALITY_NAMES := ["Низкое", "Среднее", "Высокое"]
+const UI_SCALES := [0.85, 1.0, 1.1]
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	DirAccess.make_dir_recursive_absolute(SAVE_DIR)
+	desktop = is_pc_platform() and not "--touch" in OS.get_cmdline_user_args()
+	if desktop: quality = 2
+	_setup_input_map()
 	_build_toast()
 	var cfg := ConfigFile.new()
 	if cfg.load("user://settings.cfg") == OK:
 		shadows_enabled = cfg.get_value("video", "shadows", true)
+		fullscreen = cfg.get_value("video", "fullscreen", fullscreen)
+		resolution = cfg.get_value("video", "resolution", resolution)
+		quality = clampi(cfg.get_value("video", "quality", quality), 0, 2)
+		ui_scale = clampf(cfg.get_value("video", "ui_scale", ui_scale), 0.7, 1.5)
+	if not "--no-window-settings" in OS.get_cmdline_user_args():
+		apply_settings.call_deferred()
+
+static func is_pc_platform() -> bool:
+	return OS.has_feature("pc") and not OS.has_feature("mobile") and not OS.has_feature("android")
 
 func save_settings() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("video", "shadows", shadows_enabled)
+	cfg.set_value("video", "fullscreen", fullscreen)
+	cfg.set_value("video", "resolution", resolution)
+	cfg.set_value("video", "quality", quality)
+	cfg.set_value("video", "ui_scale", ui_scale)
 	cfg.save("user://settings.cfg")
+
+## Применить окно/качество/масштаб интерфейса
+func apply_settings() -> void:
+	var vp := get_tree().root
+	vp.content_scale_factor = ui_scale
+	match quality:
+		0:
+			vp.msaa_3d = Viewport.MSAA_DISABLED; vp.scaling_3d_scale = 0.75
+			RenderingServer.directional_shadow_atlas_set_size(1024, true)
+		1:
+			vp.msaa_3d = Viewport.MSAA_2X; vp.scaling_3d_scale = 1.0
+			RenderingServer.directional_shadow_atlas_set_size(2048, true)
+		_:
+			vp.msaa_3d = Viewport.MSAA_4X; vp.scaling_3d_scale = 1.0
+			RenderingServer.directional_shadow_atlas_set_size(4096, true)
+	if desktop and DisplayServer.get_name() != "headless":
+		if fullscreen:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+		else:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+			var scr := DisplayServer.screen_get_size()
+			var sz := Vector2i(mini(resolution.x, scr.x), mini(resolution.y, scr.y))
+			DisplayServer.window_set_size(sz)
+			DisplayServer.window_set_position(DisplayServer.screen_get_position() + (scr - sz) / 2)
+
+func resolution_text() -> String:
+	return "%d×%d" % [resolution.x, resolution.y]
+
+## Клавиши ПК: WASD + стрелки
+func _setup_input_map() -> void:
+	var map := {"move_left": [KEY_A, KEY_LEFT], "move_right": [KEY_D, KEY_RIGHT], "move_up": [KEY_W, KEY_UP], "move_down": [KEY_S, KEY_DOWN]}
+	for a in map:
+		if not InputMap.has_action(a): InputMap.add_action(a, 0.2)
+		for k in map[a]:
+			var ev := InputEventKey.new(); ev.physical_keycode = k
+			InputMap.action_add_event(a, ev)
 
 # ---------- сохранения ----------
 func list_characters() -> Array:

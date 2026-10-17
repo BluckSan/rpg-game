@@ -39,16 +39,18 @@ func setup(z) -> void:
 	points_label = UIK.rich(side, "", 28)
 	UIK.place(points_label, 0.04, 0.86, 0.98, 0.92)
 	var info := UIK.panel(side, Color(0, 0, 0, 0.4))
-	UIK.place(info, 0.04, 0.56, 0.96, 0.86)
+	UIK.place(info, 0.04, 0.47, 0.96, 0.86)
 	info_title = UIK.label(info, "Выберите узел", 32, UIK.ACCENT)
 	UIK.place(info_title, 0.05, 0.76, 0.95, 0.97)
-	info_body = UIK.rich(info, "Двигайте дерево пальцем, приближайте двумя пальцами.", 25)
-	UIK.place(info_body, 0.05, 0.25, 0.95, 0.76)
+	info_body = UIK.rich(info, "Двигайте дерево пальцем, приближайте двумя пальцами.", 23)
+	UIK.place(info_body, 0.05, 0.22, 0.95, 0.78)
+	info_body.scroll_active = true
+	info_body.mouse_filter = Control.MOUSE_FILTER_PASS
 	learn_btn = UIK.button(info, "Изучить", _learn, UIK.GREEN, 30)
-	UIK.place(learn_btn, 0.05, 0.04, 0.95, 0.22)
-	UIK.place(UIK.label(side, "Пути превращения", 30, UIK.ACCENT, HORIZONTAL_ALIGNMENT_CENTER), 0, 0.5, 1, 0.555)
+	UIK.place(learn_btn, 0.05, 0.03, 0.95, 0.19)
+	UIK.place(UIK.label(side, "Пути превращения", 30, UIK.ACCENT, HORIZONTAL_ALIGNMENT_CENTER), 0, 0.415, 1, 0.465)
 	var ap := Control.new(); side.add_child(ap)
-	UIK.place(ap, 0.02, 0.14, 0.98, 0.5)
+	UIK.place(ap, 0.02, 0.135, 0.98, 0.415)
 	asc_list = UIK.scroll_list(ap, 8)
 	UIK.place(UIK.button(side, "Сброс", _reset, Color(0.45, 0.18, 0.15), 28), 0.04, 0.02, 0.36, 0.12)
 	UIK.place(UIK.button(side, "Закрыть", _close, UIK.BUTTON, 30), 0.4, 0.02, 0.96, 0.12)
@@ -222,11 +224,14 @@ func _update_info() -> void:
 	var has := DB.has_talent(data, selected)
 	learn_btn.visible = not has and n["type"] != "start"
 	learn_btn.disabled = not DB.can_allocate(data, selected)
+	UIK.place(info_body, 0.05, 0.22 if learn_btn.visible else 0.04, 0.95, 0.78)
 	learn_btn.text = "Нет очков" if DB.free_points(data) <= 0 else ("Изучить" if not learn_btn.disabled else "Недоступно (нет связи)")
 
 func _build_asc_list() -> void:
 	UIK.clear(asc_list)
-	for a in DB.ASCENDANCIES:
+	var order: Array = DB.ASCENDANCIES.duplicate()
+	order.sort_custom(func(x, y): return _asc_rank(x) < _asc_rank(y))
+	for a in order:
 		var current: bool = data["ascendancy"] == a["id"]
 		var reason := DB.asc_block_reason(data, a)
 		var pts := DB.points_in_region(data, a["id"])
@@ -250,12 +255,19 @@ func _build_asc_list() -> void:
 		b.custom_minimum_size.y = 80
 		b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
+func _asc_rank(a: Dictionary) -> int:
+	if data["ascendancy"] == a["id"]: return 0
+	if DB.asc_block_reason(data, a) == "": return 1
+	if a.has("class") and a["class"] == data["class"]: return 2
+	return 3 + DB.ASCENDANCIES.find(a)
+
 func _asc_info(a: Dictionary) -> void:
 	selected = -1
 	info_title.text = a["name"]
 	info_body.text = "%s\n\nУмение: %s — %s\nТребуется: %d ур., ключевой талант региона и %d очков в нём." % [
 		a["desc"], a["skill"]["name"], a["skill"]["desc"], DB.ASC_LEVEL, DB.ASC_REGION_POINTS]
 	learn_btn.visible = false
+	UIK.place(info_body, 0.05, 0.04, 0.95, 0.78)
 	canvas.queue_redraw()
 
 func _ascend(a: Dictionary) -> void:

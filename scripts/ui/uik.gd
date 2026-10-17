@@ -129,11 +129,15 @@ static func button(parent: Node, text: String, cb: Callable, c := BUTTON, size :
 		b.expand_icon = false
 		b.add_theme_constant_override("icon_max_width", int(size * 1.4))
 		b.add_theme_constant_override("h_separation", 10)
-	if cb.is_valid(): b.pressed.connect(cb)
+	if cb.is_valid(): b.pressed.connect(_guard.bind(cb))
 	b.button_down.connect(func(): b.pivot_offset = b.size / 2; b.scale = Vector2.ONE * 0.97)
 	b.button_up.connect(func(): b.scale = Vector2.ONE)
 	parent.add_child(b)
 	return b
+
+## Нажатие не срабатывает, если палец прокручивал список
+static func _guard(cb: Callable) -> void:
+	if not DragScroll.dragging: cb.call()
 
 static func _btn_style(c: Color) -> StyleBoxTexture:
 	var s := StyleBoxTexture.new()
@@ -166,6 +170,8 @@ static func scroll_list(parent: Node, spacing := 10) -> VBoxContainer:
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_theme_constant_override("separation", spacing)
 	sc.add_child(v)
+	var ds := DragScroll.new(); ds.name = "DragScroll"
+	sc.add_child(ds)
 	return v
 
 static func hbox(parent: Node, h: float, spacing := 10) -> HBoxContainer:

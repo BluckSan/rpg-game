@@ -4,6 +4,8 @@ class_name Minimap
 
 var zone
 const RANGE := 55.0
+var range_m := RANGE
+var big := false
 var _ring: Texture2D
 var _font: Font
 var _icons := {}
@@ -21,7 +23,7 @@ func _process(_d: float) -> void:
 func to_map(p: Vector3) -> Vector2:
 	var r := size.x / 2 * 0.78
 	var pp: Vector3 = zone.player.global_position
-	var d := Vector2(p.x - pp.x, p.z - pp.z) / RANGE * r
+	var d := Vector2(p.x - pp.x, p.z - pp.z) / range_m * r
 	var cam: Camera3D = get_viewport().get_camera_3d()
 	if cam == null: return d
 	var f := -cam.global_basis.z; var rt := cam.global_basis.x
@@ -73,3 +75,16 @@ func _marker(c: Vector2, r: float, p: Vector3, ic: String, col: Color, pulse := 
 	draw_circle(c + m, s * 0.62, Color(0, 0, 0, 0.7))
 	draw_arc(c + m, s * 0.62, 0, TAU, 20, col, 2.0)
 	draw_texture_rect(_icons[ic], Rect2(c + m - Vector2(s, s) / 2, Vector2(s, s)), false, col)
+
+
+## Большая карта (клавиша M на ПК)
+func toggle_big() -> void:
+	big = not big
+	if big:
+		anchor_left = 0.5; anchor_right = 0.5; anchor_top = 0.5; anchor_bottom = 0.5
+		offset_left = -380; offset_right = 380; offset_top = -380; offset_bottom = 380
+		range_m = RANGE * 2.2
+	else:
+		anchor_left = 1; anchor_right = 1; anchor_top = 0; anchor_bottom = 0
+		offset_left = -276; offset_right = -16; offset_top = 14; offset_bottom = 274
+		range_m = RANGE

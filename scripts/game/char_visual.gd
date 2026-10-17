@@ -8,11 +8,11 @@ class_name CharVisual
 const UPPER_ROOT := "spine_01"
 const WEAPONS := {
 	"warrior": [["hand_r", "props/sword1", Vector3(0.0, 0.04, 0.0), Vector3(0, 0, -90), 0.42],
-		["lowerarm_l", "props/shield1", Vector3(0.0, 0.18, -0.07), Vector3(0, 90, 0), 0.25]],
+		["lowerarm_l", "props/shield1", Vector3(0.0, 0.18, -0.07), Vector3(0, 0, 90), 0.25]],
 	"archer": [["hand_l", "props/bow", Vector3(0.0, 0.05, 0.03), Vector3(0, 0, 0), 0.62],
 		["spine_03", "props/arrow", Vector3(0.1, 0.05, -0.17), Vector3(10, 0, 150), 0.42],
 		["spine_03", "props/arrow", Vector3(0.05, 0.05, -0.18), Vector3(12, 0, 160), 0.42]],
-	"mage": [["hand_r", "props/staff", Vector3(0.0, 0.62, 0.0), Vector3(180, 0, 0), 0.62]],
+	"mage": [["hand_r", "props/staff", Vector3(0.0, 0.14, 0.02), Vector3(180, 0, 0), 0.62]],
 	"goblin": [["hand_r", "props/axe", Vector3(0.0, 0.05, 0.0), Vector3(0, 0, -90), 0.55]],
 	"troll": [["hand_r", "props/axe", Vector3(0.0, 0.06, 0.0), Vector3(0, 0, -90), 0.8]],
 }
@@ -64,7 +64,7 @@ var _bow_ba: BoneAttachment3D
 var _bow_rest: Array = []
 var _bow_aiming := false
 var _cur_action := ""
-const TRAILS := {"props/sword1": [Vector3(0, 0.5, 0), Vector3(0, 2.25, 0)], "props/staff": [Vector3(0, 1.9, 0), Vector3(0, 2.7, 0)],
+const TRAILS := {"props/sword1": [Vector3(0, 0.5, 0), Vector3(0, 2.25, 0)], "props/staff": [Vector3(0, 0.9, 0), Vector3(0, 1.6, 0)],
 	"props/axe": [Vector3(0, 0.35, 0), Vector3(0, 0.86, 0)]}
 
 func build(l: Dictionary, cls: String, asc: String, monster_kind := "") -> void:
@@ -202,6 +202,8 @@ func _build_weapons() -> void:
 		var inst: Node3D = CharAssets.prop(w[1]).instantiate()
 		ba.add_child(inst)
 		inst.position = w[2]; inst.rotation_degrees = w[3]; inst.scale = Vector3.ONE * float(w[4])
+		if w[1] == "props/staff":
+			_staff_orb(inst, TRAILS[w[1]][1])
 		if weapon == null and TRAILS.has(w[1]):
 			weapon = inst
 			weapon_tip = TRAILS[w[1]][1]
@@ -217,6 +219,29 @@ func _build_weapons() -> void:
 			_bow_ba = ba; _bow_rest = [w[0], w[2], w[3]]
 		if asc_id == "paladin" or asc_id == "elementalist" or asc_id == "berserker":
 			_tint_weapon(inst, CharAssets.ASC_LOOK[asc_id].fx_color)
+
+## Светящийся кристалл на навершии посоха
+func _staff_orb(inst: Node3D, tip: Vector3) -> void:
+	var c := Color(0.45, 0.75, 1.0)
+	if CharAssets.ASC_LOOK.has(asc_id): c = CharAssets.ASC_LOOK[asc_id].fx_color
+	var orb := MeshInstance3D.new()
+	var sm := SphereMesh.new(); sm.radius = 0.09; sm.height = 0.18; sm.radial_segments = 12; sm.rings = 6
+	orb.mesh = sm
+	var m := StandardMaterial3D.new()
+	m.albedo_color = c; m.emission_enabled = true; m.emission = c; m.emission_energy_multiplier = 2.5
+	orb.material_override = m
+	orb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	inst.add_child(orb); orb.position = tip - Vector3(0, 0.12, 0)
+	var halo := MeshInstance3D.new()
+	var q := QuadMesh.new(); q.size = Vector2(0.55, 0.55)
+	halo.mesh = q
+	var hm: StandardMaterial3D = CombatFX._mat(Color(c.r, c.g, c.b, 0.45)).duplicate()
+	hm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	halo.material_override = hm
+	halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	orb.add_child(halo)
+	var l := OmniLight3D.new(); l.light_color = c; l.light_energy = 0.6; l.omni_range = 2.2; l.shadow_enabled = false
+	orb.add_child(l)
 
 func _tint_weapon(n: Node, c: Color) -> void:
 	for m in n.find_children("*", "MeshInstance3D", true, false):
@@ -343,16 +368,18 @@ func _action_anim(kind: String) -> Array:
 					_combo = (_combo + 1) % 3
 					return [["attack_a", "attack_b", "attack_c"][_combo], 1.35 * attack_speed, true]
 				"archer": return ["bow_shoot", 1.6 * attack_speed, true]
-				_: return ["cast", 1.5 * attack_speed, true]
+				_:
+					_combo = (_combo + 1) % 2
+					return [["attack_a", "attack_b"][_combo], 1.4 * attack_speed, true]
 		"spin": return ["attack_combo", 1.9, false]
 		"dash": return ["dash", 1.4, false]
 		"volley": return ["bow_shoot", 1.3, true]
 		"arrow_rain": return ["throw", 1.5, true]
-		"fireball": return ["cast", 1.3, true]
-		"frost_nova": return ["cast_enter", 1.2, false]
+		"fireball": return ["sword_attack", 1.4, true]
+		"frost_nova": return ["attack_heavy", 1.25, false]
 		"rage": return ["punch_b", 1.0, false]
 		"holy_shield": return ["block", 1.0, true]
-		"meteor": return ["cast", 1.0, true]
+		"meteor": return ["attack_c", 1.0, true]
 		"summon": return ["cast_enter", 1.0, true]
 		"shadow_strike": return ["attack_heavy", 2.4, false]
 		"jump": return ["jump_start", 1.6, false]

@@ -73,7 +73,14 @@ func _process(delta: float) -> void:
 	holder.position.y = 0.4 + sin(age * 2.0) * 0.1
 	var p = zone.player
 	if p == null or p.dead or age < 0.4: return
-	if U.flat_dist(p.global_position, global_position) > 2.0: return
+	var dist := U.flat_dist(p.global_position, global_position)
+	if dist > 4.5: return
+	if dist > 1.2:
+		# притягивание добычи к герою
+		var to: Vector3 = p.global_position - global_position; to.y = 0
+		global_position += to.normalized() * minf(dist, delta * (4.0 + (4.5 - dist) * 3.0))
+		global_position.y = lerpf(global_position.y, p.global_position.y, minf(1.0, delta * 6.0))
+		return
 	var d: Dictionary = p.data
 	match type:
 		"gold":

@@ -130,11 +130,11 @@ func show_select() -> void:
 	var create := UIK.button(s, "+ Создать персонажа", open_creator, UIK.GREEN, 36)
 	UIK.place(create, 0.03, 0.04, 0.36, 0.14)
 	var ip := UIK.panel(s, Color(0, 0, 0, 0.55))
-	UIK.place(ip, 0.66, 0.2, 0.97, 0.62)
+	UIK.place(ip, 0.7, 0.2, 0.98, 0.62)
 	info = UIK.rich(ip, "", 30)
 	UIK.full(info); info.offset_left = 24; info.offset_top = 20; info.offset_right = -24; info.offset_bottom = -20
 	play_btn = UIK.button(s, "ИГРАТЬ", _on_play, UIK.GOLD, 44)
-	UIK.place(play_btn, 0.66, 0.04, 0.88, 0.16)
+	UIK.place(play_btn, 0.7, 0.04, 0.88, 0.16)
 	del_btn = UIK.button(s, "Удалить", _on_delete, UIK.RED, 28)
 	UIK.place(del_btn, 0.89, 0.04, 0.97, 0.16)
 	var ver := UIK.label(s, "v%s · офлайн · Godot" % ProjectSettings.get_setting("application/config/version"), 22, Color(1, 1, 1, 0.4), HORIZONTAL_ALIGNMENT_RIGHT)

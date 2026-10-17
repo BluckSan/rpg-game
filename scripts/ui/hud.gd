@@ -137,6 +137,7 @@ func setup(z) -> void:
 		joy_knob.draw_arc(Vector2(50, 50), 46, 0, TAU, 32, Color(1, 0.85, 0.5, 0.9), 3.0))
 	joy_base.add_child(joy_knob)
 	_set_joy(joy_default, Vector2.ZERO)
+	if Game.desktop: _setup_desktop()
 
 	pickup_box = VBoxContainer.new()
 	pickup_box.alignment = BoxContainer.ALIGNMENT_END
@@ -210,6 +211,51 @@ func refresh_skill_buttons() -> void:
 		var sc: Color = s.color if s != null else Color(0.4, 0.4, 0.4)
 		skill_btns[i].color = Color(sc.r * 0.55, sc.g * 0.55, sc.b * 0.55, 1)
 		skill_btns[i].queue_redraw()
+
+# ---------------- ПК: клавиатура и мышь ----------------
+## Сенсорные элементы прячем, на кнопках умений — подсказки клавиш
+func _setup_desktop() -> void:
+	joy_base.visible = false
+	jump_btn.visible = false
+	roll_btn.visible = false
+	var keys := ["ЛКМ", "1", "2", "3"]
+	for i in skill_btns.size(): skill_btns[i].key_hint = keys[i]
+	potion_btn.key_hint = "H"
+	interact_btn.text = "Торговать [E]"
+	var help := UIK.label(root, "WASD — ход · ЛКМ — атака · ПКМ — камера · колесо — зум\nПробел — прыжок · Shift — кувырок · H — зелье · I — герой · T — таланты · M — карта · Esc — меню", 19, Color(1, 1, 1, 0.6))
+	help.autowrap_mode = TextServer.AUTOWRAP_OFF
+	help.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	help.add_theme_constant_override("outline_size", 5)
+	help.anchor_top = 1; help.anchor_bottom = 1
+	help.offset_left = 20; help.offset_right = 1100; help.offset_top = -112; help.offset_bottom = -44
+	help.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+## Горячие клавиши (true — событие обработано)
+func _hotkey(k: int) -> bool:
+	if window != null:
+		var wname := String(window.name)
+		if k == KEY_ESCAPE or (k in [KEY_I, KEY_C] and wname == "Window_hero") or (k in [KEY_T, KEY_N] and wname == "Window_talents") \
+				or (k == KEY_E and wname == "Window_shop"):
+			close_window(); return true
+		return false
+	match k:
+		KEY_1, KEY_2, KEY_3:
+			var i := k - KEY_0
+			player.try_use(i)
+			skill_btns[i].set_held(true)
+			get_tree().create_timer(0.12).timeout.connect(func(): if is_instance_valid(skill_btns[i]): skill_btns[i].set_held(false))
+		KEY_SPACE: press_jump()
+		KEY_SHIFT, KEY_K: press_roll()
+		KEY_H, KEY_Q: player.use_potion()
+		KEY_I, KEY_C: _open("hero")
+		KEY_T, KEY_N: _open("talents")
+		KEY_M: minimap.toggle_big()
+		KEY_ESCAPE: _open("pause")
+		KEY_E:
+			if zone.near_merchant(): _open("shop")
+			else: return false
+		_: return false
+	return true
 
 # ---------------- окна ----------------
 func _open(which: String) -> void:
@@ -366,19 +412,21 @@ func _over_top_button(p: Vector2) -> bool:
 	return false
 
 func _input(ev: InputEvent) -> void:
+	if ev is InputEventKey and ev.pressed and not ev.echo and player != null:
+		if _hotkey(ev.keycode):
+			get_viewport().set_input_as_handled()
+			return
 	if window != null: return
-	if ev is InputEventKey and ev.pressed and not ev.echo and ev.keycode == KEY_E and zone.near_merchant():
-		_open("shop"); return
 	if ev is InputEventScreenTouch:
 		if ev.pressed: _touch_down(ev.index, ev.position)
 		else: _touch_up(ev.index)
 	elif ev is InputEventScreenDrag:
 		_touch_move(ev.index, ev.position, ev.relative)
 	# мышь на ПК (без тача): ЛКМ по кнопкам
-	elif ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and not DisplayServer.is_touchscreen_available():
+	elif ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and (Game.desktop or not DisplayServer.is_touchscreen_available()):
 		if ev.pressed: _touch_down(-1, ev.position)
 		else: _touch_up(-1)
-	elif ev is InputEventMouseMotion and touches.has(-1) and not DisplayServer.is_touchscreen_available():
+	elif ev is InputEventMouseMotion and touches.has(-1) and (Game.desktop or not DisplayServer.is_touchscreen_available()):
 		_touch_move(-1, ev.position, ev.relative)
 
 func _screen() -> Vector2:
@@ -409,12 +457,25 @@ func _touch_down(idx: int, p: Vector2) -> void:
 		potion_btn.set_held(true)
 		player.use_potion()
 		return
+	if Game.desktop and idx == -1:
+		# ЛКМ по миру — атака (удержание — серия ударов)
+		if window == null and not _over_ui(p):
+			touches[idx] = {"role": "skill", "slot": 0}
+			_hold_time[0] = 0.0
+			skill_btns[0].set_held(true)
+			player.attack_held = true
+		return
 	var s := _screen()
 	if p.x < s.x * 0.42 and p.y > s.y * 0.25 and not _has_role("joy"):
 		touches[idx] = {"role": "joy", "origin": p}
 		_set_joy(p, Vector2.ZERO)
 		return
 	touches[idx] = {"role": "cam", "pos": p}
+
+func _over_ui(p: Vector2) -> bool:
+	for c in [pickup_box, boss_panel, hint_panel, minimap]:
+		if c and c.is_visible_in_tree() and c.mouse_filter != Control.MOUSE_FILTER_IGNORE and c.get_global_rect().has_point(p): return true
+	return false
 
 func _has_role(r: String) -> bool:
 	for t in touches.values():
@@ -490,8 +551,10 @@ func _process(delta: float) -> void:
 	if not _has_role("joy"): _set_joy(joy_default, Vector2.ZERO)
 	var asc := DB.get_asc(d["ascendancy"])
 	name_label.text = "%s · ур. %d · %s" % [d["name"], d["level"], asc["name"] if not asc.is_empty() else DB.CLASSES[d["class"]].name]
-	_set_bar(hp_bar, player.hp, player.stats.max_hp, "%d / %d" % [ceili(player.hp), roundi(player.stats.max_hp)])
-	_set_bar(mp_bar, player.mp, player.stats.max_mp, "%d / %d" % [floori(player.mp), roundi(player.stats.max_mp)])
+	var mhp := roundi(player.stats.max_hp)
+	var mmp := roundi(player.stats.max_mp)
+	_set_bar(hp_bar, player.hp, player.stats.max_hp, "%d / %d" % [mini(ceili(player.hp), mhp), mhp])
+	_set_bar(mp_bar, player.mp, player.stats.max_mp, "%d / %d" % [mini(floori(player.mp), mmp), mmp])
 	var need := DB.xp_to_next(d["level"])
 	_set_bar(xp_bar, d["xp"], need, "Опыт %d / %d" % [d["xp"], need])
 	gold_label.text = "%d" % d["gold"]

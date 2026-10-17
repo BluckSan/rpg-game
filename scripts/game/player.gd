@@ -29,9 +29,9 @@ const COMBOS := {
 		{"anim": "bow_shoot", "speed": 1.7, "windup": 0.14, "mult": 1.05, "arrows": 1, "knock": 1.5, "stop": 0.03},
 		{"anim": "bow_shoot", "speed": 1.0, "windup": 0.32, "mult": 1.6, "arrows": 3, "pierce": true, "knock": 4.0, "stop": 0.06, "shake": 0.1, "cd": 1.3}],
 	"mage": [
-		{"anim": "cast", "speed": 1.6, "windup": 0.15, "mult": 1.0, "knock": 1.5, "stop": 0.03},
-		{"anim": "cast", "speed": 1.6, "windup": 0.15, "mult": 1.05, "knock": 1.5, "stop": 0.03},
-		{"anim": "cast_enter", "speed": 1.2, "windup": 0.32, "mult": 1.7, "explode": 2.6, "knock": 5.0, "stop": 0.07, "shake": 0.18, "cd": 1.3}]}
+		{"anim": "attack_a", "speed": 1.5, "windup": 0.2, "mult": 1.0, "knock": 1.5, "stop": 0.03, "trail": 0.3},
+		{"anim": "attack_b", "speed": 1.5, "windup": 0.2, "mult": 1.05, "knock": 1.5, "stop": 0.03, "trail": 0.3},
+		{"anim": "attack_heavy", "speed": 1.2, "windup": 0.36, "mult": 1.7, "explode": 2.6, "knock": 5.0, "stop": 0.07, "shake": 0.18, "cd": 1.3, "trail": 0.45}]}
 var combo_step := 0          # индекс следующего удара
 var combo_timer := 0.0
 var combo_count := 0         # всего выполнено ударов (для тестов)
@@ -106,7 +106,7 @@ func _physics_process(delta: float) -> void:
 	data["play_time"] = float(data["play_time"]) + delta
 
 	var input := move_input
-	var kb := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	var kb := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	if kb.length() > 0.1: input = Vector2(kb.x, -kb.y)
 	var cam := get_viewport().get_camera_3d()
 	var fwd := Vector3.FORWARD
@@ -154,7 +154,7 @@ func _physics_process(delta: float) -> void:
 	_was_on_floor = now_floor
 	visual.in_air = not now_floor and (velocity.y > 1.0 or _coyote < -0.15)
 	if global_position.y < -10: teleport(zone().spawn_point)
-	if attack_held or Input.is_key_pressed(KEY_SPACE): try_use(0)
+	if attack_held: try_use(0)
 
 ## Нажатие прыжка (кнопка HUD / клавиатура). Сработает в течение буфера, если персонаж на земле или только что сошёл с края.
 func request_jump() -> void:
@@ -233,6 +233,7 @@ func gain_xp(amount: int) -> void:
 	if lvl:
 		recalc(true)
 		zone().fx("burst", global_position + Vector3.UP, 2.5, Color(1, 0.85, 0.3), 0.8)
+		CombatFX.pillar(zone().fx_root, global_position, Color(1, 0.85, 0.35))
 		var h = zone().hud
 		if h and h.has_method("level_up"): h.level_up(data["level"], DB.free_points(data))
 		else: Game.toast("Новый уровень: %d! Очков талантов: %d" % [data["level"], DB.free_points(data)])

@@ -151,3 +151,23 @@ static func ground_ring(parent: Node, pos: Vector3, radius: float, width: float,
 	mi.global_position = pos + Vector3.UP * 0.15
 	mi.scale = Vector3(radius, 1.4, radius)
 	return mi
+
+
+## Столб света (новый уровень, превращение)
+static func pillar(parent: Node, pos: Vector3, c: Color, h := 6.0, dur := 1.2) -> void:
+	var mi := MeshInstance3D.new()
+	var cm := CylinderMesh.new(); cm.top_radius = 0.9; cm.bottom_radius = 0.6; cm.height = h; cm.cap_top = false; cm.cap_bottom = false
+	mi.mesh = cm
+	var m := _mat(Color(c.r, c.g, c.b, 0.45), true).duplicate() as StandardMaterial3D
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_DISABLED
+	m.albedo_texture = null
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
+	mi.global_position = pos + Vector3.UP * h / 2
+	mi.scale = Vector3(0.2, 1, 0.2)
+	var tw := mi.create_tween().set_parallel(true)
+	tw.tween_property(mi, "scale", Vector3(1, 1, 1), 0.25).set_trans(Tween.TRANS_BACK)
+	tw.tween_property(m, "albedo_color:a", 0.0, dur).set_delay(0.2)
+	tw.chain().tween_callback(mi.queue_free)
+	burst(parent, pos + Vector3.UP * 0.5, c, 30, 5.0, 0.12, 1.0, Vector3.UP, 25, 0.5)

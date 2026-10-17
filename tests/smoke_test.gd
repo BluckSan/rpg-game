@@ -118,6 +118,7 @@ func _ready() -> void:
 			_mob_anim_tests(z)
 			await _ui_tests(z, p)
 			await _shop_tests(z, p)
+			await _desktop_tests(z, p)
 			await _roll_tests(z, p)
 		await _combo_tests(z, p, c["class"])
 		# подвести врага и атаковать
@@ -235,6 +236,51 @@ func _combo_tests(z, p: Player, cls: String) -> void:
 	check(is_equal_approx(Engine.time_scale, 1.0), "[%s] время после стоп-кадров = 1" % cls)
 	dummy.take_damage(999999, false)
 
+## ПК-режим: горячие клавиши, мышь, настройки графики
+func _desktop_tests(z, p: Player) -> void:
+	var h = z.hud
+	check(Game.desktop == Game.is_pc_platform() or "--touch" in OS.get_cmdline_user_args(), "режим ПК определён: %s" % str(Game.desktop))
+	if not Game.desktop:
+		check(h.jump_btn.visible and h.joy_base.visible, "сенсорные кнопки на телефоне видны")
+		return
+	check(not h.jump_btn.visible and not h.roll_btn.visible and not h.joy_base.visible, "на ПК сенсорный джойстик и кнопки скрыты")
+	check(h.skill_btns[1].key_hint == "1" and h.skill_btns[0].key_hint == "ЛКМ", "подсказки клавиш на умениях")
+	check(InputMap.has_action("move_up") and InputMap.action_get_events("move_up").size() >= 2, "WASD в карте ввода")
+	h._hotkey(KEY_I); await frames(2)
+	check(h.window != null and h.window.name == "Window_hero", "I открывает героя")
+	h._hotkey(KEY_ESCAPE); await frames(2)
+	check(h.window == null and not get_tree().paused, "Esc закрывает окно")
+	h._hotkey(KEY_T); await frames(2)
+	check(h.window != null and h.window.name == "Window_talents", "T открывает таланты")
+	h._hotkey(KEY_T); await frames(2)
+	check(h.window == null, "T повторно закрывает таланты")
+	h._hotkey(KEY_M); await frames(1)
+	check(h.minimap.big, "M — большая карта")
+	h._hotkey(KEY_M); await frames(1)
+	check(not h.minimap.big, "M — карта свёрнута")
+	h._hotkey(KEY_ESCAPE); await frames(2)
+	check(h.window != null and h.window.name == "Window_pause", "Esc открывает меню")
+	var q = h.window.find_child("Quality", true, false)
+	check(q != null and h.window.find_child("Fullscreen", true, false) != null and h.window.find_child("Resolution", true, false) != null, "настройки графики/экрана в меню")
+	var q0: int = Game.quality
+	Game.quality = 0; Game.apply_settings()
+	check(get_viewport().msaa_3d == Viewport.MSAA_DISABLED and is_equal_approx(get_tree().root.scaling_3d_scale, 0.75), "качество «Низкое» применено")
+	Game.quality = 2; Game.apply_settings()
+	check(get_tree().root.msaa_3d == Viewport.MSAA_4X, "качество «Высокое» применено")
+	Game.ui_scale = 1.1; Game.apply_settings()
+	check(is_equal_approx(get_tree().root.content_scale_factor, 1.1), "масштаб интерфейса")
+	Game.ui_scale = 1.0; Game.quality = q0; Game.apply_settings()
+	h.close_window(); await frames(2)
+	# ЛКМ по миру — атака
+	var c: Vector2 = h._screen() * Vector2(0.5, 0.45)
+	h._touch_down(-1, c)
+	check(p.attack_held, "ЛКМ по миру — атака")
+	h._touch_up(-1)
+	check(not p.attack_held, "отпускание ЛКМ — конец атаки")
+	h._hotkey(KEY_SPACE)
+	h._hotkey(KEY_1)
+	await secs(0.6)
+
 func _roll_tests(z, p: Player) -> void:
 	p.recalc(true)
 	var hp0 := p.hp
@@ -288,6 +334,32 @@ func _shop_tests(z, p: Player) -> void:
 	for it in d["shop"]["stock"]:
 		if absi(int(it.ilvl) - int(d["level"])) > 1: lvl_ok = false
 	check(lvl_ok, "товары под уровень героя")
+	var nm := {}; var sl := {}
+	for it in d["shop"]["stock"]:
+		nm[it.name] = true; sl[int(it.slot)] = true
+	check(nm.size() == 6, "в лавке нет повторов (%d разных)" % nm.size())
+	check(sl.size() >= 4, "в лавке все типы снаряжения (%d)" % sl.size())
+	# прокрутка списка пальцем (не только полосой)
+	var ds: DragScroll = w.find_child("DragScroll", true, false)
+	check(ds != null, "у списка лавки есть прокрутка пальцем")
+	if ds:
+		var sc: ScrollContainer = ds.sc
+		var r := sc.get_global_rect()
+		var st := r.position + r.size * Vector2(0.5, 0.8)
+		var e1 := InputEventMouseButton.new(); e1.button_index = MOUSE_BUTTON_LEFT; e1.pressed = true; e1.position = st
+		ds._input(e1)
+		for k in 6:
+			var mm := InputEventMouseMotion.new(); mm.position = st - Vector2(0, 30 * (k + 1)); mm.relative = Vector2(0, -30)
+			ds._input(mm)
+		await frames(1)
+		var moved := sc.scroll_vertical
+		var e2 := InputEventMouseButton.new(); e2.button_index = MOUSE_BUTTON_LEFT; e2.pressed = false; e2.position = st - Vector2(0, 180)
+		ds._input(e2)
+		var mx := sc.get_v_scroll_bar().max_value - sc.size.y
+		check(moved > 0 or mx <= 0, "список прокручивается свайпом (%d, макс %d)" % [moved, mx])
+		check(DragScroll.dragging, "после свайпа нажатие кнопки подавлено")
+		await frames(3)
+		check(not DragScroll.dragging, "флаг прокрутки сброшен")
 	check(w.buy_potion() and d["potions"] == pot0 + 1, "покупка зелья")
 	var g0: int = d["gold"]
 	var price: int = DB.buy_price(d["shop"]["stock"][0])
