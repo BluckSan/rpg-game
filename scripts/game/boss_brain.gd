@@ -119,7 +119,7 @@ func _slam(t) -> void:
 	CombatFX.burst(z.fx_root, c + Vector3.UP * 0.3, Color(0.55, 0.45, 0.35), 34, 7.0, 0.2, 0.7, Vector3.UP, 70, -12)
 	z.fx("ring", c, 3.2, Color(0.7, 0.5, 0.3), 0.35)
 	var p = z.player
-	if p and not p.dead and U.flat_dist(p.global_position, c) < 3.2: p.take_damage(e._damage() * 1.7, c)
+	if p and not p.dead and U.flat_dist(p.global_position, c) < 3.2 and U.los(e, c, p.global_position): p.take_damage(e._damage() * 1.7, c)
 	for m in z.minions.duplicate():
 		if is_instance_valid(m) and U.flat_dist(m.global_position, c) < 3.2: m.take_damage(e._damage() * 1.7)
 	_wave(c, 7.5)
@@ -249,7 +249,7 @@ func _breath(t) -> void:
 	var p = z.player
 	if p and not p.dead:
 		var to := U.flat(p.global_position - e.global_position)
-		if to.length() < reach + 1.0 and to.normalized().dot(dir) > cos(deg_to_rad(38.0)):
+		if to.length() < reach + 1.0 and to.normalized().dot(dir) > cos(deg_to_rad(38.0)) and U.los(e, e.global_position, p.global_position):
 			p.take_damage(e._damage() * 1.8, e.global_position)
 	if not await _wait(0.6): return
 	busy = false
@@ -272,7 +272,7 @@ func _spores(t) -> void:
 	var p = z.player
 	for c in spots:
 		z.fx("burst", c + Vector3.UP * 0.5, 2.4, col, 0.6)
-		if p and not p.dead and U.flat_dist(p.global_position, c) < 2.4: p.take_damage(e._damage() * 1.2, c)
+		if p and not p.dead and U.flat_dist(p.global_position, c) < 2.4 and U.los(e, c, p.global_position): p.take_damage(e._damage() * 1.2, c)
 	if not await _wait(0.5): return
 	busy = false
 
@@ -294,7 +294,7 @@ func _nova() -> void:
 	var p = z.player
 	if p and not p.dead:
 		var d := U.flat_dist(p.global_position, c)
-		if d > 3.0 and d < 9.0: p.take_damage(e._damage() * 1.6, c)
+		if d > 3.0 and d < 9.0 and U.los(e, c, p.global_position): p.take_damage(e._damage() * 1.6, c)
 	if not await _wait(0.5): return
 	busy = false
 

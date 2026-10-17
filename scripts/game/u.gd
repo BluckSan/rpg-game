@@ -139,3 +139,17 @@ static func set_view_range(n: Node, d: float) -> void:
 	for g in n.find_children("*", "GeometryInstance3D", true, false):
 		(g as GeometryInstance3D).visibility_range_end = d
 		g.add_to_group("view_range_mobs")
+
+## Прямая видимость между точками (на высоте 1 м) по статике/стенам слоя 1. Пол и пологий рельеф
+## (нормаль почти вверх) не считаются преградой — только стены, колонны, скалы.
+static func los(n: Node3D, a: Vector3, b: Vector3, h := 1.0) -> bool:
+	if n == null or not n.is_inside_tree(): return true
+	var space := n.get_world_3d().direct_space_state
+	var from := a + Vector3.UP * h; var to := b + Vector3.UP * h
+	for i in 3:
+		var q := PhysicsRayQueryParameters3D.create(from, to, 1)
+		var hit := space.intersect_ray(q)
+		if hit.is_empty(): return true
+		if (hit.normal as Vector3).y < 0.7: return false
+		from = hit.position + (to - from).normalized() * 0.05 + Vector3.UP * 0.05
+	return true

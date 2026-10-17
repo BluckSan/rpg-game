@@ -300,9 +300,12 @@ const STAT_ICONS := {"max_hp": "heart-bottle", "max_mp": "drop", "damage": "swor
 	"crit": "crossed-swords", "armor": "checked-shield", "regen": "heart-beats", "leech": "skull-mask", "move_speed": "sprint", "cdr": "hourglass"}
 
 static func item_icon(it: Dictionary, class_id := "warrior") -> String:
-	## Рендеренная 3D-иконка по типу предмета (assets/items/<type>.png, см. tools/render_icons.gd).
+	## v0.5.1: готовые 2D-иконки (CC0, Idylwild/OpenGameArt) по типу и тиру: assets/items/<type>_t<0..2>.png
 	var t := str(it.get("type", ""))
-	if t != "" and Items.TYPES.has(t): return "item:" + t
-	var s := clampi(int(it.get("slot", 0)), 0, SLOT_ITEM_ICONS.size() - 1)
-	if s == 0: return "item:" + str((Items.CLASS_WEAPON.get(class_id, ["sword"]) as Array)[0])
-	return SLOT_ITEM_ICONS[s]
+	if t == "" or not Items.TYPES.has(t):
+		var s := clampi(int(it.get("slot", 0)), 0, SLOT_ITEM_ICONS.size() - 1)
+		t = str((Items.CLASS_WEAPON.get(class_id, ["sword"]) as Array)[0]) if s == 0 else SLOT_ITEM_ICONS[s].substr(5)
+	var tier := Items.tier_of(int(it.get("ilvl", 1)))
+	if it.has("unique") or int(it.get("rarity", 0)) >= 3: tier = maxi(tier, 1)
+	if it.get("set", "") != "": tier = clampi(int(Items.SETS.get(it.set, {}).get("lvl", 5)) / 10, tier, 2)
+	return "item:%s_t%d" % [t, tier]

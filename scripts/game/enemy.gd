@@ -211,6 +211,13 @@ func _build_model() -> void:
 			model.setup(mk, opts)
 			model.walk_ref = maxf(1.0, def.speed * 0.6); model.run_ref = maxf(2.0, def.speed * 1.3)
 
+## Точка прицеливания (центр тела) — для снарядов героя
+func aim_point() -> Vector3:
+	return global_position + Vector3.UP * body_height() * 0.5
+
+func body_height() -> float:
+	return clampf(radius * 2.6 * model_base_scale.y, 0.8, 6.0) if not def.boss else clampf(radius * 2.6, 2.5, 6.0)
+
 func _model_action(a: String) -> void:
 	if model and model.has_method("play_action"): model.play_action(a)
 
@@ -360,7 +367,10 @@ func _attack() -> void:
 	_model_action("attack" if randf() < 0.7 else "attack2")
 	if def.ranged:
 		var origin := global_position + Vector3.UP * float(def.get("shot_h", 1.3)) + global_basis.z * 0.4
-		var dir := U.flat(target.global_position - global_position).normalized()
+		# в 3D — в центр цели (герой на склоне выше/ниже)
+		var tp: Vector3 = target.global_position + Vector3.UP * 1.0
+		var dir := (tp - origin).normalized()
+		if Vector2(dir.x, dir.z).length() < 0.2: dir = U.flat(tp - origin).normalized()
 		Projectile.fire(zone, origin, dir, float(def.get("proj_speed", 13.0)), def.range + 4, def.get("proj", Color(0.6, 0.9, 1)), 0.25, false, Callable(), _damage())
 	else:
 		var t := target
@@ -501,7 +511,7 @@ func _cast_aoe(t) -> void:
 	zone.fx("burst", c + Vector3.UP * 0.4, r, col, 0.4)
 	zone.fx("ring", c, r, col, 0.3)
 	var p = zone.player
-	if p and not p.dead and U.flat_dist(p.global_position, c) < r: p.take_damage(_damage() * 1.3, c)
+	if p and not p.dead and U.flat_dist(p.global_position, c) < r and U.los(self, c, p.global_position): p.take_damage(_damage() * 1.3, c)
 	for m in zone.minions.duplicate():
 		if is_instance_valid(m) and U.flat_dist(m.global_position, c) < r: m.take_damage(_damage() * 1.3)
 
@@ -525,7 +535,7 @@ func _death_blast(c: Vector3, dmg: float, r := 3.0, delayed := true) -> void:
 	z.fx("burst", c + Vector3.UP * 0.6, r, Color(1, 0.55, 0.2), 0.45)
 	z.shake(0.25)
 	var p = z.player
-	if p and not p.dead and U.flat_dist(p.global_position, c) < r: p.take_damage(dmg, c)
+	if p and not p.dead and U.flat_dist(p.global_position, c) < r and U.los(z.player, c, p.global_position): p.take_damage(dmg, c)
 
 ## Шаман: лечит самого раненого союзника рядом (25% здоровья); true — лечение было
 func _heal_ally() -> bool:

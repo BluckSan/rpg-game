@@ -34,6 +34,29 @@ const LIST := [
 	"survival/tent-canvas", "survival/tent", "survival/campfire-pit", "survival/chest", "survival/barrel", "survival/box-large",
 	"survival/signpost", "survival/workbench", "survival/bedroll", "survival/fence-fortified",
 	"nature/campfire_stones", "nature/tent_detailedOpen", "nature/sign", "nature/fence_simple", "nature/bridge_wood",
+	# v0.5.1: разнообразие растительности по биомам
+	"nature/tree_oak_fall", "nature/tree_default_fall", "nature/tree_simple", "nature/tree_small", "nature/tree_plateau", "nature/tree_tall",
+	"nature/tree_pineTallB_detailed", "nature/tree_pineTallC_detailed", "nature/tree_pineSmallB", "nature/tree_pineSmallC", "nature/tree_pineRoundD",
+	"nature/tree_pineRoundE", "nature/tree_cone_dark", "nature/tree_palmDetailedTall", "nature/tree_palmShort", "nature/tree_thin", "nature/tree_fat_fall",
+	"nature/tree_simple_dark", "nature/tree_small_dark", "nature/tree_plateau_dark", "nature/tree_default_dark", "nature/tree_oak_dark",
+	"nature/plant_bushSmall", "nature/plant_bushTriangle", "nature/plant_bushLargeTriangle", "nature/plant_flatShort",
+	"nature/flower_purpleB", "nature/flower_redB", "nature/flower_yellowB", "nature/flower_purpleC", "nature/flower_yellowC", "nature/grass", "nature/grass_leafs",
+	"nature/rock_smallB", "nature/rock_smallD", "nature/rock_smallE", "nature/rock_smallFlatA", "nature/rock_tallC", "nature/rock_tallE", "nature/rock_largeD", "nature/rock_largeE",
+	"nature/stone_smallA", "nature/stone_smallC", "nature/stone_tallE", "nature/stone_largeB", "nature/stone_largeC",
+	"nature/mushroom_red", "nature/mushroom_tan", "nature/hanging_moss", "nature/lily_small", "nature/log_stack", "nature/log_stackLarge",
+	"nature/stump_roundDetailed", "nature/crop_pumpkin", "nature/crops_wheatStageB", "nature/crops_cornStageD", "nature/fence_planks", "nature/fence_gate",
+	"nature/pot_large", "nature/campfire_logs", "nature/tent_smallOpen", "nature/canoe", "nature/statue_block", "nature/bridge_stone",
+	# v0.5.1: детали точек интереса
+	"survival/barrel-open", "survival/box", "survival/box-open", "survival/bucket", "survival/resource-wood", "survival/resource-stone",
+	"survival/tree-autumn", "survival/tree-tall", "survival/patch-grass-large", "survival/rock-a", "survival/rock-b", "survival/campfire-stand",
+	"survival/tool-axe", "survival/signpost-single", "survival/structure-canvas",
+	"graveyard/candle-multiple", "graveyard/fire-basket", "graveyard/lightpost-single", "graveyard/urn-round", "graveyard/cross-wood", "graveyard/coffin-old",
+	"graveyard/debris-wood", "graveyard/pumpkin", "graveyard/iron-fence-damaged", "graveyard/bench-damaged", "graveyard/grave", "graveyard/crypt-small",
+	"graveyard/hay-bale", "graveyard/hay-bale-bundled", "graveyard/pine-fall-crooked", "graveyard/gravestone-round", "graveyard/column-large",
+	"castle/siege-ballista-demolished", "castle/siege-ram-demolished", "castle/flag-banner-long", "castle/tower-hexagon-base", "castle/stairs-stone",
+	"castle/rocks-small", "castle/wall-corner-half-tower", "castle/tree-large", "castle/tree-small",
+	"town/cart-high", "town/wheel", "town/stall", "town/stall-stool", "town/watermill", "town/fountain-square", "town/pillar-stone", "town/planks",
+	"town/fence-broken", "town/hedge-large", "town/tree-crooked", "town/tree-high-crooked", "town/rock-large", "town/rock-wide",
 ]
 
 func _init() -> void:

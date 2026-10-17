@@ -375,6 +375,9 @@ func normalize(c: Dictionary) -> Dictionary:
 	if c.has("ranks"): c["ranks"] = rk
 	DB.migrate_talents(c)
 	for list_name in ["inventory", "equipped", "stash", "buyback"]:
+		# повреждённые записи (без слота) отбрасываются, а не ломают загрузку
+		if c.has(list_name) and c[list_name] is Array:
+			c[list_name] = (c[list_name] as Array).filter(func(x): return x is Dictionary and x.has("slot") and x.has("rarity") and x.has("ilvl"))
 		for it in c.get(list_name, []):
 			it["slot"] = int(it["slot"]); it["rarity"] = int(it["rarity"]); it["ilvl"] = int(it["ilvl"])
 			if it.has("req"): it["req"] = int(it["req"])

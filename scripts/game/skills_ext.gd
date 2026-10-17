@@ -47,6 +47,7 @@ static func execute(p, s: Dictionary, target) -> bool:
 		"leap":
 			var to: Vector3 = target.global_position if target != null else pos + p.forward() * s.range * 0.7
 			if U.flat_dist(to, pos) > s.range: to = pos + U.flat(to - pos).normalized() * s.range
+			to = p.safe_destination(to)   # не через стены и не под землю
 			var tele := Tele.make(z.fx_root, "disc", to, s.radius, c)
 			p.face_towards(to)
 			p.invuln = 0.5
@@ -58,10 +59,10 @@ static func execute(p, s: Dictionary, target) -> bool:
 				if not is_instance_valid(p) or p.dead: Tele.free_later(tele); return true
 				var k := float(i + 1) / steps
 				var np := from.lerp(to, k)
-				np.y = from.y + sin(k * PI) * 2.5
+				np.y = lerpf(from.y, to.y, k) + sin(k * PI) * 2.5
 				p.global_position = np
 				Tele.set_progress(tele, k)
-			p.teleport(Vector3(to.x, from.y + 0.2, to.z))
+			p.teleport(to)
 			Tele.free_later(tele)
 			z.shake(0.35)
 			CombatFX.burst(z.fx_root, to + Vector3.UP * 0.3, c, 30, 7.0, 0.14, 0.6, Vector3.UP, 80, -10)
@@ -158,12 +159,8 @@ static func execute(p, s: Dictionary, target) -> bool:
 			var dir: Vector3 = p._last_move if p._last_move.length() > 0.1 else p.forward()
 			dir = U.flat(dir).normalized()
 			var to: Vector3 = pos + dir * s.range
-			var space: PhysicsDirectSpaceState3D = p.get_world_3d().direct_space_state
-			var q := PhysicsRayQueryParameters3D.create(pos + Vector3.UP, to + Vector3.UP, 1)
-			var r := space.intersect_ray(q)
-			if not r.is_empty(): to = r.position - dir * 0.8 - Vector3.UP
 			CombatFX.burst(z.fx_root, pos + Vector3.UP, c, 26, 4.0, 0.1, 0.4, Vector3.UP, 180, 0)
-			p.teleport(Vector3(to.x, pos.y + 0.1, to.z))
+			to = p.blink_to(to)   # капсула по пути + пол под точкой (v0.5.1)
 			p.invuln = 0.25
 			CombatFX.burst(z.fx_root, to + Vector3.UP, c, 26, 4.0, 0.1, 0.4, Vector3.UP, 180, 0)
 		"fire_wall":

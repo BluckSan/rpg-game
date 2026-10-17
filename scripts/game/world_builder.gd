@@ -13,22 +13,43 @@ const ACTIVATE_R := 120.0      # спавнеры включаются ближ�
 const DEACTIVATE_R := 165.0
 
 ## Пропсы по биомам: [ключ, штук на чанк, масштаб от, до, тип: 0 — дерево (столкновение), 1 — камень (столкновение), 2 — мелочь (только рядом)]
+## [ключ, штук на чанк, масштаб от, до, тип: 0 — дерево (столкновение), 1 — крупный камень, 2 — мелочь без столкновения]
 const PROPS := {
-	"meadows": [["nature_tree_oak", 5, 4.0, 5.5, 0], ["nature_tree_default", 4, 3.6, 5.0, 0], ["nature_tree_fat", 2, 4.0, 5.0, 0],
-		["nature_plant_bushLarge", 10, 3.0, 4.5, 2], ["nature_flower_redA", 14, 2.4, 3.2, 2], ["nature_flower_yellowA", 14, 2.4, 3.2, 2],
-		["nature_rock_largeA", 2, 2.5, 4.0, 1], ["nature_rock_smallA", 6, 2.5, 4.0, 2], ["nature_grass_large", 26, 3.0, 4.2, 2]],
-	"forest": [["nature_tree_pineTallA_detailed", 12, 4.5, 6.5, 0], ["nature_tree_pineDefaultA", 10, 4.5, 6.0, 0], ["nature_tree_detailed_dark", 7, 4.5, 6.0, 0],
-		["nature_tree_pineRoundC", 6, 4.5, 6.0, 0], ["nature_log_large", 2, 3.0, 4.0, 1], ["nature_stump_old", 4, 3.0, 4.0, 2],
-		["nature_mushroom_redGroup", 10, 3.0, 4.0, 2], ["nature_plant_bushDetailed", 10, 3.0, 4.5, 2], ["nature_rock_tallA", 2, 2.5, 3.5, 1]],
-	"desert": [["nature_cactus_tall", 7, 4.0, 6.0, 0], ["nature_cactus_short", 8, 4.0, 5.5, 2], ["nature_tree_palmTall", 1, 5.0, 6.0, 0],
-		["nature_rock_largeB", 4, 3.0, 5.0, 1], ["nature_rock_tallB", 2, 3.0, 5.0, 1], ["survival_rock-sand-a", 6, 4.0, 7.0, 2], ["nature_stone_tallC", 2, 3.0, 4.5, 1]],
-	"swamp": [["nature_tree_thin_dark", 8, 4.5, 6.0, 0], ["nature_tree_fat_darkh", 5, 4.5, 5.5, 0], ["nature_log", 4, 3.5, 4.5, 2],
-		["nature_mushroom_tanTall", 10, 3.0, 4.5, 2], ["nature_stump_oldTall", 5, 3.0, 4.0, 2], ["nature_plant_flatTall", 16, 3.0, 4.0, 2], ["nature_lily_large", 10, 3.0, 4.5, 2]],
-	"snow": [["nature_tree_pineSmallA", 10, 4.5, 6.5, 0], ["nature_tree_pineRoundA", 8, 4.5, 6.0, 0], ["nature_tree_cone", 5, 4.5, 6.0, 0],
-		["nature_rock_largeC", 4, 3.0, 5.0, 1], ["nature_stone_tallA", 2, 3.0, 4.5, 1], ["nature_stone_largeA", 4, 3.0, 4.5, 2]],
-	"ruins": [["nature_tree_blocks_dark", 3, 4.0, 5.0, 0], ["graveyard_pine-crooked", 4, 4.0, 5.5, 0], ["nature_statue_column", 2, 4.0, 5.0, 1],
-		["nature_statue_columnDamaged", 3, 4.0, 5.0, 1], ["graveyard_gravestone-broken", 6, 3.0, 4.0, 2], ["graveyard_stone-wall-damaged", 2, 4.0, 5.0, 1],
-		["graveyard_rocks-tall", 3, 3.5, 5.0, 1], ["nature_rock_smallC", 6, 2.5, 4.0, 2]],
+	"meadows": [["nature_tree_oak", 4, 4.0, 5.5, 0], ["nature_tree_default", 3, 3.6, 5.0, 0], ["nature_tree_fat", 2, 4.0, 5.0, 0],
+		["nature_tree_simple", 2, 4.0, 5.2, 0], ["nature_tree_small", 2, 4.0, 5.0, 0], ["nature_tree_oak_fall", 1, 4.2, 5.2, 0],
+		["nature_plant_bushLarge", 8, 3.0, 4.5, 2], ["nature_plant_bush", 8, 3.0, 4.2, 2], ["nature_plant_bushSmall", 10, 3.0, 4.0, 2],
+		["nature_flower_redA", 12, 2.4, 3.2, 2], ["nature_flower_yellowA", 12, 2.4, 3.2, 2], ["nature_flower_purpleB", 10, 2.4, 3.2, 2],
+		["nature_flower_yellowC", 8, 2.4, 3.2, 2], ["nature_flower_redB", 8, 2.4, 3.2, 2],
+		["nature_rock_largeA", 2, 2.5, 4.0, 1], ["nature_rock_smallA", 5, 2.5, 4.0, 2], ["nature_rock_smallFlatA", 4, 2.5, 3.5, 2],
+		["nature_grass_large", 30, 3.0, 4.2, 2], ["nature_grass", 26, 3.0, 4.5, 2], ["nature_stump_round", 2, 3.0, 3.8, 2]],
+	"forest": [["nature_tree_pineTallA_detailed", 9, 4.5, 6.5, 0], ["nature_tree_pineDefaultA", 7, 4.5, 6.0, 0], ["nature_tree_detailed_dark", 5, 4.5, 6.0, 0],
+		["nature_tree_pineRoundC", 4, 4.5, 6.0, 0], ["nature_tree_pineTallB_detailed", 5, 4.5, 6.5, 0], ["nature_tree_pineTallC_detailed", 4, 4.5, 6.5, 0],
+		["nature_tree_tall_dark", 3, 4.5, 6.0, 0], ["nature_tree_default_dark", 3, 4.5, 5.5, 0], ["nature_tree_default_fall", 1, 4.5, 5.5, 0],
+		["nature_log_large", 2, 3.0, 4.0, 1], ["nature_stump_old", 4, 3.0, 4.0, 2], ["nature_stump_roundDetailed", 3, 3.0, 4.0, 2],
+		["nature_mushroom_redGroup", 8, 3.0, 4.0, 2], ["nature_mushroom_red", 8, 3.0, 4.0, 2], ["nature_mushroom_tan", 6, 3.0, 4.0, 2],
+		["nature_plant_bushDetailed", 10, 3.0, 4.5, 2], ["nature_plant_bushTriangle", 8, 3.0, 4.5, 2], ["nature_plant_flatShort", 14, 3.0, 4.0, 2],
+		["nature_grass_leafs", 20, 3.0, 4.2, 2], ["nature_grass_leafsLarge", 14, 3.0, 4.2, 2], ["nature_rock_tallA", 2, 2.5, 3.5, 1],
+		["nature_flower_purpleC", 6, 2.4, 3.2, 2]],
+	"desert": [["nature_cactus_tall", 6, 4.0, 6.0, 0], ["nature_cactus_short", 8, 4.0, 5.5, 2], ["nature_tree_palmTall", 1, 5.0, 6.0, 0],
+		["nature_tree_palmDetailedTall", 1, 5.0, 6.0, 0], ["nature_tree_palmShort", 1, 4.5, 5.5, 0], ["nature_tree_plateau", 1, 4.5, 5.5, 0],
+		["nature_rock_largeB", 3, 3.0, 5.0, 1], ["nature_rock_tallB", 2, 3.0, 5.0, 1], ["nature_rock_tallC", 2, 3.0, 4.5, 1], ["nature_rock_largeD", 2, 3.0, 4.5, 1],
+		["survival_rock-sand-a", 5, 4.0, 7.0, 2], ["survival_rock-sand-b", 5, 4.0, 7.0, 2], ["nature_stone_tallC", 2, 3.0, 4.5, 1],
+		["nature_rock_smallD", 8, 2.5, 4.0, 2], ["nature_rock_smallE", 6, 2.5, 4.0, 2], ["nature_plant_bushSmall", 4, 2.6, 3.4, 2], ["nature_grass", 8, 2.6, 3.6, 2]],
+	"swamp": [["nature_tree_thin_dark", 7, 4.5, 6.0, 0], ["nature_tree_fat_darkh", 4, 4.5, 5.5, 0], ["nature_tree_simple_dark", 3, 4.5, 5.5, 0],
+		["nature_tree_small_dark", 3, 4.2, 5.2, 0], ["nature_log", 4, 3.5, 4.5, 2], ["nature_hanging_moss", 6, 3.5, 4.5, 2],
+		["nature_mushroom_tanTall", 8, 3.0, 4.5, 2], ["nature_mushroom_tanGroup", 8, 3.0, 4.5, 2], ["nature_stump_oldTall", 4, 3.0, 4.0, 2],
+		["nature_plant_flatTall", 16, 3.0, 4.0, 2], ["nature_plant_flatShort", 12, 3.0, 4.0, 2], ["nature_lily_large", 10, 3.0, 4.5, 2],
+		["nature_lily_small", 10, 3.0, 4.5, 2], ["nature_grass_leafsLarge", 12, 3.0, 4.2, 2]],
+	"snow": [["nature_tree_pineSmallA", 8, 4.5, 6.5, 0], ["nature_tree_pineRoundA", 6, 4.5, 6.0, 0], ["nature_tree_cone", 4, 4.5, 6.0, 0],
+		["nature_tree_pineSmallB", 4, 4.5, 6.0, 0], ["nature_tree_pineSmallC", 3, 4.5, 6.0, 0], ["nature_tree_pineRoundD", 3, 4.5, 6.0, 0],
+		["nature_tree_cone_dark", 2, 4.5, 6.0, 0], ["nature_rock_largeC", 3, 3.0, 5.0, 1], ["nature_rock_largeE", 2, 3.0, 5.0, 1],
+		["nature_stone_tallA", 2, 3.0, 4.5, 1], ["nature_stone_tallE", 2, 3.0, 4.5, 1], ["nature_stone_largeA", 4, 3.0, 4.5, 2],
+		["nature_stone_largeB", 3, 3.0, 4.5, 2], ["nature_stone_smallA", 8, 2.6, 4.0, 2], ["nature_plant_bushSmall", 4, 2.6, 3.4, 2]],
+	"ruins": [["nature_tree_blocks_dark", 3, 4.0, 5.0, 0], ["graveyard_pine-crooked", 4, 4.0, 5.5, 0], ["graveyard_pine-fall-crooked", 2, 4.0, 5.5, 0],
+		["nature_tree_plateau_dark", 2, 4.0, 5.0, 0], ["nature_statue_column", 2, 4.0, 5.0, 1], ["nature_statue_columnDamaged", 3, 4.0, 5.0, 1],
+		["graveyard_gravestone-broken", 5, 3.0, 4.0, 2], ["graveyard_stone-wall-damaged", 2, 4.0, 5.0, 1], ["nature_statue_block", 2, 3.0, 4.0, 1],
+		["graveyard_rocks-tall", 3, 3.5, 5.0, 1], ["nature_rock_smallC", 6, 2.5, 4.0, 2], ["nature_stone_smallC", 6, 2.5, 4.0, 2],
+		["graveyard_debris-wood", 3, 3.0, 4.0, 2], ["nature_grass_leafs", 12, 3.0, 4.0, 2], ["nature_plant_bushTriangle", 4, 3.0, 4.0, 2]],
 }
 
 var chunks := {}          # Vector2i -> {lod, node, heights, res}
@@ -45,8 +66,14 @@ var current_biome := -1
 var _spawn_check := 0.0
 var _wp_check := 0.0
 var built_count := 0          # для тестов
+var dress: WorldDress           # атмосфера: небо, грейдинг, частицы, зверьки, жители
+var map_features: Array = []    # для подробной карты: {type, pos: Vector2, size: Vector2, yaw, name}
+static var _blade: ArrayMesh
+static var _grass_mat: ShaderMaterial
+static var _water_mat: ShaderMaterial
 var max_build_ms := 0.0
 static var _props := {}       # key -> Mesh
+static var feature_sink = null  # массив: сюда prop() пишет постройки городов/точек — для подробной карты
 static var _prop_mat: StandardMaterial3D
 
 # ---------------- библиотека пропсов ----------------
@@ -60,6 +87,7 @@ static func prop_material() -> StandardMaterial3D:
 	if _prop_mat == null:
 		_prop_mat = StandardMaterial3D.new()
 		_prop_mat.vertex_color_use_as_albedo = true
+		_prop_mat.vertex_color_is_srgb = true   # палитра Kenney — в sRGB (раньше цвета выглядели выцветшими)
 		_prop_mat.roughness = 0.88
 		_prop_mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 		if Game.quality <= 1: _prop_mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_VERTEX
@@ -74,6 +102,10 @@ static func prop(parent: Node, key: String, pos: Vector3, yaw_deg: float, s: flo
 	mi.position = pos
 	mi.rotation_degrees.y = yaw_deg
 	mi.scale = Vector3.ONE * s
+	if feature_sink != null and mi.is_inside_tree():
+		var g := mi.global_position
+		var ab := mi.get_aabb()
+		feature_sink.append({"key": key, "pos": Vector2(g.x, g.z), "size": Vector2(ab.size.x, ab.size.z) * s, "yaw": mi.global_rotation.y})
 	return mi
 
 # ---------------- сборка ----------------
@@ -90,7 +122,9 @@ func build(z) -> void:
 	terrain_mat = ShaderMaterial.new()
 	terrain_mat.shader = load("res://shaders/terrain.gdshader")
 	terrain_mat.set_shader_parameter("layers", load("res://assets/terrain/layers.jpg"))
-	terrain_mat.set_shader_parameter("tex_on", Game.quality >= 2)
+	terrain_mat.set_shader_parameter("normals", load("res://assets/terrain/normals.jpg"))
+	terrain_mat.set_shader_parameter("cloud_noise", WorldDress.cloud_texture())
+	_terrain_tier()
 	var t0: Dictionary = WorldData.TOWNS[0]
 	var tp := Vector3(t0.pos.x, 0, t0.pos.y)
 	spawn_point = tp + Vector3(4, 0, 12)
@@ -99,8 +133,10 @@ func build(z) -> void:
 	portal_point = tp + Vector3(0, 0, 26); portal_point.y = WorldData.height(portal_point.x, portal_point.z)
 	arena_point = Vector3.ZERO
 	dungeon_gate_point = Vector3.ZERO
+	feature_sink = map_features
 	for i in WorldData.TOWNS.size(): _town(i)
 	for p in WorldData.POIS: _poi(p)
+	feature_sink = null
 	_world_spawners()
 	_world_edges()
 	# старт: чанки вокруг игрока — сразу, чтобы он не провалился
@@ -108,15 +144,27 @@ func build(z) -> void:
 	if z.data.get("has_pos", false) and z.data.get("zone", "") == "global":
 		start = Vector3(z.data["pos"][0], z.data["pos"][1], z.data["pos"][2])
 	prepare(start)
+	dress = WorldDress.new(); dress.name = "Dress"
+	add_child(dress)
+	dress.setup(z, self)
 	add_to_group("graphics_listeners")
 	apply_graphics()
 
 func apply_graphics() -> void:
 	super.apply_graphics()
-	if terrain_mat: terrain_mat.set_shader_parameter("tex_on", Game.quality >= 2)
+	if terrain_mat: _terrain_tier()
+	if dress: dress.apply_graphics()
 	_focus_chunk = Vector2i(99999, 99999)   # пересчитать кольца под новую дальность
 
 func is_dungeon_env() -> bool: return false
+
+## Уровни ландшафта: Низкое — цвет вершин; Среднее — текстуры + тени облаков; Высокое — + нормали; Очень/Ультра — + второй масштаб
+func _terrain_tier() -> void:
+	var q := Game.quality
+	terrain_mat.set_shader_parameter("tex_on", q >= 1)
+	terrain_mat.set_shader_parameter("normals_on", q >= 2)
+	terrain_mat.set_shader_parameter("anti_tile", q >= 3)
+	terrain_mat.set_shader_parameter("clouds_on", q >= 1)
 
 ## Высота земли (для врагов, лута): по сетке загруженного чанка — совпадает со столкновением; иначе — формула
 func height_at(p: Vector3) -> float:
@@ -295,7 +343,23 @@ static func gen_chunk(k: Vector2i, lod: int, quality: int) -> Dictionary:
 			idx[t + 3] = a + 1; idx[t + 4] = a + w + 1; idx[t + 5] = a + w
 			t += 6
 	var out := {"res": res, "heights": hs, "verts": verts, "norms": norms, "cols": cols, "c0": c0, "c1": c1, "idx": idx,
-		"water": swamp > 0.45, "props": {}, "solid": []}
+		"water": swamp > 0.45, "props": {}, "solid": [], "fires": [], "grass": []}
+	# малые точки интереса (лагеря, повозки, святилища…): пропсы, чей центр — в этом чанке
+	var minors := WorldData.minor_near(rect)
+	for m in minors:
+		var mb := Basis(Vector3.UP, deg_to_rad(m.yaw))
+		for it in WorldData.minor_layout(m):
+			var off: Vector2 = it[1]
+			var o3 := mb * Vector3(off.x, 0, off.y)
+			var wx: float = m.pos.x + o3.x; var wz: float = m.pos.y + o3.z
+			if not rect.has_point(Vector2(wx, wz)): continue
+			var lx := wx - ox; var lz := wz - oz
+			var y := WorldData.height(wx, wz, segs, pois)
+			var b := Basis(Vector3.UP, deg_to_rad(m.yaw + float(it[2]))).scaled(Vector3.ONE * float(it[3]))
+			if not out.props.has(it[0]): out.props[it[0]] = []
+			out.props[it[0]].append(Transform3D(b, Vector3(lx, y - 0.03, lz)))
+			if it[4] and lod == 0: out.solid.append([Vector3(lx, y, lz), 0.32 * float(it[3]), 1])
+			if it[5]: out.fires.append(Vector3(lx, y, lz))
 	# пропсы: зерно — от координат чанка (детерминированно)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(k) ^ 0x5eed
@@ -310,7 +374,10 @@ static func gen_chunk(k: Vector2i, lod: int, quality: int) -> Dictionary:
 			if kind == 2 and lod != 0: continue
 			var count: int = row[1]
 			if kind == 2 and quality <= 0: count = count / 3
-			elif kind == 2 and quality == 1: count = count * 2 / 3
+			elif kind == 2 and quality == 1: count = count * 11 / 10
+			elif kind == 2 and quality == 2: count = count * 9 / 5
+			elif kind == 2 and quality >= 3: count = count * 12 / 5
+			elif kind == 0 and quality >= 2: count = count * 13 / 10
 			for i in count:
 				var lx := rng.randf() * cs; var lz := rng.randf() * cs
 				var x := ox + lx; var z := oz + lz
@@ -323,6 +390,9 @@ static func gen_chunk(k: Vector2i, lod: int, quality: int) -> Dictionary:
 				var pd := INF
 				for p in pois: pd = minf(pd, Vector2(x, z).distance_to(p.pos))
 				if pd < (22.0 if kind != 2 else 12.0): continue
+				var md := INF
+				for m in minors: md = minf(md, Vector2(x, z).distance_to(m.pos))
+				if md < (13.0 if kind != 2 else 9.0): continue
 				if row[0] == "nature_lily_large" and hs[iz2 * w + ix2] > -0.2: continue
 				var y := hs[iz2 * w + ix2]
 				var s := rng.randf_range(row[2], row[3])
@@ -330,7 +400,32 @@ static func gen_chunk(k: Vector2i, lod: int, quality: int) -> Dictionary:
 				if not out.props.has(row[0]): out.props[row[0]] = []
 				out.props[row[0]].append(Transform3D(b, Vector3(lx, y - 0.05, lz)))
 				if kind != 2 and lod == 0: out.solid.append([Vector3(lx, y, lz), (0.45 if kind == 0 else 1.1) * s / 4.0, kind])
+	# трава-травинки (ветер) — только ближние чанки, Высокое+: плотность по весу слоя травы
+	var gcount := 0
+	if lod == 0: gcount = [0, 0, 3200, 5000, 7000][clampi(quality, 0, 4)]
+	if gcount > 0:
+		var gr := RandomNumberGenerator.new(); gr.seed = hash(k) ^ 0x6a55
+		for i in gcount:
+			var lx := gr.randf() * cs; var lz := gr.randf() * cs
+			var ix2 := clampi(int(round(lx / cell)), 0, res); var iz2 := clampi(int(round(lz / cell)), 0, res)
+			var vi := iz2 * w + ix2
+			var gw: float = c0[vi * 4] + c0[vi * 4 + 1] * 0.35   # трава + лесная подстилка
+			if gw < 0.35 or gr.randf() > gw: continue
+			if norms[vi].y < 0.85: continue
+			var x := ox + lx; var z := oz + lz
+			if WorldData.road_dist(x, z, segs) < 3.0: continue
+			var y := _interp_h(hs, w, cell, lx, lz)
+			out.grass.append(Vector4(lx, y, lz, gr.randf()))
 	return out
+
+static func _interp_h(hs: PackedFloat32Array, w: int, cell: float, lx: float, lz: float) -> float:
+	var fx := lx / cell; var fz := lz / cell
+	var ix := clampi(int(fx), 0, w - 2); var iz := clampi(int(fz), 0, w - 2)
+	var tx := fx - ix; var tz := fz - iz
+	var h00 := hs[iz * w + ix]; var h10 := hs[iz * w + ix + 1]; var h01 := hs[(iz + 1) * w + ix]; var h11 := hs[(iz + 1) * w + ix + 1]
+	# та же триангуляция, что у сетки: (a, a+1, a+w) и (a+1, a+w+1, a+w)
+	if tx + tz <= 1.0: return h00 + (h10 - h00) * tx + (h01 - h00) * tz
+	return h11 + (h01 - h11) * (1.0 - tx) + (h10 - h11) * (1.0 - tz)
 
 static func _neighbor_biomes(bw: Array, w: int) -> Array:
 	var out := []
@@ -393,20 +488,107 @@ func _apply(k: Vector2i, lod: int, d: Dictionary) -> void:
 		mmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
 		if not small: mmi.add_to_group("view_range")
 		root.add_child(mmi)
+	if not d.grass.is_empty():
+		var g: Array = d.grass
+		var mm := MultiMesh.new(); mm.transform_format = MultiMesh.TRANSFORM_3D; mm.use_colors = true
+		mm.mesh = blade_mesh(); mm.instance_count = g.size()
+		for i in g.size():
+			var v: Vector4 = g[i]
+			var sc := 0.75 + v.w * 0.5
+			mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, v.w * 37.0).scaled(Vector3(sc, sc * (0.8 + v.w * 0.6), sc)), Vector3(v.x, v.y - 0.02, v.z)))
+			mm.set_instance_color(i, Color(v.w, 0, 0))
+		var gi := MultiMeshInstance3D.new(); gi.name = "Grass"; gi.multimesh = mm
+		gi.material_override = grass_material(WorldData.biome_at(root.position.x + 32, root.position.z + 32))
+		gi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		gi.visibility_range_end = 42.0; gi.visibility_range_end_margin = 8.0
+		gi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF if Game.quality >= 3 else GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
+		root.add_child(gi)
+	for f in d.fires:
+		if lod == 0: _campfire(root, f)
 	if d.water:
 		var wm := MeshInstance3D.new(); wm.name = "Water"
 		var pm := PlaneMesh.new(); pm.size = Vector2(WorldData.CHUNK, WorldData.CHUNK)
+		pm.subdivide_width = 0; pm.subdivide_depth = 0
 		wm.mesh = pm
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = Color(0.22, 0.28, 0.18, 0.72)
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.roughness = 0.15; mat.metallic_specular = 0.6
+		# мелководье/берег: карта глубины чанка (33×33) → пена у кромки на всех уровнях без копии буфера глубины
+		var img := Image.create(d.res + 1, d.res + 1, false, Image.FORMAT_RF)
+		for iz in d.res + 1:
+			for ix in d.res + 1:
+				img.set_pixel(ix, iz, Color(clampf(-0.25 - d.heights[iz * (d.res + 1) + ix], -1.0, 3.0), 0, 0))
+		var mat := water_material().duplicate() as ShaderMaterial
+		mat.set_shader_parameter("depth_map", ImageTexture.create_from_image(img))
 		wm.material_override = mat
 		wm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		wm.position = Vector3(WorldData.CHUNK / 2, -0.25, WorldData.CHUNK / 2)
 		root.add_child(wm)
 	chunks[k] = {"lod": lod, "node": root, "heights": d.heights, "res": d.res, "solid": d.solid}
 	built_count += 1
+
+static func blade_mesh() -> ArrayMesh:
+	# пучок: 9 травинок разной высоты/наклона в круге 0.35 м (одна копия MultiMesh = пучок)
+	if _blade == null:
+		var st := SurfaceTool.new(); st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var r := RandomNumberGenerator.new(); r.seed = 99
+		for k in 9:
+			var b := Basis(Vector3.UP, r.randf() * TAU)
+			var off := Vector3(r.randf_range(-0.3, 0.3), 0, r.randf_range(-0.3, 0.3))
+			var w := r.randf_range(0.025, 0.04); var h := r.randf_range(0.22, 0.42)
+			var lean := Vector3(r.randf_range(-0.08, 0.08), 0, r.randf_range(-0.08, 0.08))
+			var p0 := off + b * Vector3(-w, 0, 0); var p1 := off + b * Vector3(w, 0, 0); var p2 := off + lean + b * Vector3(0.0, h, 0.02)
+			var nrm := Vector3(0, 1, 0).lerp(b * Vector3(0, 0, 1), 0.4).normalized()
+			for v in [[p0, 0.0], [p1, 0.0], [p2, 1.0]]:
+				st.set_normal(nrm); st.set_uv(Vector2(0.5, v[1])); st.add_vertex(v[0])
+		_blade = st.commit()
+	return _blade
+
+## Трава по биомам (цвет основания/кончиков) — один шейдер, материалы кэшируются
+static var _grass_mats := {}
+static func grass_material(b: int) -> ShaderMaterial:
+	var id: String = WorldData.BIOMES[b].id
+	if not _grass_mats.has(id):
+		var gm := ShaderMaterial.new(); gm.shader = load("res://assets/shaders/grass.gdshader")
+		var cols := {"meadows": [Color(0.16, 0.30, 0.10), Color(0.55, 0.70, 0.28)], "forest": [Color(0.10, 0.22, 0.08), Color(0.35, 0.50, 0.20)],
+			"desert": [Color(0.42, 0.36, 0.18), Color(0.78, 0.70, 0.42)], "swamp": [Color(0.16, 0.20, 0.08), Color(0.45, 0.48, 0.20)],
+			"snow": [Color(0.30, 0.36, 0.30), Color(0.70, 0.75, 0.70)], "ruins": [Color(0.16, 0.18, 0.14), Color(0.42, 0.45, 0.32)]}
+		var c: Array = cols.get(id, cols.meadows)
+		gm.set_shader_parameter("base_col", c[0]); gm.set_shader_parameter("tip_col", c[1])
+		_grass_mats[id] = gm
+	return _grass_mats[id]
+
+static func water_material() -> ShaderMaterial:
+	if _water_mat == null:
+		_water_mat = ShaderMaterial.new(); _water_mat.shader = load("res://shaders/water_world.gdshader")
+		var wn := NoiseTexture2D.new(); wn.width = 256; wn.height = 256; wn.seamless = true; wn.as_normal_map = true; wn.bump_strength = 5.0
+		var wf := FastNoiseLite.new(); wf.frequency = 0.03; wn.noise = wf
+		var fn := NoiseTexture2D.new(); fn.width = 256; fn.height = 256; fn.seamless = true
+		var ff := FastNoiseLite.new(); ff.frequency = 0.05; ff.fractal_octaves = 3; ff.seed = 4; fn.noise = ff
+		_water_mat.set_shader_parameter("wave", wn); _water_mat.set_shader_parameter("foam_noise", fn)
+	return _water_mat
+
+## Костёр малой точки: огонь-частицы, на Высоком+ — мерцающий свет
+func _campfire(root: Node3D, p: Vector3) -> void:
+	var gp := GPUParticles3D.new()
+	gp.amount = maxi(6, int(18 * Game.particle_mul)); gp.lifetime = 0.9
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE; pm.emission_sphere_radius = 0.35
+	pm.direction = Vector3.UP; pm.spread = 12; pm.initial_velocity_min = 0.8; pm.initial_velocity_max = 1.6
+	pm.gravity = Vector3(0, 0.6, 0); pm.scale_min = 0.6; pm.scale_max = 1.2
+	var grad := Gradient.new(); grad.set_color(0, Color(1, 0.75, 0.3, 1)); grad.set_color(1, Color(0.9, 0.2, 0.05, 0))
+	var gt := GradientTexture1D.new(); gt.gradient = grad; pm.color_ramp = gt
+	var sc := Curve.new(); sc.add_point(Vector2(0, 1)); sc.add_point(Vector2(1, 0.2))
+	var st := CurveTexture.new(); st.curve = sc; pm.scale_curve = st
+	gp.process_material = pm
+	var q := QuadMesh.new(); q.size = Vector2(0.45, 0.45)
+	q.material = WorldDress.soft_particle_material(true)
+	gp.draw_pass_1 = q
+	gp.visibility_range_end = 70.0
+	root.add_child(gp); gp.position = p + Vector3.UP * 0.2
+	if Game.quality >= 2:
+		var l := OmniLight3D.new()
+		l.light_color = Color(1, 0.6, 0.3); l.light_energy = 1.6; l.omni_range = 7.0
+		l.shadow_enabled = false; l.distance_fade_enabled = true; l.distance_fade_begin = 35.0; l.distance_fade_length = 10.0
+		l.set_script(load("res://scripts/game/flicker.gd"))
+		root.add_child(l); l.position = p + Vector3.UP * 1.0
 
 static func _is_small(key: String) -> bool:
 	for b in PROPS:

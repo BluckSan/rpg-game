@@ -70,6 +70,11 @@ var jumps := 0
 ## Для тестов: принудительное направление движения в мировых координатах
 var force_move := Vector3.ZERO
 var god_mode := false
+## Безопасные перемещения (v0.5.1): последняя точка на земле и счётчик спасений из-под карты
+var last_safe := Vector3.INF
+var _safe_t := 0.0
+var rescues := 0
+var _cap_shape: CapsuleShape3D
 
 func setup(d: Dictionary) -> void:
 	data = d
@@ -78,6 +83,7 @@ func setup(d: Dictionary) -> void:
 	collision_mask = 1
 	var cs := CollisionShape3D.new()
 	var cap := CapsuleShape3D.new(); cap.radius = 0.4; cap.height = 1.9
+	_cap_shape = cap
 	cs.shape = cap; cs.position = Vector3(0, 0.95, 0)
 	add_child(cs)
 	floor_snap_length = 0.4
@@ -182,7 +188,7 @@ func _physics_process(delta: float) -> void:
 	if now_floor and not _was_on_floor and velocity.y <= 0.1: visual.play_action("land")
 	_was_on_floor = now_floor
 	visual.in_air = not now_floor and (velocity.y > 1.0 or _coyote < -0.15)
-	if global_position.y < -10: teleport(zone().spawn_point)
+	_safety(delta)
 	if attack_held: try_use(0)
 
 ## Нажатие прыжка (кнопка HUD / клавиатура). Сработает в течение буфера, если персонаж на земле или только что сошёл с края.
@@ -215,6 +221,74 @@ func is_rolling() -> bool:
 func teleport(p: Vector3) -> void:
 	global_position = p
 	velocity = Vector3.ZERO
+
+# ---------------- безопасные рывки/телепорты ----------------
+## Точка назначения рывка: капсула «прощупывает» путь по стенам/статике (слой 1) и останавливается
+## перед первым препятствием; затем луч вниз ищет пол. Без пола путь укорачивается; не нашли — остаёмся.
+func safe_destination(to: Vector3, margin := 0.35) -> Vector3:
+	var from := global_position
+	var flat := Vector3(to.x - from.x, 0, to.z - from.z)
+	if flat.length() < 0.05: return from
+	var space := get_world_3d().direct_space_state
+	var q := PhysicsShapeQueryParameters3D.new()
+	q.shape = _cap_shape if _cap_shape else CapsuleShape3D.new()
+	q.collision_mask = 1
+	q.exclude = [get_rid()]
+	# капсула приподнята на 0.6 м: невысокие ступени и склоны не останавливают, стены — да
+	q.transform = Transform3D(Basis.IDENTITY, from + Vector3.UP * (0.95 + 0.6))
+	q.motion = flat
+	var res := space.cast_motion(q)
+	var safe_k: float = res[0] if res.size() > 0 else 1.0
+	var dist := flat.length() * safe_k
+	if safe_k < 1.0: dist = maxf(0.0, dist - margin)
+	var dir := flat.normalized()
+	# пол под точкой назначения; если его нет (обрыв в пустоту, край мира) — отступаем назад
+	var tries := 0
+	while dist > 0.05 and tries < 8:
+		var cand := from + dir * dist
+		var fy = floor_at(cand, maxf(from.y, cand.y) + 2.5)
+		if fy != null:
+			return Vector3(cand.x, float(fy) + 0.05, cand.z)
+		dist *= 0.6
+		tries += 1
+	return from
+
+## Высота пола под точкой (луч вниз по физике), не ниже рельефа мира; null — пола нет
+func floor_at(p: Vector3, top: float) -> Variant:
+	var space := get_world_3d().direct_space_state
+	var rq := PhysicsRayQueryParameters3D.create(Vector3(p.x, top, p.z), Vector3(p.x, top - 60.0, p.z), 1)
+	rq.exclude = [get_rid()]
+	var hit := space.intersect_ray(rq)
+	var z = zone()
+	var is_world: bool = z != null and z.get("builder") is WorldBuilder
+	if hit.is_empty():
+		if is_world: return z.ground_y(p)   # чанк ещё строится — высота рельефа по формуле
+		return null
+	var y: float = hit.position.y
+	if is_world: y = maxf(y, z.ground_y(p) - 0.05)
+	return y
+
+## Рывок/телепорт без прохождения сквозь стены и под карту
+func blink_to(to: Vector3) -> Vector3:
+	var d := safe_destination(to)
+	teleport(d)
+	return d
+
+## Страховка: запоминаем последнюю точку на земле; под картой/за краем — возвращаем туда
+func _safety(delta: float) -> void:
+	var z = zone()
+	if z == null: return
+	var gy: float = z.ground_y(global_position)
+	_safe_t -= delta
+	if is_on_floor() and _safe_t <= 0 and global_position.y > gy - 0.4:
+		_safe_t = 0.25
+		last_safe = global_position
+	var is_world: bool = z.get("builder") is WorldBuilder
+	var under := global_position.y < gy - (1.5 if is_world else 3.5)
+	if under or global_position.y < -10.0:
+		rescues += 1
+		var back: Vector3 = last_safe if last_safe != Vector3.INF else z.spawn_point
+		teleport(back + Vector3.UP * 0.1)
 
 func face_towards(p: Vector3) -> void:
 	var d := p - global_position
@@ -400,6 +474,7 @@ func find_target(rng: float):
 		var dist := d.length()
 		if dist > rng: continue
 		var score := dist * (1.5 - f.dot(d.normalized()) * 0.5)
+		if not U.los(self, global_position, e.global_position, 1.2): score *= 3.0   # за стеной — в последнюю очередь
 		if score < best_score:
 			best_score = score; best = e
 	return best
@@ -440,14 +515,24 @@ func hit_area(center: Vector3, radius: float, mult: float, spell: bool, extra :=
 	for e in zone().enemies.duplicate():
 		if not is_instance_valid(e) or not e.alive: continue
 		if U.flat_dist(e.global_position, center) <= radius + e.radius:
+			if not U.los(self, center, e.global_position): continue   # за стеной — не задевает
 			hit(e, mult, spell, false, fbl.duplicate())
 			fbl["stop"] = 0.0; fbl["shake"] = 0.0
 			if extra.is_valid() and is_instance_valid(e) and e.alive: extra.call(e)
 
+## Направление выстрела: в 3D в «центр масс» цели (цель выше/ниже — снаряд наклоняется);
+## без цели — вперёд по горизонтали (в мире снаряд следует рельефу).
 func _dir_to(origin: Vector3, t) -> Vector3:
 	if t == null: return forward()
-	var d: Vector3 = t.global_position + Vector3.UP * 0.8 - origin
-	d.y = 0
+	var aim: Vector3
+	if t is Vector3: aim = t + Vector3.UP * 0.9
+	elif t.has_method("aim_point"): aim = t.aim_point()
+	else: aim = t.global_position + Vector3.UP * 0.9
+	var d: Vector3 = aim - origin
+	if Vector2(d.x, d.z).length() < 0.3: d = forward() * 0.5 + Vector3(0, d.y, 0)
+	# не круче ±55° (чтобы не стрелять «в небо» вплотную)
+	var fl := Vector2(d.x, d.z).length()
+	d.y = clampf(d.y, -fl * 1.43, fl * 1.43)
 	return d.normalized()
 
 var cur_elem := "phys"   # стихия текущего умения (Combat.SKILL_ELEM)
@@ -524,7 +609,7 @@ func _execute(s: Dictionary) -> void:
 			var behind: Vector3 = target.global_position - target.global_basis.z * 1.3
 			behind.y = global_position.y
 			z.fx("burst", global_position + Vector3.UP, 1.5, s.color, 0.3)
-			teleport(behind)
+			behind = blink_to(behind)
 			face_towards(target.global_position)
 			hit(target, s.mult, false, true)
 			z.fx("burst", behind + Vector3.UP, 1.5, s.color, 0.3)

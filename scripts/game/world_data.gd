@@ -265,3 +265,124 @@ static func layer_weights(x: float, z: float, slope: float, w: PackedFloat32Arra
 		out[L.ROAD] += road
 	out[7] = bright
 	return out
+
+# ---------- малые точки интереса (v0.5.1): каждые ~100–150 м ----------
+## Лагеря, повозки, святилища, фермы, руины, могилы, сторожевые башни — детерминированно по сетке 125 м.
+const MINOR_STEP := 125.0
+const MINOR_KINDS := {
+	"meadows": ["farm", "camp", "cart", "shrine", "woodpile", "ruin"],
+	"forest": ["camp", "woodpile", "shrine", "shrooms", "ruin", "hunters"],
+	"desert": ["cart", "ruin", "bones", "camp", "obelisk"],
+	"swamp": ["ruin", "graves", "shrine", "boat", "shrooms"],
+	"snow": ["camp", "tower", "cart", "shrine"],
+	"ruins": ["ruin", "graves", "obelisk", "tower", "siege"],
+}
+const MINOR_NAMES := {
+	"farm": "Заброшенная ферма", "camp": "Стоянка путников", "cart": "Разбитая повозка", "shrine": "Придорожное святилище",
+	"woodpile": "Делянка лесоруба", "ruin": "Древние развалины", "shrooms": "Грибной круг", "hunters": "Охотничий лагерь",
+	"bones": "Кости великана", "obelisk": "Одинокий обелиск", "graves": "Забытые могилы", "boat": "Старая пристань",
+	"tower": "Сторожевая башня", "siege": "Брошенные осадные машины",
+}
+static var _minor: Array = []
+
+static func minor_pois() -> Array:
+	if not _minor.is_empty(): return _minor
+	init()
+	var rng := RandomNumberGenerator.new()
+	var n := int(EDGE / MINOR_STEP)
+	for gz in range(-n, n + 1):
+		for gx in range(-n, n + 1):
+			rng.seed = hash(Vector2i(gx, gz)) ^ 0x31337
+			var p := Vector2(gx * MINOR_STEP + rng.randf_range(-38, 38), gz * MINOR_STEP + rng.randf_range(-38, 38))
+			if maxf(absf(p.x), absf(p.y)) > EDGE - 40: continue
+			if town_dist(p.x, p.y) < TOWN_R + 45 or poi_dist(p.x, p.y) < 60: continue
+			var rd := road_dist(p.x, p.y)
+			if rd < 9.0: p += (p - Vector2(gx * MINOR_STEP, gz * MINOR_STEP)).normalized() * 12.0
+			if road_dist(p.x, p.y) < 8.0: continue
+			var b := biome_at(p.x, p.y)
+			var kinds: Array = MINOR_KINDS[BIOMES[b].id]
+			var k: String = kinds[rng.randi() % kinds.size()]
+			_minor.append({"id": "m%d_%d" % [gx, gz], "kind": k, "name": MINOR_NAMES[k], "pos": p, "biome": b,
+				"yaw": rng.randf() * 360.0, "seed": rng.randi()})
+	return _minor
+
+static func minor_near(r: Rect2) -> Array:
+	var g := r.grow(20.0)
+	var out := []
+	for m in minor_pois(): if g.has_point(m.pos): out.append(m)
+	return out
+
+## Раскладка малой точки: [ключ пропа, смещение XZ, поворот°, масштаб, твёрдый, огонь]
+static func minor_layout(m: Dictionary) -> Array:
+	var rng := RandomNumberGenerator.new(); rng.seed = int(m.seed)
+	var L := []
+	var ring := func(key: String, n: int, r: float, s: float, solid := true, a0 := 0.0):
+		for i in n:
+			var a := a0 + TAU * i / n
+			L.append([key, Vector2(cos(a), sin(a)) * r, rad_to_deg(-a) + 90.0 + rng.randf_range(-8, 8), s, solid, false])
+	var put := func(key: String, x: float, z: float, yaw: float, s: float, solid := true, fire := false):
+		L.append([key, Vector2(x, z), yaw, s, solid, fire])
+	match String(m.kind):
+		"camp", "hunters":
+			put.call("survival_campfire-pit", 0, 0, 0, 4.0, false, true)
+			put.call("survival_tent-canvas" if m.kind == "camp" else "nature_tent_smallOpen", 4.5, -2.5, 200, 5.5)
+			put.call("nature_tent_detailedOpen", -4.0, -3.0, 150, 5.0)
+			put.call("survival_bedroll", 2.0, 2.5, 30, 3.0, false)
+			put.call("survival_box", -3.0, 3.0, 20, 3.0); put.call("survival_barrel", -3.8, 2.2, 0, 3.0)
+			put.call("nature_log", 0, 3.2, 90, 3.2, false)
+			if m.kind == "hunters": put.call("survival_workbench", 5, 3, -40, 3.2); put.call("survival_resource-wood", 6, 1, 10, 3.0)
+			else: put.call("survival_signpost-single", 7, 0, 90, 3.5)
+		"cart":
+			put.call("town_cart-high", 0, 0, rng.randf() * 360, 3.2)
+			put.call("town_wheel", 2.4, 1.2, 80, 3.0, false)
+			put.call("survival_box-open", -2.2, 1.6, 30, 3.0); put.call("survival_barrel-open", -1.8, -1.8, 0, 3.0)
+			put.call("survival_box", 2.0, -2.2, 60, 2.8); put.call("graveyard_debris-wood", 0.5, 2.6, 15, 3.0, false)
+		"farm":
+			for i in 6: put.call("nature_fence_planks", -7.5 + i * 3.0, -6.0, 0, 3.0)
+			for i in 4: put.call("nature_fence_planks", -9.0, -4.5 + i * 3.0, 90, 3.0)
+			for ix in 4:
+				for iz in 3: put.call("nature_crops_wheatStageB" if (ix + iz) % 3 else "nature_crops_cornStageD", -5.5 + ix * 3.0, -3 + iz * 3.0, 0, 3.0, false)
+			put.call("graveyard_hay-bale", 5, 5, 20, 3.2); put.call("graveyard_hay-bale-bundled", 7, 3.5, 70, 3.0)
+			put.call("nature_crop_pumpkin", 3, 6, 0, 3.0, false); put.call("survival_bucket", 1.5, 5.5, 0, 3.0, false)
+		"shrine":
+			put.call("nature_statue_obelisk" if rng.randf() < 0.5 else "nature_statue_head", 0, 0, 180, 4.2)
+			ring.call("graveyard_candle-multiple", 4, 2.2, 3.0, false, 0.4)
+			put.call("graveyard_altar-stone", 0, 2.4, 0, 3.0)
+			ring.call("nature_flower_purpleB", 6, 3.6, 2.6, false)
+		"woodpile":
+			put.call("nature_log_stackLarge", 0, 0, 20, 3.4); put.call("nature_log_stack", 3.5, 1.5, 70, 3.2)
+			for i in 4: put.call("nature_stump_roundDetailed", -4 + i * 2.6, -3.5 + (i % 2) * 1.6, i * 40, 3.4, false)
+			put.call("survival_tool-axe", 1.2, -1.8, 30, 3.0, false); put.call("survival_resource-wood", -2.5, 2.4, 0, 3.0)
+		"ruin":
+			for i in 5:
+				var a := TAU * i / 5.0
+				put.call("graveyard_stone-wall-damaged" if i % 2 else "nature_statue_columnDamaged", cos(a) * 6.5, sin(a) * 6.5, rad_to_deg(-a) + 90, 4.4)
+			put.call("graveyard_pillar-large", 0, 0, 0, 3.6); put.call("castle_rocks-small", 2.5, 2.0, 40, 3.5, false)
+			put.call("graveyard_debris-wood", -2.4, 1.5, 0, 3.0, false); put.call("nature_rock_smallFlatA", 1.5, -3.0, 0, 3.0, false)
+		"shrooms":
+			ring.call("nature_mushroom_redTall" if m.biome != 3 else "nature_mushroom_tanTall", 9, 4.5, 3.6, false)
+			put.call("nature_mushroom_redGroup", 0, 0, 0, 4.5, false); put.call("nature_stump_oldTall", 1.5, 1.0, 0, 3.6)
+		"bones":
+			for i in 7: put.call("graveyard_rocks-tall" if i % 2 else "nature_rock_tallE", -9 + i * 3.0, sin(i * 0.9) * 2.5, i * 30, 3.0 + (3 - absi(i - 3)) * 0.4)
+			put.call("graveyard_urn-round", 3, 4, 0, 3.0, false); put.call("graveyard_coffin-old", -2, 4.5, 20, 3.0, false)
+		"obelisk":
+			put.call("nature_statue_obelisk", 0, 0, 0, 6.5)
+			ring.call("nature_stone_smallC", 6, 3.5, 3.0, false)
+			put.call("graveyard_fire-basket", 2.5, 2.5, 0, 3.0, true, true)
+		"graves":
+			for i in 8: put.call(["graveyard_gravestone-cross", "graveyard_gravestone-round", "graveyard_grave", "graveyard_gravestone-broken"][i % 4], -6 + (i % 4) * 4.0, -2 + (i / 4) * 4.5, rng.randf_range(-15, 15), 3.2, false)
+			put.call("graveyard_lightpost-single", 7, 0, 0, 3.4); put.call("graveyard_iron-fence-damaged", 0, -5.5, 0, 3.4)
+			put.call("graveyard_pine-fall-crooked", -9, 4, 0, 4.0); put.call("graveyard_crypt-small", 0, 7, 180, 3.4)
+		"boat":
+			for i in 4: put.call("town_planks", 0, i * 2.2, 0, 3.0, false)
+			put.call("nature_canoe", 2.4, 6, 20, 3.4, false); put.call("survival_barrel", -1.8, 1.0, 0, 3.0)
+			put.call("nature_lily_small", 3, 3, 0, 3.0, false); put.call("survival_campfire-stand", -3, -1.5, 0, 3.0, false, true)
+		"tower":
+			put.call("castle_tower-hexagon-base", 0, 0, 0, 3.4); put.call("castle_flag-banner-long", 3.5, 0, 0, 3.4)
+			put.call("survival_box-large", -3.2, 2.0, 15, 3.0); put.call("graveyard_fire-basket", 2.5, 3.0, 0, 3.0, true, true)
+			put.call("castle_stairs-stone", -3.0, -2.5, 90, 3.0)
+		"siege":
+			put.call("castle_siege-ballista-demolished", 0, 0, rng.randf() * 360, 3.6)
+			put.call("castle_siege-ram-demolished", 6, 3, rng.randf() * 360, 3.6)
+			put.call("castle_rocks-small", -4, 3, 0, 3.4, false); put.call("graveyard_debris-wood", 3, -3, 40, 3.2, false)
+	return L

@@ -184,6 +184,7 @@ func _ready() -> void:
 	z.hud._open("map"); await frames(3)
 	check(z.hud.window != null and z.hud.window.name == "Window_map", "окно карты мира открыто")
 	var mw = z.hud.window
+	await _map_checks(mw, z)
 	check(mw.has_method("travel") and mw.travel("cross"), "быстрое перемещение из окна карты")
 	await frames(3)
 	check(z.hud.window == null, "после перемещения карта закрыта")
@@ -197,3 +198,66 @@ func _ready() -> void:
 	check(saved["zone"] == "global" and saved.get("has_pos", false), "позиция в мире сохранена")
 	print("=== RESULT: %s (%d errors) ===" % ["PASS" if errors == 0 else "FAIL", errors])
 	get_tree().quit(0 if errors == 0 else 1)
+
+## v0.5.1: масштаб/сдвиг/к герою, значки по категориям, легенда, переключатели, подсказки
+func _map_checks(mw, z) -> void:
+	var mr: Control = mw.map_rect
+	await frames(2)
+	var cats := {}
+	for mk in mw.collect_markers(): cats[mk.cat] = int(cats.get(mk.cat, 0)) + 1
+	for k in ["town", "waypoint", "boss", "dungeon", "portal", "poi", "minor", "merchant", "stash", "resource", "quest"]:
+		check(cats.get(k, 0) > 0, "карта: есть значки «%s» (%d)" % [mw.CATS[k][0], cats.get(k, 0)])
+	check(mw.legend.get_child_count() >= mw.CATS.size(), "легенда: %d категорий" % mw.legend.get_child_count())
+	check(mw.markers.size() > 0 and mw.markers.any(func(m): return m.cat == "player"), "на карте нарисованы значки и герой (%d)" % mw.markers.size())
+	var z0: float = mw.zoom
+	mw.find_child("ZoomIn", true, false).pressed.emit(); await frames(2)
+	check(mw.zoom > z0, "кнопка «+» приближает (%.2f→%.2f)" % [z0, mw.zoom])
+	mw.find_child("ZoomOut", true, false).pressed.emit(); await frames(2)
+	check(absf(mw.zoom - z0) < 0.01, "кнопка «−» отдаляет")
+	var wheel := InputEventMouseButton.new(); wheel.button_index = MOUSE_BUTTON_WHEEL_UP; wheel.pressed = true; wheel.position = mr.size * 0.5
+	mw._on_map_input(wheel); mw._on_map_input(wheel); await frames(1)
+	check(mw.zoom > z0 * 1.3, "колесо мыши приближает (×%.2f)" % mw.zoom)
+	# щипок двумя пальцами
+	var zp: float = mw.zoom
+	var t0 := InputEventScreenTouch.new(); t0.index = 0; t0.pressed = true; t0.position = mr.size * 0.5 - Vector2(60, 0)
+	var t1 := InputEventScreenTouch.new(); t1.index = 1; t1.pressed = true; t1.position = mr.size * 0.5 + Vector2(60, 0)
+	mw._on_map_input(t0); mw._on_map_input(t1)
+	var dr := InputEventScreenDrag.new(); dr.index = 1; dr.position = mr.size * 0.5 + Vector2(180, 0)
+	mw._on_map_input(dr)
+	t0.pressed = false; t1.pressed = false; mw._on_map_input(t1); mw._on_map_input(t0)
+	check(mw.zoom > zp * 1.5, "щипок приближает (%.2f→%.2f)" % [zp, mw.zoom])
+	# сдвиг перетаскиванием
+	var c0: Vector2 = mw.center
+	var down := InputEventMouseButton.new(); down.button_index = MOUSE_BUTTON_LEFT; down.pressed = true; down.position = mr.size * 0.5
+	mw._on_map_input(down)
+	var mv := InputEventMouseMotion.new(); mv.relative = Vector2(-120, 80); mv.position = mr.size * 0.5 + mv.relative
+	mw._on_map_input(mv)
+	var up := InputEventMouseButton.new(); up.button_index = MOUSE_BUTTON_LEFT; up.pressed = false; up.position = mv.position
+	mw._on_map_input(up)
+	check(mw.center.distance_to(c0) > 5.0, "перетаскивание сдвигает карту (%.0f м)" % mw.center.distance_to(c0))
+	mw.find_child("ZoomCenter", true, false).pressed.emit(); await frames(2)
+	var pp: Vector3 = z.player.global_position
+	var pm: Vector2 = mw.to_map(Vector2(pp.x, pp.z))
+	check(pm.distance_to(mr.size * 0.5) < 60.0 and mw.zoom >= 2.5, "«◎» — карта по центру на герое")
+	# при приближении — больше подробностей
+	mw.zoom = 1.0; mr.queue_redraw(); await frames(2)
+	var far: int = mw.markers.size()
+	mw.zoom = 4.0; mw.center_on_player(); mw.zoom = 4.0; mr.queue_redraw(); await frames(2)
+	var near_cats := {}
+	for mk in mw.markers: near_cats[mk.cat] = true
+	check(near_cats.has("minor") or near_cats.has("merchant") or near_cats.has("resource"), "при приближении видны мелкие значки (%s)" % ", ".join(near_cats.keys()))
+	print("  значков: ×1 — %d, ×4 у героя — %d" % [far, mw.markers.size()])
+	# переключатель категории
+	mw.set_category("town", false); mr.queue_redraw(); await frames(2)
+	check(not mw.markers.any(func(m): return m.cat == "town"), "категория «Города» отключается")
+	mw.set_category("town", true)
+	var lg_vis: bool = mw.legend.visible
+	mw.toggle_legend(); check(mw.legend.visible != lg_vis, "легенда сворачивается"); mw.toggle_legend()
+	# подсказка по касанию
+	mw.zoom = 1.0; mr.queue_redraw(); await frames(2)
+	var wpm = null
+	for mk in mw.markers: if mk.cat == "waypoint" and mk.get("wp", "") != "": wpm = mk; break
+	check(wpm != null and mw.tap(wpm.screen + Vector2(4, 3)) and mw.tip.visible, "касание значка — подсказка")
+	check(mw.tip_btn.visible, "у открытого камня в подсказке есть «Переместиться»")
+	check(not mw.tap(Vector2(-500, -500)) and not mw.tip.visible, "касание мимо — подсказка скрыта")
+	await frames(1)
