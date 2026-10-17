@@ -17,6 +17,36 @@ var move_input := Vector2.ZERO
 var attack_held := false
 var _dash_vel := Vector3.ZERO
 var _dash_time := 0.0
+## Комбо базовой атаки: 3 удара на класс (последний — сильный, с замахом)
+const COMBO_WINDOW := 1.2
+const COMBOS := {
+	"warrior": [
+		{"anim": "attack_a", "speed": 1.5, "windup": 0.16, "mult": 1.0, "arc": 75.0, "reach": 0.0, "knock": 2.5, "stop": 0.045, "shake": 0.0, "trail": 0.32},
+		{"anim": "attack_b", "speed": 1.5, "windup": 0.16, "mult": 1.15, "arc": 85.0, "reach": 0.2, "knock": 3.0, "stop": 0.05, "shake": 0.06, "trail": 0.32},
+		{"anim": "attack_c", "speed": 1.2, "windup": 0.3, "mult": 1.9, "arc": 130.0, "reach": 0.7, "knock": 7.0, "stop": 0.09, "shake": 0.28, "trail": 0.5, "cd": 1.35}],
+	"archer": [
+		{"anim": "bow_shoot", "speed": 1.7, "windup": 0.14, "mult": 1.0, "arrows": 1, "knock": 1.5, "stop": 0.03},
+		{"anim": "bow_shoot", "speed": 1.7, "windup": 0.14, "mult": 1.05, "arrows": 1, "knock": 1.5, "stop": 0.03},
+		{"anim": "bow_shoot", "speed": 1.0, "windup": 0.32, "mult": 1.6, "arrows": 3, "pierce": true, "knock": 4.0, "stop": 0.06, "shake": 0.1, "cd": 1.3}],
+	"mage": [
+		{"anim": "cast", "speed": 1.6, "windup": 0.15, "mult": 1.0, "knock": 1.5, "stop": 0.03},
+		{"anim": "cast", "speed": 1.6, "windup": 0.15, "mult": 1.05, "knock": 1.5, "stop": 0.03},
+		{"anim": "cast_enter", "speed": 1.2, "windup": 0.32, "mult": 1.7, "explode": 2.6, "knock": 5.0, "stop": 0.07, "shake": 0.18, "cd": 1.3}]}
+var combo_step := 0          # индекс следующего удара
+var combo_timer := 0.0
+var combo_count := 0         # всего выполнено ударов (для тестов)
+var last_combo_index := -1
+## Кувырок: рывок с неуязвимостью
+const ROLL_TIME := 0.42
+const ROLL_SPEED := 11.0
+const ROLL_CD := 0.9
+var roll_cd := 0.0
+var invuln := 0.0
+var _roll_time := 0.0
+var _roll_dir := Vector3.FORWARD
+var _last_move := Vector3.ZERO
+var rolls := 0
+var dodged := 0
 ## Прыжок: скорость, «время койота» и буфер нажатия
 const JUMP_VELOCITY := 7.6
 const GRAVITY := 20.0
@@ -63,6 +93,11 @@ func zone():
 func _physics_process(delta: float) -> void:
 	for i in 4:
 		if cooldowns[i] > 0: cooldowns[i] -= delta
+	if roll_cd > 0: roll_cd -= delta
+	if invuln > 0: invuln -= delta
+	if combo_timer > 0:
+		combo_timer -= delta
+		if combo_timer <= 0: combo_step = 0
 	if dead: return
 	hp = minf(stats.max_hp, hp + stats.regen * delta)
 	mp = minf(stats.max_mp, mp + stats.mp_regen * delta)
@@ -82,8 +117,13 @@ func _physics_process(delta: float) -> void:
 	var move := fwd * input.y + right * input.x
 	if force_move != Vector3.ZERO: move = Vector3(force_move.x, 0, force_move.z)
 	if move.length() > 1: move = move.normalized()
+	_last_move = move
 	var v: Vector3
-	if _dash_time > 0:
+	if _roll_time > 0:
+		_roll_time -= delta
+		v = _roll_dir * ROLL_SPEED * clampf(0.45 + _roll_time / ROLL_TIME, 0.5, 1.2)
+		rotation.y = atan2(_roll_dir.x, _roll_dir.z)
+	elif _dash_time > 0:
 		_dash_time -= delta
 		v = _dash_vel
 	else:
@@ -100,6 +140,7 @@ func _physics_process(delta: float) -> void:
 		_coyote -= delta
 		velocity.y -= GRAVITY * delta
 	if Input.is_key_pressed(KEY_J): request_jump()
+	if Input.is_key_pressed(KEY_K): request_roll()
 	if _jump_buffer > 0:
 		_jump_buffer -= delta
 		if _coyote > 0 and _dash_time <= 0:
@@ -119,6 +160,27 @@ func _physics_process(delta: float) -> void:
 func request_jump() -> void:
 	if dead: return
 	_jump_buffer = JUMP_BUFFER
+
+## Кувырок/уклонение (кнопка HUD, клавиша K): короткая неуязвимость, уходит из-под ударов
+func request_roll() -> bool:
+	if dead or roll_cd > 0 or _roll_time > 0: return false
+	_roll_dir = _last_move.normalized() if _last_move.length() > 0.2 else forward()
+	_roll_dir.y = 0
+	_roll_time = ROLL_TIME
+	invuln = ROLL_TIME * 0.9
+	roll_cd = ROLL_CD
+	rolls += 1
+	visual.play_action("roll")
+	CombatFX.burst(zone().fx_root, global_position + Vector3.UP * 0.2, Color(0.8, 0.7, 0.55, 0.6), 10, 2.0, 0.18, 0.5, Vector3.UP, 80, 0.5)
+	return true
+
+## Отбрасывание игрока (таран босса)
+func knockback(dir: Vector3, force: float) -> void:
+	_dash_vel = U.flat(dir).normalized() * force
+	_dash_time = 0.2
+
+func is_rolling() -> bool:
+	return _roll_time > 0
 
 func teleport(p: Vector3) -> void:
 	global_position = p
@@ -140,6 +202,10 @@ func respawn(p: Vector3) -> void:
 # ---------------- урон и опыт ----------------
 func take_damage(dmg: float, _from: Vector3) -> void:
 	if dead or god_mode: return
+	if invuln > 0:
+		dodged += 1
+		zone().float_text(global_position + Vector3.UP * 2.2, "Уклонение!", Color(0.6, 0.9, 1.0))
+		return
 	var dr: float = stats.dr + (0.5 if shield_timer > 0 else 0.0)
 	var final := dmg * (1.0 - clampf(dr, 0, 0.85))
 	hp -= final
@@ -150,6 +216,7 @@ func take_damage(dmg: float, _from: Vector3) -> void:
 		zone().on_player_died()
 	elif final > stats.max_hp * 0.08:
 		visual.play_action("hit")
+		zone().shake(0.25 if final > stats.max_hp * 0.2 else 0.12)
 
 func heal(a: float) -> void:
 	if not dead: hp = minf(stats.max_hp, hp + a)
@@ -166,7 +233,9 @@ func gain_xp(amount: int) -> void:
 	if lvl:
 		recalc(true)
 		zone().fx("burst", global_position + Vector3.UP, 2.5, Color(1, 0.85, 0.3), 0.8)
-		Game.toast("Новый уровень: %d! Очков талантов: %d" % [data["level"], DB.free_points(data)])
+		var h = zone().hud
+		if h and h.has_method("level_up"): h.level_up(data["level"], DB.free_points(data))
+		else: Game.toast("Новый уровень: %d! Очков талантов: %d" % [data["level"], DB.free_points(data)])
 		zone().save()
 	if clvl:
 		recalc()
@@ -243,21 +312,31 @@ func roll_damage(mult: float, spell: bool) -> Array:
 	if crit: dmg *= stats.crit_mult
 	return [dmg, crit]
 
-func hit(e, mult: float, spell := false, force_crit := false) -> void:
+func hit(e, mult: float, spell := false, force_crit := false, fb := {}) -> void:
 	if e == null or not is_instance_valid(e) or not e.alive: return
 	var r := roll_damage(mult, spell)
 	var dmg: float = r[0]
 	var crit: bool = r[1]
 	if force_crit and not crit:
 		dmg *= stats.crit_mult; crit = true
+	var dir := U.flat(e.global_position - global_position).normalized()
+	var z = zone()
+	CombatFX.hit(z.fx_root, e.global_position + Vector3.UP * (2.2 if e.def.boss else 0.9), e.kind, crit, dir)
 	e.take_damage(dmg, crit)
+	if is_instance_valid(e):
+		e.knockback(dir, float(fb.get("knock", 1.5)) * (1.4 if crit else 1.0))
+	z.hit_stop(float(fb.get("stop", 0.03)) * (1.6 if crit else 1.0))
+	var sh := float(fb.get("shake", 0.0)) + (0.12 if crit else 0.0)
+	if sh > 0: z.shake(sh)
 	if stats.leech > 0: heal(dmg * stats.leech)
 
-func hit_area(center: Vector3, radius: float, mult: float, spell: bool, extra := Callable()) -> void:
+func hit_area(center: Vector3, radius: float, mult: float, spell: bool, extra := Callable(), fb := {"knock": 4.0, "stop": 0.05, "shake": 0.15}) -> void:
+	var fbl: Dictionary = fb.duplicate()
 	for e in zone().enemies.duplicate():
 		if not is_instance_valid(e) or not e.alive: continue
 		if U.flat_dist(e.global_position, center) <= radius + e.radius:
-			hit(e, mult, spell)
+			hit(e, mult, spell, false, fbl.duplicate())
+			fbl["stop"] = 0.0; fbl["shake"] = 0.0
 			if extra.is_valid() and is_instance_valid(e) and e.alive: extra.call(e)
 
 func _dir_to(origin: Vector3, t) -> Vector3:
@@ -270,21 +349,19 @@ func _execute(s: Dictionary) -> void:
 	var z = zone()
 	var target = find_target(maxf(s.range, cls.range) + 2)
 	if target != null and s.kind != "dash": face_towards(target.global_position)
-	visual.attack_speed = stats.attack_speed * (1.5 if rage_timer > 0 else 1.0)
-	visual.play_action("attack" if s.kind in ["melee", "projectile"] else s.kind)
+	var aspd: float = stats.attack_speed * (1.5 if rage_timer > 0 else 1.0)
+	visual.attack_speed = aspd
+	if s.kind in ["melee", "projectile"]:
+		_combo_attack(s, target, aspd)
+		return
+	visual.play_action(s.kind)
 	var origin := global_position + Vector3.UP * 1.3 + forward() * 0.6
 	match s.kind:
-		"melee":
-			for e in z.enemies.duplicate():
-				if not e.alive: continue
-				var d: Vector3 = U.flat(e.global_position - global_position)
-				if d.length() <= cls.range + e.radius and rad_to_deg(forward().angle_to(d)) < 70:
-					hit(e, 1.0)
-			z.fx("burst", global_position + forward() * 1.2 + Vector3.UP, 1.3, Color.WHITE, 0.15)
-		"projectile":
-			Projectile.fire(z, origin, _dir_to(origin, target), 22.0, s.range, s.color, 0.25, true, func(e): hit(e, 1.0))
 		"spin":
-			hit_area(global_position, s.radius, s.mult, false)
+			CombatFX.slash_arc(z.fx_root, global_position, forward(), s.radius, 360, s.color, 0.35, 0.9)
+			await get_tree().create_timer(0.12, false).timeout
+			if dead: return
+			hit_area(global_position, s.radius, s.mult, false, Callable(), {"knock": 6.0, "stop": 0.07, "shake": 0.25})
 			z.fx("ring", global_position, s.radius, s.color, 0.35)
 		"dash":
 			var dir: Vector3 = U.flat(target.global_position - global_position) if target != null else forward()
@@ -297,9 +374,11 @@ func _execute(s: Dictionary) -> void:
 				if e.alive and _dist_to_segment(e.global_position, a, b) < s.radius + e.radius: hit(e, s.mult)
 			z.fx("burst", b + Vector3.UP, 2.0, s.color, 0.3)
 		"volley":
+			await get_tree().create_timer(0.15, false).timeout
+			if dead: return
 			var base := _dir_to(origin, target)
 			for i in range(-2, 3):
-				Projectile.fire(z, origin, base.rotated(Vector3.UP, deg_to_rad(i * 12)), 22.0, s.range, s.color, 0.22, true, func(e): hit(e, s.mult))
+				Projectile.fire(z, origin, base.rotated(Vector3.UP, deg_to_rad(i * 12)), 24.0, s.range, s.color, 0.22, true, func(e): hit(e, s.mult)).add_trail(s.color, false)
 		"arrow_rain":
 			var pos: Vector3 = target.global_position if target != null else global_position + forward() * 8
 			z.fx("ring", pos, s.radius, s.color, 0.6)
@@ -307,11 +386,19 @@ func _execute(s: Dictionary) -> void:
 			hit_area(pos, s.radius, s.mult, false)
 			z.fx("burst", pos + Vector3.UP, s.radius, s.color, 0.3)
 		"fireball":
-			Projectile.fire(z, origin, _dir_to(origin, target), 16.0, s.range, s.color, 0.5, true, func(e):
+			CombatFX.cast_glow(visual.tip_node(), s.color, 0.4, 0.5)
+			await get_tree().create_timer(0.2, false).timeout
+			if dead: return
+			origin = visual.tip_position()
+			var fp := Projectile.fire(z, origin, _dir_to(origin, target), 16.0, s.range, s.color, 0.5, true, func(e):
 				var p: Vector3 = e.global_position
 				hit_area(p, s.radius, s.mult, true)
+				CombatFX.burst(z.fx_root, p + Vector3.UP, Color(1, 0.6, 0.2), 30, 8.0, 0.12, 0.6, Vector3.UP, 90, -6)
+				z.shake(0.3)
 				z.fx("burst", p + Vector3.UP, s.radius, s.color, 0.4))
+			fp.add_trail(s.color, true)
 		"frost_nova":
+			CombatFX.burst(z.fx_root, global_position + Vector3.UP * 0.3, Color(0.7, 0.95, 1.0), 40, 9.0, 0.1, 0.6, Vector3.UP, 95, -2)
 			hit_area(global_position, s.radius, s.mult, true, func(e): e.slow(0.4, 3.0))
 			z.fx("ring", global_position, s.radius, s.color, 0.45)
 		"rage":
@@ -346,6 +433,66 @@ func _execute(s: Dictionary) -> void:
 			hit_area(global_position, s.radius, s.mult, false, func(e): e.stun(2.0))
 			heal(stats.max_hp * 0.15)
 			z.fx("ring", global_position, s.radius, s.color, 0.5)
+
+## Базовая атака: цепочка из трёх ударов. Замах (windup) — урон наносится не сразу, а в момент удара в анимации.
+func _combo_attack(s: Dictionary, target, aspd: float) -> void:
+	var z = zone()
+	var list: Array = COMBOS.get(data["class"], COMBOS["warrior"])
+	var idx := combo_step
+	var c: Dictionary = list[idx]
+	last_combo_index = idx
+	combo_step = (idx + 1) % list.size()
+	combo_timer = COMBO_WINDOW / maxf(0.5, aspd) + float(c.windup)
+	combo_count += 1
+	cooldowns[0] = max_cooldown(0) * float(c.get("cd", 1.0))
+	var spd: float = float(c.speed) * clampf(aspd, 0.7, 1.8)
+	visual.play_anim(c.anim, spd, true, float(c.get("trail", 0.0)) / spd)
+	if data["class"] == "mage":
+		CombatFX.cast_glow(visual.tip_node(), s.color, float(c.windup) / aspd + 0.1, 0.35 if idx < 2 else 0.6)
+	var fb := {"knock": c.get("knock", 1.5), "stop": c.get("stop", 0.03), "shake": c.get("shake", 0.0)}
+	await get_tree().create_timer(float(c.windup) / clampf(aspd, 0.7, 1.8), false).timeout
+	if dead or not is_inside_tree(): return
+	if target != null and is_instance_valid(target) and target.alive: face_towards(target.global_position)
+	var origin := global_position + Vector3.UP * 1.3 + forward() * 0.6
+	match data["class"]:
+		"warrior":
+			var reach: float = cls.range + float(c.reach)
+			var any := false
+			for e in z.enemies.duplicate():
+				if not is_instance_valid(e) or not e.alive: continue
+				var d: Vector3 = U.flat(e.global_position - global_position)
+				if d.length() <= reach + e.radius and rad_to_deg(forward().angle_to(d)) < float(c.arc) * 0.5 + 15:
+					hit(e, float(c.mult), false, false, fb.duplicate())
+					fb["stop"] = 0.0; fb["shake"] = 0.0
+					any = true
+			CombatFX.slash_arc(z.fx_root, global_position, forward(), reach + 0.3, float(c.arc), Color(1, 0.95, 0.8) if idx < 2 else Color(1, 0.7, 0.35), 0.2 if idx < 2 else 0.3)
+			if idx == 2:
+				z.fx("ring", global_position + forward() * 1.2, 1.6, Color(1, 0.8, 0.5), 0.3)
+				if not any: z.shake(0.1)
+		"archer":
+			origin = visual.tip_position() if visual.weapon else origin
+			var base := _dir_to(origin, target)
+			var n := int(c.get("arrows", 1))
+			for i in n:
+				var ang := (i - (n - 1) / 2.0) * 7.0
+				var pr := Projectile.fire(z, origin, base.rotated(Vector3.UP, deg_to_rad(ang)), 26.0 if idx < 2 else 30.0, s.range + 2, s.color if idx < 2 else Color(1, 0.85, 0.4), 0.22, true,
+					func(e): hit(e, float(c.mult), false, false, fb.duplicate()))
+				pr.pierce = bool(c.get("pierce", false))
+				pr.add_trail(Color(1, 0.95, 0.75) if idx < 2 else Color(1, 0.75, 0.3), false)
+			if idx == 2: z.shake(float(c.get("shake", 0.0)))
+		_:
+			origin = visual.tip_position()
+			var ex := float(c.get("explode", 0.0))
+			var col: Color = s.color if idx < 2 else Color(0.75, 0.55, 1.0)
+			var pr := Projectile.fire(z, origin, _dir_to(origin, target), 20.0, s.range, col, 0.28 if idx < 2 else 0.45, true, func(e):
+				if ex > 0:
+					var p: Vector3 = e.global_position
+					hit_area(p, ex, float(c.mult), true, Callable(), fb.duplicate())
+					CombatFX.burst(z.fx_root, p + Vector3.UP, col, 26, 6.0, 0.1, 0.5, Vector3.UP, 90, -3)
+					z.fx("burst", p + Vector3.UP, ex, col, 0.35)
+				else:
+					hit(e, float(c.mult), true, false, fb.duplicate()))
+			pr.add_trail(col, true)
 
 static func _dist_to_segment(p: Vector3, a: Vector3, b: Vector3) -> float:
 	p.y = 0; a.y = 0; b.y = 0

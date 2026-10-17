@@ -11,6 +11,11 @@ const MAX_DIST := 18.0
 var pitch_node: Node3D
 var arm: SpringArm3D
 var camera: Camera3D
+var trauma := 0.0
+
+## Тряска камеры (0..1), затухает сама
+func shake(amount: float) -> void:
+	trauma = clampf(trauma + amount, 0.0, 1.0)
 
 func _ready() -> void:
 	pitch_node = Node3D.new(); add_child(pitch_node)
@@ -39,6 +44,15 @@ func _process(delta: float) -> void:
 	rotation.y = yaw
 	pitch_node.rotation_degrees.x = -pitch
 	arm.spring_length = distance
+	if trauma > 0:
+		trauma = maxf(0.0, trauma - delta * 2.2)
+		var k := trauma * trauma
+		var t := Time.get_ticks_msec() * 0.05
+		camera.h_offset = sin(t * 1.7) * 0.35 * k
+		camera.v_offset = cos(t * 2.3) * 0.28 * k
+		camera.rotation.z = sin(t * 1.3) * 0.03 * k
+	elif camera.h_offset != 0.0:
+		camera.h_offset = 0.0; camera.v_offset = 0.0; camera.rotation.z = 0.0
 
 func _unhandled_input(ev: InputEvent) -> void:
 	# мышь — для отладки на ПК

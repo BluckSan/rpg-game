@@ -1,5 +1,6 @@
 extends CanvasLayer
-## Игровой интерфейс: полосы, джойстик, кнопки умений, окна. Мультитач обрабатывается здесь.
+## Игровой интерфейс: полосы, мини-карта, джойстик, кнопки умений, окна, подсказки, уведомления.
+## Мультитач обрабатывается здесь.
 
 var zone
 var player: Player
@@ -14,15 +15,31 @@ var skill_btns := []      # [0] атака, [1..3] умения
 var potion_btn: SkillButton
 var potion_label: Label
 var jump_btn: SkillButton
+var roll_btn: SkillButton
+var interact_btn: Button
 var joy_base: Control
 var joy_knob: Control
 var joy_default := Vector2(260, 840)
 const JOY_R := 110.0
 var pickup_box: VBoxContainer
+var boss_panel: Control
 var boss_bar: ProgressBar
+var boss_name: Label
+var boss_phase: Label
+var minimap: Minimap
+var objective: Label
 var window: Control
 var bar_pool := []
 var top_buttons := []
+var blockers := []          # элементы, нажатия на которые не уходят в джойстик/камеру
+var hint_panel: Control
+var hint_label: Label
+var hint_id := ""
+var tooltip: Control
+var _hold_time := {}
+var _tip_slot := -1
+var _start_pos := Vector3.ZERO
+var _hint_age := 0.0
 
 # мультитач
 var touches := {}   # index -> {"role": "joy"/"skill"/"cam", "slot": int, "pos": Vector2, "origin": Vector2}
@@ -37,75 +54,147 @@ func setup(z) -> void:
 	UIK.full(root)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
+	if not zone.data.has("tutorial"): zone.data["tutorial"] = {}
+	_start_pos = player.global_position
 
-	var status := UIK.panel(root, Color(0, 0, 0, 0.45))
-	status.position = Vector2(20, 20); status.size = Vector2(580, 175)
+	# --- статус: портрет, имя, здоровье, мана ---
+	var status := UIK.panel(root, Color(0.1, 0.08, 0.06, 0.85))
+	UIK.rect(status, Vector2(16, 16), Vector2(640, 200))
 	status.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	name_label = UIK.label(status, "", 26)
-	name_label.position = Vector2(16, 6); name_label.size = Vector2(550, 50)
-	hp_bar = UIK.bar(status, Color(0.8, 0.15, 0.15)); hp_bar.position = Vector2(16, 62); hp_bar.size = Vector2(548, 46)
-	mp_bar = UIK.bar(status, Color(0.2, 0.4, 0.9)); mp_bar.position = Vector2(16, 116); mp_bar.size = Vector2(548, 46)
-	gold_label = UIK.label(root, "", 26, Color(1, 0.85, 0.35))
-	gold_label.position = Vector2(28, 200); gold_label.size = Vector2(500, 40)
+	var port := Panel.new(); port.add_theme_stylebox_override("panel", UIK.frame("slot", Color.WHITE, 8))
+	status.add_child(port); UIK.rect(port, Vector2(18, 26), Vector2(120, 120))
+	var pic := UIK.icon_rect(port, UIK.WEAPON_ICONS.get(zone.data["class"], "person"), 84, UIK.ACCENT)
+	pic.position = Vector2(18, 18)
+	name_label = UIK.label(status, "", 26, UIK.ACCENT)
+	UIK.rect(name_label, Vector2(152, 10), Vector2(470, 46))
+	name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	name_label.clip_text = true
+	hp_bar = UIK.bar(status, Color(0.78, 0.13, 0.12)); UIK.rect(hp_bar, Vector2(152, 60), Vector2(470, 52))
+	var hi := UIK.icon_rect(hp_bar, "heart-bottle", 34); hi.position = Vector2(12, 9)
+	mp_bar = UIK.bar(status, Color(0.18, 0.38, 0.9)); UIK.rect(mp_bar, Vector2(152, 118), Vector2(470, 44))
+	var mi := UIK.icon_rect(mp_bar, "drop", 28); mi.position = Vector2(12, 8)
+	var gold_box := HBoxContainer.new(); gold_box.add_theme_constant_override("separation", 8)
+	gold_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	status.add_child(gold_box); UIK.rect(gold_box, Vector2(152, 162), Vector2(470, 36))
+	UIK.icon_rect(gold_box, "two-coins", 30, Color(1, 0.82, 0.3))
+	gold_label = UIK.label(gold_box, "", 24, Color(1, 0.85, 0.4))
+	gold_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 
-	xp_bar = UIK.bar(root, Color(0.85, 0.65, 0.15))
-	xp_bar.anchor_left = 0.25; xp_bar.anchor_right = 0.75; xp_bar.anchor_top = 1; xp_bar.anchor_bottom = 1
-	xp_bar.offset_top = -28; xp_bar.offset_bottom = 0
+	xp_bar = UIK.bar(root, Color(0.85, 0.62, 0.15))
+	xp_bar.anchor_left = 0.27; xp_bar.anchor_right = 0.73; xp_bar.anchor_top = 1; xp_bar.anchor_bottom = 1
+	xp_bar.offset_top = -34; xp_bar.offset_bottom = -4
 	xp_bar.get_node("Text").add_theme_font_size_override("font_size", 18)
 
-	var b_tal := _top_button("Таланты", _open.bind("talents"), Color(0.35, 0.25, 0.45), 0, 200)
+	# --- мини-карта и цель ---
+	minimap = Minimap.new()
+	minimap.zone = zone
+	minimap.anchor_left = 1; minimap.anchor_right = 1
+	minimap.offset_left = -276; minimap.offset_right = -16; minimap.offset_top = 14; minimap.offset_bottom = 274
+	root.add_child(minimap)
+	objective = UIK.label(root, "", 22, UIK.TEXT, HORIZONTAL_ALIGNMENT_RIGHT)
+	objective.anchor_left = 1; objective.anchor_right = 1
+	objective.offset_left = -640; objective.offset_right = -20; objective.offset_top = 278; objective.offset_bottom = 340
+
+	# --- верхние кнопки (слева от карты) ---
+	var b_tal := _top_button("Таланты", _open.bind("talents"), Color(0.42, 0.28, 0.5), 0, 240, "book-cover")
 	talent_badge = UIK.label(b_tal, "", 24, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
 	var badge_bg := UIK.panel(b_tal, Color(0.85, 0.2, 0.2), 22)
-	badge_bg.position = Vector2(170, -14); badge_bg.size = Vector2(44, 44)
+	UIK.rect(badge_bg, Vector2(206, -14), Vector2(44, 44))
 	badge_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	talent_badge.reparent(badge_bg); UIK.full(talent_badge)
-	_top_button("Герой", _open.bind("hero"), UIK.BUTTON, 1, 170)
-	_top_button("Меню", _open.bind("pause"), UIK.BUTTON, 2, 150)
+	_top_button("Герой", _open.bind("hero"), UIK.BUTTON, 1, 210, "person")
+	_top_button("Меню", _open.bind("pause"), Color(0.3, 0.3, 0.32), 2, 190, "cog")
 
-	# боевые кнопки (координаты от правого нижнего угла)
+	# --- боевые кнопки (координаты от правого нижнего угла) ---
 	var cls: Dictionary = DB.CLASSES[zone.data["class"]]
-	skill_btns.append(_skill_button(cls.skills[0].name, Vector2(-60, -60), 230, Color(0.75, 0.3, 0.2)))
-	var pos := [Vector2.ZERO, Vector2(-320, -60), Vector2(-280, -250), Vector2(-110, -320)]
+	skill_btns.append(_skill_button(cls.skills[0].name, Vector2(-50, -50), 240, Color(0.62, 0.26, 0.16), UIK.SKILL_ICONS.get(cls.skills[0].id, "broadsword")))
+	skill_btns[0].max_pips = 3
+	var pos := [Vector2.ZERO, Vector2(-310, -40), Vector2(-290, -240), Vector2(-100, -320)]
 	for i in range(1, 4):
-		skill_btns.append(_skill_button("", pos[i], 150, Color.GRAY))
-	potion_btn = _skill_button("Зелье", Vector2(-470, -40), 110, Color(0.8, 0.15, 0.25))
-	potion_label = UIK.label(potion_btn, "", 26, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT)
-	potion_label.position = Vector2(0, 70); potion_label.size = Vector2(110, 40)
-	jump_btn = _skill_button("Прыжок", Vector2(-480, -260), 130, Color(0.25, 0.5, 0.75))
+		skill_btns.append(_skill_button("", pos[i], 156, Color.GRAY, ""))
+	potion_btn = _skill_button("Зелье", Vector2(-60, -500), 116, Color(0.7, 0.12, 0.2), "health-potion")
+	potion_label = UIK.label(potion_btn, "", 1)   # число показывается значком на кнопке
+	potion_label.visible = false
+	jump_btn = _skill_button("Прыжок", Vector2(-480, -250), 134, Color(0.22, 0.45, 0.7), "jump-across")
+	roll_btn = _skill_button("Кувырок", Vector2(-500, -40), 134, Color(0.3, 0.5, 0.3), "dodging")
+
+	interact_btn = UIK.button(root, "Торговать", _open.bind("shop"), UIK.GOLD, 34, "shop")
+	interact_btn.anchor_left = 0.5; interact_btn.anchor_right = 0.5; interact_btn.anchor_top = 1; interact_btn.anchor_bottom = 1
+	interact_btn.offset_left = -170; interact_btn.offset_right = 170; interact_btn.offset_top = -200; interact_btn.offset_bottom = -100
+	interact_btn.visible = false
+	blockers.append(interact_btn)
 
 	joy_base = Control.new(); joy_base.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	joy_base.size = Vector2(JOY_R * 2, JOY_R * 2)
-	joy_base.draw.connect(func(): joy_base.draw_circle(Vector2(JOY_R, JOY_R), JOY_R, Color(1, 1, 1, 0.18)))
+	joy_base.draw.connect(func():
+		joy_base.draw_circle(Vector2(JOY_R, JOY_R), JOY_R, Color(0.05, 0.04, 0.03, 0.35))
+		joy_base.draw_arc(Vector2(JOY_R, JOY_R), JOY_R - 3, 0, TAU, 48, Color(0.95, 0.74, 0.36, 0.55), 4.0))
 	root.add_child(joy_base)
 	joy_knob = Control.new(); joy_knob.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	joy_knob.size = Vector2(100, 100)
-	joy_knob.draw.connect(func(): joy_knob.draw_circle(Vector2(50, 50), 50, Color(1, 1, 1, 0.55)))
+	joy_knob.draw.connect(func():
+		joy_knob.draw_circle(Vector2(50, 50), 48, Color(0.9, 0.8, 0.6, 0.55))
+		joy_knob.draw_arc(Vector2(50, 50), 46, 0, TAU, 32, Color(1, 0.85, 0.5, 0.9), 3.0))
 	joy_base.add_child(joy_knob)
 	_set_joy(joy_default, Vector2.ZERO)
 
 	pickup_box = VBoxContainer.new()
 	pickup_box.alignment = BoxContainer.ALIGNMENT_END
+	pickup_box.add_theme_constant_override("separation", 6)
 	pickup_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pickup_box.position = Vector2(24, 300); pickup_box.size = Vector2(600, 300)
+	UIK.rect(pickup_box, Vector2(20, 380), Vector2(560, 300))
 	root.add_child(pickup_box)
 
-	boss_bar = UIK.bar(root, Color(0.7, 0.1, 0.1))
-	boss_bar.anchor_left = 0.5; boss_bar.anchor_right = 0.5
-	boss_bar.offset_left = -400; boss_bar.offset_right = 400; boss_bar.offset_top = 30; boss_bar.offset_bottom = 76
-	boss_bar.visible = false
+	# --- полоса босса ---
+	boss_panel = UIK.panel(root, Color(0.1, 0.06, 0.05, 0.88))
+	boss_panel.anchor_left = 0.5; boss_panel.anchor_right = 0.5
+	boss_panel.offset_left = -400; boss_panel.offset_right = 400; boss_panel.offset_top = 116; boss_panel.offset_bottom = 236
+	boss_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sk := UIK.icon_rect(boss_panel, "skull-crossed-bones", 44, Color(1, 0.4, 0.3)); sk.position = Vector2(24, 12)
+	boss_name = UIK.label(boss_panel, "", 30, UIK.ACCENT)
+	boss_name.autowrap_mode = TextServer.AUTOWRAP_OFF
+	UIK.rect(boss_name, Vector2(80, 8), Vector2(500, 50))
+	boss_phase = UIK.label(boss_panel, "", 24, Color(1, 0.6, 0.4), HORIZONTAL_ALIGNMENT_RIGHT)
+	boss_phase.autowrap_mode = TextServer.AUTOWRAP_OFF
+	UIK.rect(boss_phase, Vector2(420, 10), Vector2(356, 50))
+	boss_name.size = Vector2(400, 50)
+	boss_bar = UIK.bar(boss_panel, Color(0.7, 0.08, 0.08))
+	UIK.rect(boss_bar, Vector2(24, 62), Vector2(752, 46))
+	for f in [0.66, 0.33]:
+		var m := ColorRect.new(); m.color = Color(1, 0.85, 0.4, 0.95)
+		m.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		boss_bar.add_child(m); UIK.rect(m, Vector2(752 * f - 2, -4), Vector2(4, 54))
+		m.name = "Mark%d" % int(f * 100)
+	boss_panel.visible = false
+	boss_bar.move_to_front()
 	refresh_skill_buttons()
 
-func _top_button(t: String, cb: Callable, c: Color, idx: int, w: float) -> Button:
-	var b := UIK.button(root, t, cb, c, 28)
+	# --- подсказка обучения ---
+	hint_panel = Panel.new()
+	hint_panel.add_theme_stylebox_override("panel", UIK.frame("tooltip", Color.WHITE, 18))
+	UIK.rect(hint_panel, Vector2(16, 230), Vector2(860, 140))
+	hint_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(hint_panel)
+	var hico := UIK.icon_rect(hint_panel, "treasure-map", 60, UIK.ACCENT); hico.position = Vector2(26, 40)
+	hint_label = UIK.label(hint_panel, "", 25)
+	UIK.rect(hint_label, Vector2(100, 14), Vector2(560, 112))
+	var ok := UIK.button(hint_panel, "Понятно", _hint_done, UIK.GREEN, 26)
+	UIK.rect(ok, Vector2(676, 34), Vector2(164, 72)); ok.custom_minimum_size = Vector2(164, 72)
+	blockers.append(ok)
+	hint_panel.visible = false
+
+func _top_button(t: String, cb: Callable, c: Color, idx: int, w: float, ic := "") -> Button:
+	var b := UIK.button(root, t, cb, c, 28, ic)
 	b.anchor_left = 1; b.anchor_right = 1
-	var right: float = -20.0 - [0.0, 220.0, 410.0][idx]
-	b.offset_right = right; b.offset_left = right - w; b.offset_top = 20; b.offset_bottom = 100
+	var right: float = -292.0 - [0.0, 256.0, 482.0][idx]
+	b.offset_right = right; b.offset_left = right - w; b.offset_top = 20; b.offset_bottom = 104
 	top_buttons.append(b)
 	return b
 
-func _skill_button(t: String, offset: Vector2, sz: float, c: Color) -> SkillButton:
+func _skill_button(t: String, offset: Vector2, sz: float, c: Color, ic: String) -> SkillButton:
 	var sb := SkillButton.new()
 	sb.text = t; sb.color = c
+	if ic != "": sb.icon = UIK.icon(ic)
 	sb.anchor_left = 1; sb.anchor_right = 1; sb.anchor_top = 1; sb.anchor_bottom = 1
 	sb.offset_left = offset.x - sz; sb.offset_right = offset.x
 	sb.offset_top = offset.y - sz; sb.offset_bottom = offset.y
@@ -117,31 +206,151 @@ func refresh_skill_buttons() -> void:
 	for i in range(1, 4):
 		var s = player.get_skill(i)
 		skill_btns[i].text = s.name if s != null else "Путь"
-		skill_btns[i].color = (s.color * 0.8 + Color(0, 0, 0, 1)) if s != null else Color(0.3, 0.3, 0.3)
+		skill_btns[i].icon = UIK.icon(UIK.SKILL_ICONS.get(s.id, "magic-swirl")) if s != null else UIK.icon("aura")
+		var sc: Color = s.color if s != null else Color(0.4, 0.4, 0.4)
+		skill_btns[i].color = Color(sc.r * 0.55, sc.g * 0.55, sc.b * 0.55, 1)
 		skill_btns[i].queue_redraw()
 
 # ---------------- окна ----------------
 func _open(which: String) -> void:
 	if window: window.queue_free()
+	_hide_tooltip()
 	match which:
 		"talents": window = preload("res://scripts/ui/talent_tree_ui.gd").new()
 		"hero": window = preload("res://scripts/ui/inventory_ui.gd").new()
+		"shop": window = preload("res://scripts/ui/shop_ui.gd").new()
 		_: window = preload("res://scripts/ui/pause_menu.gd").new()
+	window.name = "Window_" + which
 	UIK.full(window)
 	add_child(window)
 	window.setup(zone)
+	UIK.pop_in(window)
+	if which == "talents": _mark_hint("talents")
+	if which == "shop": _mark_hint("shop")
 	_release_all()
 	get_tree().paused = true
 
 func close_window() -> void:
-	if window: window.queue_free()
+	if window: UIK.pop_out(window)
 	window = null
 	get_tree().paused = false
 	refresh_skill_buttons()
 
-func pickup(t: String, c: Color) -> void:
-	var l := UIK.label(pickup_box, t, 26, c)
-	get_tree().create_timer(3.0).timeout.connect(l.queue_free)
+## Лента добычи: иконка + текст, плавно появляется и исчезает
+func pickup(t: String, c: Color, ic := "") -> void:
+	var row := PanelContainer.new()
+	row.add_theme_stylebox_override("panel", UIK.box(Color(0.06, 0.05, 0.04, 0.6), 10, 2, Color(c.r, c.g, c.b, 0.6)))
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var h := HBoxContainer.new(); h.add_theme_constant_override("separation", 10)
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(h)
+	if ic != "": UIK.icon_rect(h, ic, 36, c)
+	var l := UIK.label(h, t, 24, c)
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	pickup_box.add_child(row)
+	while pickup_box.get_child_count() > 6: pickup_box.get_child(0).free()
+	row.modulate.a = 0.0
+	var tw := row.create_tween()
+	tw.tween_property(row, "modulate:a", 1.0, 0.18)
+	tw.tween_interval(3.0)
+	tw.tween_property(row, "modulate:a", 0.0, 0.5)
+	tw.tween_callback(row.queue_free)
+
+## Баннер «Новый уровень»
+var level_banners := 0
+func level_up(level: int, points: int) -> void:
+	level_banners += 1
+	var b := Control.new(); b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.anchor_left = 0.5; b.anchor_right = 0.5
+	b.offset_left = -450; b.offset_right = 450; b.offset_top = 150; b.offset_bottom = 330
+	b.name = "LevelBanner"
+	root.add_child(b)
+	var bg := Panel.new(); bg.add_theme_stylebox_override("panel", UIK.frame("panel", Color(1, 1, 1, 0.95)))
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(bg); UIK.full(bg)
+	var ic := UIK.icon_rect(b, "trophy", 90, UIK.ACCENT); ic.position = Vector2(40, 45)
+	var t := UIK.label(b, "НОВЫЙ УРОВЕНЬ %d" % level, 56, UIK.ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
+	t.autowrap_mode = TextServer.AUTOWRAP_OFF
+	UIK.rect(t, Vector2(140, 20), Vector2(700, 80))
+	var sub := UIK.label(b, "Очков талантов: %d — откройте «Таланты»" % points, 26, UIK.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	sub.autowrap_mode = TextServer.AUTOWRAP_OFF
+	UIK.rect(sub, Vector2(140, 100), Vector2(700, 50))
+	b.pivot_offset = Vector2(450, 90)
+	b.scale = Vector2(0.6, 0.6); b.modulate.a = 0
+	var tw := b.create_tween()
+	tw.set_parallel(true).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(b, "scale", Vector2.ONE, 0.35)
+	tw.tween_property(b, "modulate:a", 1.0, 0.25)
+	tw.chain().tween_interval(2.6)
+	tw.chain().tween_property(b, "modulate:a", 0.0, 0.5)
+	tw.chain().tween_callback(b.queue_free)
+
+# ---------------- подсказки обучения ----------------
+const HINTS := {
+	"move": "Левый джойстик — движение. Проведите пальцем по правой части экрана, чтобы повернуть камеру.",
+	"attack": "Удерживайте большую кнопку атаки: три удара подряд — это комбо, последний бьёт сильнее.",
+	"jump": "«Прыжок» перепрыгивает ударные волны босса, «Кувырок» даёт миг неуязвимости.",
+	"talents": "Есть свободное очко! Нажмите «Таланты» вверху и изучите новый узел.",
+	"shop": "Рядом торговец: нажмите «Торговать», чтобы купить зелья и снаряжение или продать добычу.",
+	"boss": "Красные зоны — предупреждение об атаке босса. Уходите из них или делайте кувырок!",
+}
+
+func _tut() -> Dictionary: return zone.data["tutorial"]
+
+func show_hint(id: String) -> void:
+	if _tut().get(id, false) or hint_id == id: return
+	hint_id = id
+	_hint_age = 0.0
+	hint_label.text = HINTS[id]
+	hint_panel.visible = true
+	UIK.pop_in(hint_panel, 0.25)
+
+func _mark_hint(id: String) -> void:
+	_tut()[id] = true
+	if hint_id == id: _hint_done()
+
+func _hint_done() -> void:
+	if hint_id != "": _tut()[hint_id] = true
+	hint_id = ""
+	hint_panel.visible = false
+
+func _update_hints(delta: float) -> void:
+	_hint_age += delta
+	var t := _tut()
+	# условия выполнения
+	if hint_id == "move" and (player.global_position.distance_to(_start_pos) > 4.0 or _hint_age > 12): _mark_hint("move")
+	elif hint_id == "attack" and (player.combo_count >= 3 or _hint_age > 15): _mark_hint("attack")
+	elif hint_id == "jump" and (player.jumps > 0 or player.rolls > 0 or _hint_age > 12): _mark_hint("jump")
+	elif hint_id == "talents" and DB.free_points(zone.data) == 0: _mark_hint("talents")
+	elif hint_id == "shop" and not zone.near_merchant(): hint_id = ""; hint_panel.visible = false
+	elif hint_id == "boss" and _hint_age > 9: _mark_hint("boss")
+	if hint_id != "": return
+	if not t.get("move", false): show_hint("move")
+	elif not t.get("attack", false): show_hint("attack")
+	elif not t.get("jump", false): show_hint("jump")
+	elif zone.near_merchant() and not t.get("shop", false): show_hint("shop")
+	elif DB.free_points(zone.data) > 0 and not t.get("talents", false): show_hint("talents")
+	elif boss_panel.visible and not t.get("boss", false): show_hint("boss")
+
+# ---------------- подсказки к умениям (долгое нажатие) ----------------
+func show_skill_tooltip(slot: int) -> void:
+	var s = player.get_skill(slot)
+	if s == null: return
+	var body: String = s.get("desc", "Основная атака: серия из 3 ударов")
+	if float(s.get("mana", 0)) > 0: body += "\n[color=#7fb2ff]Мана: %d[/color]" % int(s.mana)
+	if float(s.get("cd", 0)) > 0: body += "   [color=#e6c27a]Перезарядка: %.0f с[/color]" % float(s.cd)
+	var b: Control = skill_btns[slot]
+	_show_tooltip(s.name, body, UIK.SKILL_ICONS.get(s.id, "magic-swirl"), UIK.ACCENT, b.get_global_rect())
+
+func _show_tooltip(title: String, body: String, ic: String, col: Color, near: Rect2) -> void:
+	_hide_tooltip()
+	tooltip = UIK.tooltip(root, title, body, ic, col)
+	UIK.place_tooltip(tooltip, near, _screen())
+
+func _hide_tooltip() -> void:
+	if tooltip and is_instance_valid(tooltip): tooltip.queue_free()
+	tooltip = null
+	_tip_slot = -1
 
 # ---------------- ввод ----------------
 func _release_all() -> void:
@@ -152,12 +361,14 @@ func _release_all() -> void:
 	_set_joy(joy_default, Vector2.ZERO)
 
 func _over_top_button(p: Vector2) -> bool:
-	for b in top_buttons:
-		if b.get_global_rect().has_point(p): return true
+	for b in top_buttons + blockers:
+		if b.is_visible_in_tree() and b.get_global_rect().has_point(p): return true
 	return false
 
 func _input(ev: InputEvent) -> void:
 	if window != null: return
+	if ev is InputEventKey and ev.pressed and not ev.echo and ev.keycode == KEY_E and zone.near_merchant():
+		_open("shop"); return
 	if ev is InputEventScreenTouch:
 		if ev.pressed: _touch_down(ev.index, ev.position)
 		else: _touch_up(ev.index)
@@ -178,6 +389,7 @@ func _touch_down(idx: int, p: Vector2) -> void:
 	for i in skill_btns.size():
 		if skill_btns[i].hit(p):
 			touches[idx] = {"role": "skill", "slot": i}
+			_hold_time[i] = 0.0
 			skill_btns[i].set_held(true)
 			if i == 0: player.attack_held = true
 			else: player.try_use(i)
@@ -186,6 +398,11 @@ func _touch_down(idx: int, p: Vector2) -> void:
 		touches[idx] = {"role": "jump"}
 		jump_btn.set_held(true)
 		press_jump()
+		return
+	if roll_btn.hit(p):
+		touches[idx] = {"role": "roll"}
+		roll_btn.set_held(true)
+		press_roll()
 		return
 	if potion_btn.hit(p):
 		touches[idx] = {"role": "potion"}
@@ -234,11 +451,15 @@ func _touch_up(idx: int) -> void:
 			_set_joy(joy_default, Vector2.ZERO)
 		"skill":
 			skill_btns[t["slot"]].set_held(false)
+			_hold_time.erase(t["slot"])
+			if _tip_slot == t["slot"]: _hide_tooltip()
 			if t["slot"] == 0: player.attack_held = false
 		"potion":
 			potion_btn.set_held(false)
 		"jump":
 			jump_btn.set_held(false)
+		"roll":
+			roll_btn.set_held(false)
 	touches.erase(idx)
 	pinch_last = 0
 
@@ -246,24 +467,40 @@ func _touch_up(idx: int) -> void:
 func press_jump() -> void:
 	if player: player.request_jump()
 
+## Кнопка «Кувырок»
+func press_roll() -> void:
+	if player: player.request_roll()
+
 func _set_joy(center: Vector2, knob: Vector2) -> void:
 	joy_base.position = center - Vector2(JOY_R, JOY_R)
 	joy_knob.position = Vector2(JOY_R, JOY_R) + knob - Vector2(50, 50)
 
 # ---------------- обновление ----------------
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if player == null or player.stats.is_empty(): return
+	if window == null:
+		_update_hints(delta)
+		for k in _hold_time.keys():
+			_hold_time[k] += delta
+			if k > 0 and _hold_time[k] > 0.55 and _tip_slot != k:
+				show_skill_tooltip(k); _tip_slot = k
+	interact_btn.visible = window == null and zone.near_merchant()
 	var d: Dictionary = zone.data
 	joy_default = Vector2(260, _screen().y - 240)
 	if not _has_role("joy"): _set_joy(joy_default, Vector2.ZERO)
 	var asc := DB.get_asc(d["ascendancy"])
-	name_label.text = "%s  ур. %d  ·  %s (мастерство %d)" % [d["name"], d["level"], asc["name"] if not asc.is_empty() else DB.CLASSES[d["class"]].name, d["class_level"]]
+	name_label.text = "%s · ур. %d · %s" % [d["name"], d["level"], asc["name"] if not asc.is_empty() else DB.CLASSES[d["class"]].name]
 	_set_bar(hp_bar, player.hp, player.stats.max_hp, "%d / %d" % [ceili(player.hp), roundi(player.stats.max_hp)])
 	_set_bar(mp_bar, player.mp, player.stats.max_mp, "%d / %d" % [floori(player.mp), roundi(player.stats.max_mp)])
 	var need := DB.xp_to_next(d["level"])
 	_set_bar(xp_bar, d["xp"], need, "Опыт %d / %d" % [d["xp"], need])
-	gold_label.text = "Золото: %d" % d["gold"]
-	potion_label.text = "x%d " % d["potions"]
+	gold_label.text = "%d" % d["gold"]
+	potion_btn.badge = str(d["potions"]); potion_btn.queue_redraw()
+	var c0: SkillButton = skill_btns[0]
+	var pip := player.combo_step if player.combo_timer > 0 else 0
+	if c0.pips != pip: c0.pips = pip; c0.queue_redraw()
+	roll_btn.set_state(clampf(player.roll_cd / Player.ROLL_CD, 0, 1), 0.0, "")
+	objective.text = _objective()
 	var free := DB.free_points(d)
 	talent_badge.get_parent().visible = free > 0
 	talent_badge.text = str(free)
@@ -296,7 +533,7 @@ func _update_enemy_bars() -> void:
 			bar.size = Vector2(130, 16)
 			bar.get_node("Text").visible = false
 			var nm := UIK.label(bar, "", 20, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-			nm.position = Vector2(-85, -38); nm.size = Vector2(300, 34)
+			UIK.rect(nm, Vector2(-85, -38), Vector2(300, 34))
 			nm.autowrap_mode = TextServer.AUTOWRAP_OFF
 			nm.name = "Name"
 			root.move_child(bar, 0)
@@ -311,6 +548,23 @@ func _update_enemy_bars() -> void:
 		var diff: int = e.level - zone.data["level"]
 		nl.add_theme_color_override("font_color", Color(1, 0.35, 0.3) if diff >= 3 else (Color(0.7, 0.7, 0.7) if diff <= -3 else Color.WHITE))
 	for i in range(used, bar_pool.size()): bar_pool[i].visible = false
-	boss_bar.visible = boss != null
+	boss_panel.visible = boss != null
 	if boss != null:
-		_set_bar(boss_bar, boss.hp, boss.max_hp, boss.display_name)
+		_set_bar(boss_bar, boss.hp, boss.max_hp, "%d / %d" % [ceili(boss.hp), roundi(boss.max_hp)])
+		boss_name.text = str(boss.def.name) + "  ·  ур. %d" % boss.level
+		var br = boss.brain
+		if br:
+			boss_phase.text = "Фаза %d · %s" % [br.phase, br.PHASE_NAMES[br.phase]] + ("  · ЯРОСТЬ" if br.enraged else "")
+			var fill: StyleBoxTexture = boss_bar.get_theme_stylebox("fill")
+			var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.008)
+			fill.modulate_color = Color(0.95, 0.25 + 0.2 * pulse, 0.05) if br.enraged else (Color(0.85, 0.2, 0.08) if br.phase == 2 else Color(0.78, 0.1, 0.1))
+			for f in [66, 33]:
+				var m: ColorRect = boss_bar.get_node("Mark%d" % f)
+				m.color = Color(1, 0.85, 0.4, 0.95) if boss.hp / boss.max_hp > f / 100.0 else Color(0.4, 0.35, 0.3, 0.7)
+
+func _objective() -> String:
+	var boss_alive := false
+	for e in zone.enemies:
+		if e.alive and e.def.boss: boss_alive = true
+	if boss_alive: return "Цель: победить Древнего тролля в руинах (череп на карте)"
+	return "Цель: портал в Глобальный мир (замок на карте)"

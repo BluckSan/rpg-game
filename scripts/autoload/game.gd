@@ -134,4 +134,4 @@ func _process(delta: float) -> void:
 
 func _place_toast() -> void:
 	var vs := get_viewport().get_visible_rect().size
-	_toast_panel.position = Vector2((vs.x - _toast_panel.size.x) / 2, vs.y * 0.16)
+	_toast_panel.position = Vector2((vs.x - _toast_panel.size.x) / 2, vs.y * 0.24)

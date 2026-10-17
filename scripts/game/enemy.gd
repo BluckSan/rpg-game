@@ -27,6 +27,11 @@ var _returning := false
 var _anim := 0.0
 var _lunge := 0.0
 var _flash := 0.0
+var _kb := Vector3.ZERO
+var brain   # BossBrain для босса
+var damage_mult := 1.0
+var speed_mult := 1.0
+var hits_taken := 0
 
 static func spawn(z, k: String, lvl: int, pos: Vector3, parent: Node) -> Enemy:
 	var e := Enemy.new()
@@ -43,6 +48,9 @@ static func spawn(z, k: String, lvl: int, pos: Vector3, parent: Node) -> Enemy:
 	e.global_position = Vector3(pos.x, z.ground_y(pos), pos.z)
 	e.rotation.y = randf() * TAU
 	e._build_model()
+	if e.def.boss:
+		e.brain = BossBrain.new()
+		e.brain.setup(e)
 	z.enemies.append(e)
 	return e
 
@@ -50,7 +58,7 @@ var display_name: String:
 	get: return "%s (%d)" % [def.name, level]
 
 func _damage() -> float:
-	return def.dmg * (1 + (level - 1) * 0.18)
+	return def.dmg * (1 + (level - 1) * 0.18) * damage_mult
 
 func _build_model() -> void:
 	match kind:
@@ -84,13 +92,28 @@ func _model_action(a: String) -> void:
 
 func take_damage(dmg: float, crit: bool) -> void:
 	if not alive: return
+	if brain and brain.invulnerable: 
+		zone.float_text(global_position + Vector3.UP * 4.5, "Неуязвим", Color(0.8, 0.8, 0.8))
+		return
 	hp -= dmg
+	hits_taken += 1
 	_flash = 0.12
 	_aggro = true; _returning = false
 	if model is MobModel: model.hit_react()
 	elif model is CharVisual and not model.is_acting() and not def.boss: model.play_action("hit")
 	zone.damage_number(global_position + Vector3.UP * (4.5 if def.boss else 2.0), dmg, crit, false)
 	if hp <= 0: _die()
+
+## Отбрасывание при попадании (босс почти не сдвигается) + «упругий» отклик модели
+func knockback(dir: Vector3, force: float) -> void:
+	if not alive: return
+	var k := 0.08 if def.boss else (0.5 if kind in ["troll", "goblin"] else 1.0)
+	_kb += U.flat(dir).normalized() * force * k
+	if model:
+		var base := model.scale
+		var tw := create_tween()
+		tw.tween_property(model, "scale", Vector3(base.x * 1.08, base.y * 0.92, base.z * 1.08), 0.05)
+		tw.tween_property(model, "scale", base, 0.12)
 
 func slow(factor: float, t: float) -> void:
 	_slow_factor = factor; _slow_timer = t
@@ -138,10 +161,18 @@ func _process(delta: float) -> void:
 		_slow_timer -= delta
 		if _slow_timer <= 0: _slow_factor = 1.0
 	_animate(delta)
+	if _kb.length_squared() > 0.01:
+		var np := global_position + _kb * delta
+		np.y = zone.ground_y(np)
+		global_position = np
+		_kb = _kb * exp(-delta * 9.0)
+	if brain:
+		brain.update(delta)
+		if brain.busy: return
 	if _stun_timer > 0:
 		_stun_timer -= delta
 		return
-	var speed: float = def.speed * _slow_factor
+	var speed: float = def.speed * _slow_factor * speed_mult
 	var home_dist := U.flat_dist(global_position, home)
 	if home_dist > (22.0 if def.boss else 28.0):
 		_returning = true; _aggro = false
@@ -155,11 +186,10 @@ func _process(delta: float) -> void:
 		_aggro = true
 		var to := U.flat(target.global_position - global_position)
 		_face(to, delta)
-		if def.boss: _boss_logic(delta)
 		if to.length() > def.range * 0.9:
 			_move_towards(target.global_position, speed, delta)
 		elif _attack_timer <= 0:
-			_attack_timer = def.interval
+			_attack_timer = def.interval / speed_mult
 			_attack()
 	else:
 		_aggro = false
@@ -179,28 +209,16 @@ func _attack() -> void:
 		var dir := U.flat(target.global_position - global_position).normalized()
 		Projectile.fire(zone, origin, dir, 13.0, def.range + 4, Color(0.6, 0.9, 1), 0.25, false, Callable(), _damage())
 	else:
-		_deal_to(target, _damage())
+		var t := target
+		await get_tree().create_timer(0.25 if not def.boss else 0.45, false).timeout
+		if not alive or t == null or not is_instance_valid(t): return
+		if U.flat_dist(t.global_position, global_position) <= def.range + 0.6:
+			_deal_to(t, _damage())
 
 func _deal_to(t: Node3D, dmg: float) -> void:
 	if t == null or not is_instance_valid(t): return
 	if t is Player: t.take_damage(dmg, global_position)
 	elif t.has_method("take_damage"): t.take_damage(dmg)
-
-func _boss_logic(delta: float) -> void:
-	_boss_timer -= delta
-	if _boss_timer > 0 or target == null: return
-	_boss_timer = randf_range(5.0, 7.5)
-	var pos := target.global_position
-	var r := 4.5
-	zone.fx("telegraph", pos, r, Color.RED, 1.3)
-	_model_action("slam")
-	await get_tree().create_timer(1.3, false).timeout
-	if not alive or not is_instance_valid(self): return
-	zone.fx("ring", pos, r, Color(0.6, 0.4, 0.2), 0.4)
-	var p: Player = zone.player
-	if p and U.flat_dist(p.global_position, pos) < r: p.take_damage(_damage() * 1.8, pos)
-	for m in zone.minions.duplicate():
-		if is_instance_valid(m) and U.flat_dist(m.global_position, pos) < r: m.take_damage(_damage() * 1.8)
 
 func _move_towards(p: Vector3, speed: float, delta: float) -> void:
 	var d := U.flat(p - global_position)

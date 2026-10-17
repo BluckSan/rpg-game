@@ -57,6 +57,15 @@ var _run_ref := 4.6
 var _loco: AnimationNodeBlendSpace1D
 var _idle_name := "idle"
 var neutral_pose := false
+var weapon: Node3D          # основное оружие (для следа и точки каста)
+var weapon_tip := Vector3(0, 1, 0)
+var trail: WeaponTrail
+var _bow_ba: BoneAttachment3D
+var _bow_rest: Array = []
+var _bow_aiming := false
+var _cur_action := ""
+const TRAILS := {"props/sword1": [Vector3(0, 0.5, 0), Vector3(0, 2.25, 0)], "props/staff": [Vector3(0, 1.9, 0), Vector3(0, 2.7, 0)],
+	"props/axe": [Vector3(0, 0.35, 0), Vector3(0, 0.86, 0)]}
 
 func build(l: Dictionary, cls: String, asc: String, monster_kind := "") -> void:
 	class_id = cls; asc_id = asc; monster = monster_kind
@@ -66,7 +75,7 @@ func build(l: Dictionary, cls: String, asc: String, monster_kind := "") -> void:
 	else:
 		look = CharAssets.normalize_look(l)
 	for c in get_children(): c.queue_free()
-	model = null; beast = null; fx = null; skel = null; tree = null; meshes = {}
+	model = null; beast = null; fx = null; skel = null; tree = null; meshes = {}; weapon = null; trail = null; _bow_ba = null
 	dead = false
 	if asc == "druid":
 		beast = MobModel.new(); add_child(beast)
@@ -193,6 +202,19 @@ func _build_weapons() -> void:
 		var inst: Node3D = CharAssets.prop(w[1]).instantiate()
 		ba.add_child(inst)
 		inst.position = w[2]; inst.rotation_degrees = w[3]; inst.scale = Vector3.ONE * float(w[4])
+		if weapon == null and TRAILS.has(w[1]):
+			weapon = inst
+			weapon_tip = TRAILS[w[1]][1]
+			trail = WeaponTrail.new()
+			add_child(trail)
+			var tc := Color(1, 0.95, 0.85, 0.9)
+			if CharAssets.ASC_LOOK.has(asc_id): tc = CharAssets.ASC_LOOK[asc_id].fx_color
+			elif class_id == "mage": tc = Color(0.5, 0.75, 1.0, 0.9)
+			elif monster != "": tc = Color(1, 0.5, 0.3, 0.7)
+			trail.setup(inst, TRAILS[w[1]][0], TRAILS[w[1]][1], tc)
+		elif weapon == null and w[1] == "props/bow":
+			weapon = inst; weapon_tip = Vector3(0, 1.0, 0)
+			_bow_ba = ba; _bow_rest = [w[0], w[2], w[3]]
 		if asc_id == "paladin" or asc_id == "elementalist" or asc_id == "berserker":
 			_tint_weapon(inst, CharAssets.ASC_LOOK[asc_id].fx_color)
 
@@ -311,6 +333,9 @@ func _action_anim(kind: String) -> Array:
 			"slam": return ["attack_heavy", 1.4, false]
 			"hit": return ["hit", 1.3, true]
 			"roar": return ["cheer", 1.0, false]
+			"throw": return ["throw", 0.9, false]
+			"charge": return ["attack_heavy", 0.8, false]
+			"stomp": return ["attack_heavy", 1.1, false]
 	match kind:
 		"attack":
 			match class_id:
@@ -336,6 +361,8 @@ func _action_anim(kind: String) -> Array:
 		"drink": return ["consume", 1.6, true]
 		"cheer": return ["cheer", 1.0, false]
 		"pickup": return ["interact", 1.5, true]
+		"roll": return ["roll", 1.5, false]
+		"beast_roar": return ["cheer", 1.3, false]
 	return ["attack_a", 1.2, true]
 
 func play_action(kind: String) -> void:
@@ -348,15 +375,51 @@ func play_action(kind: String) -> void:
 	var lib := CharAssets.anim_library(_gender)
 	if not lib.has_animation(a[0]): return
 	_act_node.animation = "h/" + a[0]
+	_cur_action = a[0]
 	_oneshot.filter_enabled = bool(a[2]) and _speed > 0.6
 	tree.set("parameters/act_ts/scale", a[1])
 	tree.set("parameters/act/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
+	if kind in ["spin", "dash", "shadow_strike", "slam", "charge", "stomp"] or (kind == "attack" and monster != ""): swing(0.5)
 
 ## Спокойная стойка (для редактора лица): голова прямо, без боевой позы
 func set_neutral(v: bool) -> void:
 	neutral_pose = v
 	if _loco and _loco.get_blend_point_count() > 0:
 		(_loco.get_blend_point_node(0) as AnimationNodeAnimation).animation = "h/" + ("idle" if v else _idle_name)
+
+## Произвольная анимация из библиотеки (для комбо и особых атак)
+func play_anim(anim: String, speed := 1.0, upper := true, trail_time := 0.0) -> void:
+	if beast:
+		beast.play_action("attack", speed)
+		return
+	if tree == null or dead: return
+	if not CharAssets.anim_library(_gender).has_animation(anim): return
+	_act_node.animation = "h/" + anim
+	_cur_action = anim
+	_oneshot.filter_enabled = upper and _speed > 0.6
+	tree.set("parameters/act_ts/scale", speed)
+	tree.set("parameters/act/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
+	if trail_time > 0: swing(trail_time)
+
+## След оружия на время взмаха
+func swing(t: float) -> void:
+	if trail: trail.emit(t)
+
+## Мировая позиция кончика оружия (точка каста)
+func tip_position() -> Vector3:
+	if weapon and is_instance_valid(weapon): return weapon.global_transform * weapon_tip
+	return global_position + Vector3.UP * 1.4 + global_basis.z * 0.5
+
+## Узел у кончика оружия (для свечения каста)
+func tip_node() -> Node3D:
+	var n := Node3D.new()
+	if weapon and is_instance_valid(weapon):
+		weapon.add_child(n); n.position = weapon_tip
+	else:
+		add_child(n); n.position = Vector3(0, 1.4, 0.5)
+	n.top_level = false
+	get_tree().create_timer(1.0).timeout.connect(n.queue_free)
+	return n
 
 func play_attack() -> void:
 	play_action("attack")
@@ -375,6 +438,20 @@ func set_dead(v: bool) -> void:
 			tree.set("parameters/death_seek/seek_request", 0.0)
 		tree.set("parameters/dead/blend_amount", 1.0 if v else 0.0)
 
+## Лук: в покое — в левой руке; при выстреле — перед грудью в правой руке, тетивой к себе
+func _update_bow() -> void:
+	if _bow_ba == null or not is_instance_valid(_bow_ba): return
+	var aim := is_acting() and _cur_action in ["bow_shoot", "bow_aim", "throw"]
+	if aim == _bow_aiming: return
+	_bow_aiming = aim
+	var w: Node3D = _bow_ba.get_child(0)
+	if aim:
+		_bow_ba.bone_name = "hand_r"
+		w.position = Vector3(0, 0.02, 0.02); w.rotation_degrees = Vector3(90, 0, 0)
+	else:
+		_bow_ba.bone_name = _bow_rest[0]
+		w.position = _bow_rest[1]; w.rotation_degrees = _bow_rest[2]
+
 func _process(delta: float) -> void:
 	var p := global_position
 	var v := Vector2(p.x - _last_pos.x, p.z - _last_pos.z).length() / maxf(delta, 0.0001)
@@ -386,6 +463,7 @@ func _process(delta: float) -> void:
 		beast.speed_override = _speed
 		return
 	if tree == null: return
+	_update_bow()
 	var s := _speed / maxf(0.5, model.scale.x if monster != "" else 1.0)
 	tree.set("parameters/loco/blend_position", clampf(s, 0, 8))
 	tree.set("parameters/loco_ts/scale", 1.0 if s < 5.5 else clampf(s / 5.5, 1.0, 1.4))

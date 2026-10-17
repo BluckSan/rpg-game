@@ -26,7 +26,7 @@ func _ready() -> void:
 		return
 	print("=== SMOKE TEST ===")
 	for f in Game.list_characters(): Game.delete_character(f["id"])
-	get_tree().create_timer(200.0, true, false, true).timeout.connect(func():
+	get_tree().create_timer(280.0, true, false, true).timeout.connect(func():
 		printerr("TIMEOUT / script error")
 		get_tree().quit(2))
 	await frames(2)
@@ -116,6 +116,10 @@ func _ready() -> void:
 		if i == 0:
 			await _jump_tests(z, p)
 			_mob_anim_tests(z)
+			await _ui_tests(z, p)
+			await _shop_tests(z, p)
+			await _roll_tests(z, p)
+		await _combo_tests(z, p, c["class"])
 		# подвести врага и атаковать
 		var e = z.enemies[0]
 		p.teleport(e.global_position + Vector3(0, 0.1, -1.5))
@@ -192,6 +196,7 @@ func _ready() -> void:
 		var hp0: float = pl.hp
 		await get_tree().create_timer(2.5).timeout
 		check(pl.hp < hp0 or pl.dead, "босс атакует игрока (%d → %d)" % [hp0, pl.hp])
+		await _boss_tests(z2, pl, boss)
 		boss.take_damage(99999, true)
 		await frames(5)
 		check(not is_instance_valid(boss) or not boss.alive, "босс повержен, выпала добыча")
@@ -204,6 +209,164 @@ func _ready() -> void:
 	for id in ids: Game.delete_character(id)
 	print("=== RESULT: %s (%d errors) ===" % ["PASS" if errors == 0 else "FAIL", errors])
 	get_tree().quit(1 if errors > 0 else 0)
+
+func secs(t: float) -> void:
+	await get_tree().create_timer(t).timeout
+
+func _combo_tests(z, p: Player, cls: String) -> void:
+	var dummy := Enemy.spawn(z, "slime", 1, p.global_position + p.forward() * 1.6, z.fx_root)
+	dummy.max_hp = 99999; dummy.hp = 99999
+	dummy.def = dummy.def.duplicate(); dummy.def.aggro = 0.0
+	await frames(2)
+	p.face_towards(dummy.global_position)
+	p.combo_step = 0; p.combo_timer = 0
+	var n0 := p.combo_count
+	var seq := []
+	for k in 3:
+		p.cooldowns[0] = 0
+		p.try_use(0)
+		seq.append(p.last_combo_index)
+		await secs(0.5)
+	check(p.combo_count - n0 >= 3 and seq == [0, 1, 2], "[%s] комбо из 3 ударов: %s" % [cls, str(seq)])
+	check(dummy.hp < 99999, "[%s] комбо наносит урон (%d)" % [cls, 99999 - dummy.hp])
+	check(dummy.hits_taken >= 2, "[%s] попаданий по цели: %d" % [cls, dummy.hits_taken])
+	await secs(1.4)
+	check(p.combo_step == 0, "[%s] комбо сбрасывается после паузы" % cls)
+	check(is_equal_approx(Engine.time_scale, 1.0), "[%s] время после стоп-кадров = 1" % cls)
+	dummy.take_damage(999999, false)
+
+func _roll_tests(z, p: Player) -> void:
+	p.recalc(true)
+	var hp0 := p.hp
+	var d0 := p.dodged
+	check(p.request_roll(), "кувырок выполнен")
+	check(p.is_rolling() and p.invuln > 0, "кувырок даёт неуязвимость")
+	p.take_damage(50.0, p.global_position + Vector3(1, 0, 0))
+	check(p.hp == hp0 and p.dodged == d0 + 1, "урон во время кувырка поглощён (уклонение)")
+	check(not p.request_roll(), "повторный кувырок на перезарядке")
+	await secs(1.0)
+	check(not p.is_rolling(), "кувырок завершён")
+
+func _ui_tests(z, p: Player) -> void:
+	var h = z.hud
+	check(h.minimap != null and h.minimap.is_visible_in_tree(), "мини-карта на экране")
+	check(h.roll_btn != null and h.jump_btn != null and h.potion_btn != null, "кнопки кувырка, прыжка и зелья")
+	check(h.skill_btns[0].icon != null and h.skill_btns[1].icon != null, "иконки на кнопках умений")
+	check(h.skill_btns[0].max_pips == 3, "точки комбо на кнопке атаки")
+	check(h.objective.text != "", "строка цели: %s" % h.objective.text)
+	await frames(2)
+	var hid: String = h.hint_id
+	check(h.hint_panel.visible and hid != "", "подсказка обучения на экране: %s" % hid)
+	h._hint_done()
+	check(z.data["tutorial"].get(hid, false), "подсказка отмечена как прочитанная")
+	h.show_skill_tooltip(1)
+	await frames(3)
+	check(h.tooltip != null and is_instance_valid(h.tooltip), "подсказка к умению (долгое нажатие)")
+	h._hide_tooltip()
+	var b0: int = h.level_banners
+	p.gain_xp(DB.xp_to_next(p.data["level"]))
+	await frames(2)
+	check(h.level_banners == b0 + 1 and h.root.find_child("LevelBanner", true, false) != null, "баннер «Новый уровень»")
+	var rows: int = h.pickup_box.get_child_count()
+	h.pickup("Тест", Color.WHITE, "two-coins")
+	check(h.pickup_box.get_child_count() == rows + 1, "уведомление о добыче с иконкой")
+
+func _shop_tests(z, p: Player) -> void:
+	p.teleport(z.merchant_point + Vector3(0, 0.1, 1.8))
+	await frames(4)
+	check(z.merchant != null and z.near_merchant(), "торговец в лагере рядом")
+	check(z.hud.interact_btn.visible, "кнопка «Торговать» появилась")
+	var d: Dictionary = p.data
+	d["gold"] = 5000
+	var pot0: int = d["potions"]
+	z.hud._open("shop")
+	await frames(3)
+	var w = z.hud.window
+	check(w != null and w.name == "Window_shop" and get_tree().paused, "окно лавки открыто")
+	check(d["shop"]["stock"].size() == 6, "в лавке 6 товаров")
+	var lvl_ok := true
+	for it in d["shop"]["stock"]:
+		if absi(int(it.ilvl) - int(d["level"])) > 1: lvl_ok = false
+	check(lvl_ok, "товары под уровень героя")
+	check(w.buy_potion() and d["potions"] == pot0 + 1, "покупка зелья")
+	var g0: int = d["gold"]
+	var price: int = DB.buy_price(d["shop"]["stock"][0])
+	check(w.buy(0) and d["gold"] == g0 - price, "покупка предмета (−%d)" % price)
+	var idx: int = d["inventory"].size() - 1
+	var sp: int = DB.sell_price(d["inventory"][idx])
+	g0 = d["gold"]
+	check(w.sell(idx) and d["gold"] == g0 + sp, "продажа предмета (+%d)" % sp)
+	check(d["buyback"].size() >= 1, "проданное попало в выкуп")
+	check(w.buyback(0) and d["gold"] == g0, "выкуп предмета")
+	w.select_tab("sell"); await frames(1)
+	w.select_tab("buyback"); await frames(1)
+	w.select_tab("buy"); await frames(1)
+	d["gold"] = 0
+	check(not w.buy(0), "без золота купить нельзя")
+	d["gold"] = 1000
+	w.restock()
+	check(d["shop"]["stock"].size() == 6 and d["gold"] < 1000, "обновление товаров")
+	z.hud.close_window()
+	await frames(3)
+	check(not get_tree().paused, "лавка закрыта")
+
+func _boss_tests(z, pl: Player, boss) -> void:
+	var br = boss.brain
+	check(br != null, "у босса есть мозг (фазы)")
+	if br == null: return
+	check(boss.max_hp >= 2200, "у босса больше здоровья: %d" % boss.max_hp)
+	pl.god_mode = true
+	await secs(0.5)
+	check(z.hud.boss_panel.visible, "полоса босса с метками фаз видна")
+	boss.hp = boss.max_hp * 0.6
+	await secs(2.4)
+	check(br.phase == 2 and br.log.has("phase2"), "фаза 2 на 66%% (фаза %d)" % br.phase)
+	check("Фаза 2" in z.hud.boss_phase.text, "надпись фазы: %s" % z.hud.boss_phase.text)
+	for k in ["slam", "charge", "rock", "summon"]:
+		var guard := 0
+		while br.busy and guard < 200:
+			await frames(1); guard += 1
+		br.run(k, pl)
+		await secs(2.2)
+		check(br.log.has(k), "атака босса «%s» выполнена" % k)
+	check(br.adds.size() >= 2, "босс призвал помощников: %d" % br.adds.size())
+	var shock := 0
+	for ch in z.fx_root.get_children():
+		if ch is BossBrain.Shockwave: shock += 1
+	pl.god_mode = false
+	pl.recalc(true)
+	var hp1 := pl.hp
+	var w := BossBrain.Shockwave.new()
+	w.zone = z; w.center = pl.global_position + Vector3(3, 0, 0); w.speed = 8.0; w.damage = 10.0
+	z.fx_root.add_child(w)
+	await secs(0.8)
+	check(pl.hp < hp1, "ударная волна ранит стоящего на земле")
+	pl.god_mode = true
+	boss.hp = boss.max_hp * 0.3
+	await secs(2.4)
+	check(br.phase == 3 and br.enraged and boss.speed_mult > 1.0 and boss.damage_mult > 1.0, "фаза 3: ярость (быстрее и сильнее)")
+	check("ЯРОСТЬ" in z.hud.boss_phase.text, "ярость отмечена на полосе")
+	pl.god_mode = false
+	var guard2 := 0
+	while br.busy and guard2 < 300:
+		await frames(1); guard2 += 1
+	var items0 := 0
+	for ch in z.fx_root.get_children():
+		if ch is Loot and ch.type == "item": items0 += 1
+	boss.take_damage(99999, true)
+	await frames(3)
+	var items := 0
+	var rare := 0
+	var uniq := 0
+	for ch in z.fx_root.get_children():
+		if ch is Loot and ch.type == "item" and is_instance_valid(ch):
+			items += 1
+			if int(ch.item.rarity) >= 2: rare += 1
+			if int(ch.item.rarity) == 3: uniq += 1
+	check(items - items0 >= 4 and rare >= 1, "добыча босса: %d предм., редких+ %d" % [items - items0, rare])
+	check(uniq >= 1 and z.last_boss_drop.get("first", false), "первая победа: гарантированный уникальный")
+	for a in br.adds:
+		if is_instance_valid(a) and a.alive: a.take_damage(99999, false)
 
 func phys(n: int) -> void:
 	for i in n: await get_tree().physics_frame

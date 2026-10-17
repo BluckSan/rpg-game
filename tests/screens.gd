@@ -3,7 +3,7 @@ extends Node
 ## godot --path . --rendering-driver opengl3 --resolution 1920x1080 res://tests/screens.tscn
 ## Сохраняет в /workspace/rpg-shots/ (или в user://shots, если папки нет).
 var is_runner := false
-var out := "/workspace/rpg-shots"
+var out := "/workspace/rpg-shots/v030"
 var only := ""
 
 func shot(n: String) -> void:
@@ -22,6 +22,7 @@ func _ready() -> void:
 	if not is_runner:
 		var r = load("res://tests/screens.gd").new(); r.is_runner = true
 		get_tree().root.add_child.call_deferred(r); return
+	DirAccess.make_dir_recursive_absolute(out)
 	if not DirAccess.dir_exists_absolute(out):
 		out = ProjectSettings.globalize_path("user://shots"); DirAccess.make_dir_recursive_absolute(out)
 	for a in OS.get_cmdline_user_args():
@@ -129,8 +130,177 @@ func _ready() -> void:
 	if want("ui"):
 		z.player.teleport(Vector3(16, 0.1, 18)); await w(1.5)
 		await shot("16_zone_gameplay")
+	await _v030(z, c, rng)
 	Game.delete_character(c["id"])
+	Engine.time_scale = 1.0
 	get_tree().quit()
+
+# ---------------- v0.3: интерфейс, бой, босс, лавка ----------------
+func _v030(z, c: Dictionary, rng: RandomNumberGenerator) -> void:
+	var p: Player = z.player
+	p.god_mode = true
+	if want("hud"):
+		z.data["tutorial"] = {}
+		z.hud._start_pos = z.spawn_point
+		z.hud.hint_id = ""
+		p.teleport(z.spawn_point + Vector3(1.5, 0, 1)); p.face_towards(z.merchant_point)
+		z.cam_rig.yaw = 200.0
+		await w(1.5); await shot("20_hud_tutorial_hint")
+		z.hud._hint_done(); z.hud._hint_done()
+		p.teleport(z.merchant_point + Vector3(1.2, 0.1, 2.2)); p.face_towards(z.merchant_point)
+		z.cam_rig.yaw = 150.0
+		await w(1.5); await shot("21_merchant_interact")
+		for k in z.hud.HINTS: z.data["tutorial"][k] = true
+		z.hud._hint_done()
+	for k in z.hud.HINTS: z.data["tutorial"][k] = true
+	z.hud._hint_done()
+	if want("shop"):
+		z.data["gold"] = 1460
+		for i in 5: z.data["inventory"].append(DB.roll_item(rng.randi_range(2, 6), z.data["class"], 0.3))
+		z.hud._open("shop"); await w(0.6)
+		var s = z.hud.window
+		s._select("stock", 1); await w(0.4)
+		await shot("22_shop_buy")
+		s.select_tab("sell"); s._select("inv", 0); await w(0.4)
+		await shot("23_shop_sell")
+		s.sell(0); s.sell(0)
+		s.select_tab("buyback"); s._select("buyback", 0); await w(0.4)
+		await shot("23b_shop_buyback")
+		z.hud.close_window(); await w(0.3)
+	if want("inv"):
+		for i in 3: z.data["inventory"].append(DB.roll_item(6, z.data["class"], 0.6))
+		z.hud._open("hero"); await w(0.6)
+		var iv = z.hud.window
+		iv._select(z.data["inventory"][z.data["inventory"].size() - 1], false); await w(0.4)
+		await shot("24_hero_inventory_tooltip")
+		z.hud.close_window(); await w(0.3)
+	if want("talents"):
+		z.data["level"] = max(int(z.data["level"]), 4)
+		z.hud._open("talents"); await w(0.6)
+		var tw = z.hud.window
+		var nid: int = DB.tree_nodes[DB.start_node(z.data["class"])]["links"][0] if DB.tree_nodes[DB.start_node(z.data["class"])].has("links") else DB.start_node(z.data["class"])
+		tw._tap(tw._to_screen(DB.tree_nodes[nid]["pos"])); await w(0.5)
+		await shot("25_talent_tooltip")
+		z.hud.close_window(); await w(0.3)
+	# бой: стая слизней возле лагеря
+	var arena := Vector3(14, 0, 6)
+	if want("levelup") or want("combat"):
+		p.teleport(arena + Vector3(0, 0.1, -2)); await w(0.5)
+	if want("levelup"):
+		p.gain_xp(DB.xp_to_next(z.data["level"]) + 5)
+		z.hud.pickup("+48 золота", Color(1, 0.85, 0.35), "two-coins")
+		z.hud.pickup("+1 зелье лечения", Color(1, 0.4, 0.4), "health-potion")
+		var it := DB.roll_item(5, z.data["class"], 0.5)
+		z.hud.pickup(it.name, DB.RARITY_COLORS[int(it.rarity)], UIK.item_icon(it, z.data["class"]))
+		await w(0.6); await shot("26_levelup_loot_feed")
+		await w(3.0)
+	if want("combat"):
+		await _combat_shots(z, "warrior", arena)
+	if want("skilltip"):
+		z.hud.show_skill_tooltip(1); await w(0.5)
+		await shot("30_skill_tooltip")
+		z.hud._hide_tooltip()
+	if want("boss2"):
+		await _boss_shots(z)
+	if want("classes2"):
+		for cls in ["archer", "mage"]:
+			var c2 := DB.new_character("Тест", cls, CharAssets.random_look(1 if cls == "archer" else 0, rng))
+			c2["level"] = 8; c2["class_level"] = 3; c2["tutorial"] = {"move": true, "attack": true, "jump": true, "talents": true, "shop": true, "boss": true}
+			Game.save_character(c2)
+			Game.play(c2); await w(2.5)
+			var z2 = get_tree().current_scene
+			z2.player.god_mode = true
+			z2.player.teleport(arena + Vector3(0, 0.1, -2)); await w(0.5)
+			await _combat_shots(z2, cls, arena)
+			Game.delete_character(c2["id"])
+
+func _pack(z, center: Vector3, n: int) -> Array:
+	var out := []
+	for i in n:
+		var e := Enemy.spawn(z, ["slime", "goblin", "skeleton"][i % 3], 3, center + Vector3((i - 1) * 1.3, 0, 0.4 * (i % 2)), z.fx_root)
+		e.max_hp = 9999; e.hp = 9999
+		e.def = e.def.duplicate(); e.def.aggro = 0.0; e.def.dmg = 0.0
+		out.append(e)
+	return out
+
+func _combat_shots(z, cls: String, arena: Vector3) -> void:
+	var p: Player = z.player
+	var mobs := _pack(z, arena + Vector3(0, 0, 2.2 if cls == "warrior" else 6.0), 3)
+	p.teleport(arena + Vector3(0, 0.1, 0)); p.face_towards(mobs[1].global_position)
+	z.cam_rig.yaw = 120.0; z.cam_rig.distance = 7.5
+	await w(1.0)
+	p.data["class_level"] = 3; p.recalc(true)
+	z.base_time_scale = 0.3; Engine.time_scale = 0.3
+	var pre: String = {"warrior": "27", "archer": "28", "mage": "29"}[cls]
+	for k in 3:
+		p.cooldowns[0] = 0
+		p.face_towards(mobs[1].global_position)
+		p.try_use(0)
+		await w(0.22 if cls == "warrior" else 0.3)
+		await shot("%s_combo_%s_hit%d" % [pre, cls, k + 1])
+		await w(0.35)
+	# умение 1
+	p.cooldowns[1] = 0; p.mp = p.stats.max_mp
+	p.try_use(1)
+	await w(0.3); await shot("%s_skill1_%s" % [pre, cls])
+	await w(0.6)
+	if cls == "archer":
+		# крупный план лука во время выстрела
+		var cam := Camera3D.new(); z.add_child(cam)
+		p.cooldowns[0] = 0; p.try_use(0)
+		await w(0.12)
+		var hp := p.global_position
+		var side := p.forward().cross(Vector3.UP).normalized()
+		cam.global_position = hp + side * 2.2 + p.forward() * 1.2 + Vector3.UP * 1.5
+		cam.look_at(hp + Vector3.UP * 1.25); cam.fov = 40; cam.current = true
+		await shot("28b_archer_bow_closeup")
+		cam.current = false; cam.queue_free()
+	Engine.time_scale = 1.0; z.base_time_scale = 1.0
+	z.cam_rig.distance = 11.0
+	for e in mobs:
+		if is_instance_valid(e) and e.alive: e.take_damage(999999, false)
+	await w(1.0)
+
+func _boss_shots(z) -> void:
+	var p: Player = z.player
+	var boss = null
+	for e in z.enemies:
+		if e.def.boss: boss = e
+	if boss == null: return
+	var a: Vector3 = z.arena_point
+	p.teleport(a + Vector3(0, 0.3, -7)); p.face_towards(boss.global_position)
+	z.cam_rig.yaw = 0.0; z.cam_rig.distance = 13.0
+	await w(2.0)
+	var br = boss.brain
+	br.special_timer = 99.0
+	boss.hp = boss.max_hp * 0.6
+	await w(0.5)
+	await shot("31_boss_phase2_banner")
+	await w(1.8)
+	br.special_timer = 99.0
+	while br.busy: await w(0.1)
+	br.special_timer = 99.0
+	br.run("slam", p)
+	await w(0.6); await shot("32_boss_slam_telegraph")
+	await w(0.85); await shot("33_boss_shockwave")
+	while br.busy: await w(0.1)
+	br.special_timer = 99.0
+	br.run("charge", p)
+	await w(0.5); await shot("34_boss_charge_telegraph")
+	while br.busy: await w(0.1)
+	br.special_timer = 99.0
+	br.run("rock", p)
+	await w(0.9); await shot("35_boss_rock_throw")
+	while br.busy: await w(0.1)
+	boss.hp = boss.max_hp * 0.3
+	await w(0.7); await shot("36_boss_phase3_enrage")
+	await w(2.0)
+	br.special_timer = 99.0
+	while br.busy: await w(0.1)
+	br.summon_timer = 0
+	br.run("summon", p)
+	await w(1.6); await shot("37_boss_summon_adds")
+	p.god_mode = false
 
 func _cam(cam: Camera3D, pos: Vector3, at: Vector3, fov: float) -> void:
 	cam.global_position = pos; cam.look_at(at); cam.fov = fov; cam.current = true

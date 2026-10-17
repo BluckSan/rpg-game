@@ -187,6 +187,24 @@ func _tap(p: Vector2) -> void:
 	if best >= 0:
 		selected = best
 		refresh()
+		_show_tip(best, p)
+	elif tip and is_instance_valid(tip):
+		tip.queue_free()
+
+var tip: Control
+## Всплывающая подсказка у выбранного узла
+func _show_tip(id: int, at: Vector2) -> void:
+	if tip and is_instance_valid(tip): tip.queue_free()
+	var n: Dictionary = DB.tree_nodes[id]
+	var title: String = ("Начало: " + DB.CLASSES[n["class"]].name) if n["type"] == "start" else n["name"]
+	var t := ""
+	for m in n["mods"]: t += DB.describe_mod(m) + "\n"
+	var has := DB.has_talent(data, id)
+	t += "[color=#7fd87f]Изучено[/color]" if has else ("[color=#e6c27a]Можно изучить[/color]" if DB.can_allocate(data, id) else "[color=#999]Нужна связь с изученным узлом[/color]")
+	var col: Color = {"keystone": Color(1, 0.6, 0.25), "notable": UIK.ACCENT}.get(n["type"], UIK.TEXT)
+	var ic: String = {"keystone": "aura", "notable": "crystal-ball", "start": "swords-emblem"}.get(n["type"], "gem-pendant")
+	tip = UIK.tooltip(self, title, t.strip_edges(), ic, col, 440)
+	UIK.place_tooltip(tip, Rect2(at - Vector2(30, 30), Vector2(60, 60)), get_viewport_rect().size)
 
 func _update_info() -> void:
 	if selected < 0:

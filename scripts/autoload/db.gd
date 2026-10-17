@@ -92,7 +92,7 @@ var ENEMIES := {
 	"skeleton_archer": {"name": "Скелет-лучник", "hp": 50.0, "dmg": 11.0, "speed": 2.6, "range": 11.0, "interval": 1.8, "aggro": 13.0, "radius": 0.5, "xp": 28.0, "ranged": true, "boss": false, "color": Color(0.9,0.88,0.8)},
 	"skeleton": {"name": "Скелет-воин", "hp": 70.0, "dmg": 12.0, "speed": 3.4, "range": 1.9, "interval": 1.2, "aggro": 11.0, "radius": 0.5, "xp": 30.0, "ranged": false, "boss": false, "color": Color(0.85,0.83,0.75)},
 	"goblin": {"name": "Гоблин-громила", "hp": 120.0, "dmg": 18.0, "speed": 3.0, "range": 2.2, "interval": 1.6, "aggro": 10.0, "radius": 0.8, "xp": 45.0, "ranged": false, "boss": false, "color": Color(0.35,0.55,0.2)},
-	"troll": {"name": "Древний тролль", "hp": 900.0, "dmg": 30.0, "speed": 3.2, "range": 3.2, "interval": 1.8, "aggro": 16.0, "radius": 1.6, "xp": 500.0, "ranged": false, "boss": true, "color": Color(0.4,0.5,0.45)},
+	"troll": {"name": "Древний тролль", "hp": 2200.0, "dmg": 28.0, "speed": 3.2, "range": 3.2, "interval": 1.8, "aggro": 16.0, "radius": 1.6, "xp": 500.0, "ranged": false, "boss": true, "color": Color(0.4,0.5,0.45)},
 }
 
 ## Зоны. Чтобы добавить глобальную карту: сделать сборщик мира в zone.gd для "global" и поставить available = true.
@@ -328,3 +328,74 @@ func describe_item(it: Dictionary) -> String:
 
 func sell_price(it: Dictionary) -> int:
 	return 5 + int(it.ilvl) * 3 * (int(it.rarity) + 1)
+
+# ---------------- Торговец ----------------
+const RARITY_PRICE := [1.0, 2.2, 4.5, 9.0]
+const BUYBACK_SIZE := 10
+func buy_price(it: Dictionary) -> int:
+	return int(round((20 + int(it.ilvl) * 9) * RARITY_PRICE[int(it.rarity)]))
+
+func potion_price(level: int) -> int:
+	return 15 + level * 3
+
+## Товары торговца: 6 предметов под уровень героя, редкость растёт с уровнем
+func shop_stock(level: int, class_id: String) -> Array:
+	var out := []
+	var bonus := clampf(0.08 + level * 0.015, 0.0, 0.35)
+	for i in 6:
+		var ilvl := maxi(1, level + randi_range(-1, 1))
+		var it := roll_item(ilvl, class_id, bonus)
+		if it.rarity == 3: it = roll_item(ilvl, class_id, 0.0)  # уникальные — только с босса
+		out.append(it)
+	return out
+
+## Покупка/продажа (возвращают пустую строку при успехе, иначе причину)
+func shop_buy(c: Dictionary, idx: int) -> String:
+	var stock: Array = c["shop"]["stock"]
+	if idx < 0 or idx >= stock.size(): return "Нет товара"
+	var it: Dictionary = stock[idx]
+	var price := buy_price(it)
+	if int(c["gold"]) < price: return "Не хватает золота"
+	if c["inventory"].size() >= INVENTORY_SIZE: return "Инвентарь полон"
+	c["gold"] = int(c["gold"]) - price
+	c["inventory"].append(it)
+	stock.remove_at(idx)
+	return ""
+
+func shop_buy_potion(c: Dictionary, n := 1) -> String:
+	var price := potion_price(int(c["level"])) * n
+	if int(c["gold"]) < price: return "Не хватает золота"
+	c["gold"] = int(c["gold"]) - price
+	c["potions"] = int(c["potions"]) + n
+	return ""
+
+func shop_sell(c: Dictionary, idx: int) -> String:
+	var inv: Array = c["inventory"]
+	if idx < 0 or idx >= inv.size(): return "Нет предмета"
+	var it: Dictionary = inv[idx]
+	inv.remove_at(idx)
+	c["gold"] = int(c["gold"]) + sell_price(it)
+	var bb: Array = c["buyback"]
+	bb.push_front(it)
+	while bb.size() > BUYBACK_SIZE: bb.pop_back()
+	return ""
+
+func shop_buyback(c: Dictionary, idx: int) -> String:
+	var bb: Array = c["buyback"]
+	if idx < 0 or idx >= bb.size(): return "Нет предмета"
+	var it: Dictionary = bb[idx]
+	var price := sell_price(it)
+	if int(c["gold"]) < price: return "Не хватает золота"
+	if c["inventory"].size() >= INVENTORY_SIZE: return "Инвентарь полон"
+	c["gold"] = int(c["gold"]) - price
+	c["inventory"].append(it)
+	bb.remove_at(idx)
+	return ""
+
+func shop_restock_price(level: int) -> int:
+	return 10 + level * 4
+
+func shop_ensure(c: Dictionary) -> void:
+	if not c.has("buyback"): c["buyback"] = []
+	if not c.has("shop") or int(c["shop"].get("level", -1)) != int(c["level"]):
+		c["shop"] = {"level": int(c["level"]), "stock": shop_stock(int(c["level"]), c["class"])}

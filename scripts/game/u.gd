@@ -94,24 +94,39 @@ static func telegraph(parent: Node, pos: Vector3, radius: float, dur: float) -> 
 	mi.material_override = fx_mat(Color(1, 0.1, 0.05, 0.35))
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(mi)
-	mi.global_position = Vector3(pos.x, 0.03, pos.z)
+	mi.global_position = Vector3(pos.x, pos.y + 0.04, pos.z)
 	mi.scale = Vector3(radius * 2, 0.005, radius * 2)
 	mi.get_tree().create_timer(dur, false).timeout.connect(mi.queue_free)
 
+static var _num_font: Font
+
 static func damage_number(parent: Node, pos: Vector3, amount: float, crit: bool, to_player: bool) -> void:
+	var t := str(int(round(amount)))
+	if crit: t += "!"
+	var c := Color(1, 0.3, 0.25) if to_player else (Color(1, 0.78, 0.15) if crit else Color(1, 0.98, 0.92))
+	_pop_label(parent, pos, t, c, 0.0016 if crit else 0.0011, crit)
+
+static func float_text(parent: Node, pos: Vector3, text: String, c: Color) -> void:
+	_pop_label(parent, pos, text, c, 0.001, false)
+
+static func _pop_label(parent: Node, pos: Vector3, text: String, c: Color, px: float, big: bool) -> void:
+	if _num_font == null: _num_font = load("res://fonts/Philosopher-Bold.ttf")
 	var l := Label3D.new()
-	l.font = load("res://fonts/Rubik.ttf")
-	l.text = str(int(round(amount))) + ("!" if crit else "")
+	l.font = _num_font
+	l.text = text
 	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	l.no_depth_test = true
 	l.fixed_size = true
-	l.pixel_size = 0.0012 if crit else 0.0009
-	l.font_size = 48
-	l.outline_size = 12
-	l.modulate = Color(1, 0.3, 0.3) if to_player else (Color(1, 0.85, 0.2) if crit else Color.WHITE)
+	l.font_size = 56
+	l.outline_size = 14
+	l.outline_modulate = Color(0.25, 0.08, 0.0) if big else Color(0, 0, 0)
+	l.modulate = c
+	l.pixel_size = px * 2.0
 	parent.add_child(l)
-	l.global_position = pos + Vector3(randf_range(-0.4, 0.4), 0, randf_range(-0.4, 0.4))
+	var side := randf_range(-0.6, 0.6)
+	l.global_position = pos + Vector3(side, 0, randf_range(-0.3, 0.3))
 	var tw := l.create_tween().set_parallel(true)
-	tw.tween_property(l, "global_position", l.global_position + Vector3.UP * 1.2, 0.9)
-	tw.tween_property(l, "modulate:a", 0.0, 0.9).set_delay(0.3)
+	tw.tween_property(l, "pixel_size", px, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "global_position", l.global_position + Vector3(side * 0.6, 1.4, 0), 0.9).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	tw.tween_property(l, "modulate:a", 0.0, 0.45).set_delay(0.5)
 	tw.chain().tween_callback(l.queue_free)

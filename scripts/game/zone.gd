@@ -12,6 +12,11 @@ var enemies: Array = []   # живые враги
 var minions: Array = []
 var fx_root: Node3D
 var _autosave := 30.0
+var last_boss_drop := {}
+var merchant: Node3D
+var merchant_point := Vector3.ZERO
+var arena_point := Vector3.ZERO
+var portal_point := Vector3.ZERO
 ## Возвышенности для наземных врагов (у игрока — физика): диски, коробки, пандусы
 var _h_discs: Array = []
 var _h_boxes: Array = []
@@ -50,6 +55,11 @@ func _ready() -> void:
 	add_child(builder)
 	builder.build(self)
 	spawn_point = builder.spawn_point
+	merchant_point = builder.merchant_point
+	arena_point = builder.arena_point
+	portal_point = builder.portal_point
+	DB.shop_ensure(data)
+	_spawn_merchant()
 
 	player = Player.new()
 	player.name = "Player"
@@ -66,6 +76,27 @@ func _ready() -> void:
 	add_child(hud)
 	hud.setup(self)
 	Game.toast(DB.ZONES[data["zone"]]["name"], 3.0)
+
+func _spawn_merchant() -> void:
+	var m := CharVisual.new()
+	m.name = "Merchant"
+	add_child(m)
+	m.build({"gender": 0, "skin": 1, "hair": 1, "hair_color": 3, "beard": 1, "height": 1.04, "build": 0.4}, "mage", "")
+	m.global_position = merchant_point
+	m.rotation.y = atan2(spawn_point.x - merchant_point.x, spawn_point.z - merchant_point.z)
+	merchant = m
+	var l := Label3D.new()
+	l.font = UIK.title_font(); l.text = "Торговец Борис"; l.font_size = 56; l.pixel_size = 0.006
+	l.outline_size = 10; l.modulate = UIK.ACCENT; l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true
+	m.add_child(l); l.position = Vector3(0, 2.35, 0)
+	var ic := Sprite3D.new()
+	ic.texture = UIK.icon("two-coins"); ic.pixel_size = 0.0035; ic.modulate = Color(1, 0.85, 0.3)
+	ic.billboard = BaseMaterial3D.BILLBOARD_ENABLED; ic.no_depth_test = true
+	m.add_child(ic); ic.position = Vector3(0, 2.75, 0)
+
+func near_merchant() -> bool:
+	return merchant != null and player != null and U.flat_dist(player.global_position, merchant_point) < 3.2
 
 func _process(delta: float) -> void:
 	_autosave -= delta
@@ -103,6 +134,28 @@ func fx(kind: String, pos: Vector3, radius: float, c: Color, dur := 0.35) -> voi
 		"burst": U.burst(fx_root, pos, radius, c, dur)
 		"ring": U.ring(fx_root, pos, radius, c, dur)
 		"telegraph": U.telegraph(fx_root, pos, radius, dur)
+
+## «Стоп-кадр» при попадании: на долю секунды почти останавливаем время
+var _stop_active := false
+var base_time_scale := 1.0   # для замедленных снимков
+var hit_stops := 0
+func hit_stop(dur: float) -> void:
+	if dur <= 0.0 or _stop_active or not is_inside_tree(): return
+	_stop_active = true
+	hit_stops += 1
+	Engine.time_scale = 0.05 * base_time_scale
+	await get_tree().create_timer(dur, true, false, true).timeout
+	Engine.time_scale = base_time_scale
+	_stop_active = false
+
+func _exit_tree() -> void:
+	Engine.time_scale = 1.0
+
+func shake(amount: float) -> void:
+	if cam_rig: cam_rig.shake(amount)
+
+func float_text(pos: Vector3, text: String, c: Color) -> void:
+	U.float_text(fx_root, pos, text, c)
 
 func damage_number(pos: Vector3, amount: float, crit: bool, to_player: bool) -> void:
 	U.damage_number(fx_root, pos, amount, crit, to_player)

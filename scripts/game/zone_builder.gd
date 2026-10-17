@@ -14,6 +14,9 @@ const PATHS := [[Vector3(0,0,0), Vector3(28,0,22)], [Vector3(0,0,0), Vector3(-42
 
 var zone
 var spawn_point := Vector3(0, 0.1, -3.5)
+var merchant_point := Vector3(-3.4, 0, -5.6)
+var arena_point := Vector3(-4, 0.8, 64)
+var portal_point := Vector3(66, 0, 56)
 var rng := RandomNumberGenerator.new()
 var _batches := {}   # mesh kind -> [[Transform3D, Color], ...]
 var _colliders: StaticBody3D
@@ -33,7 +36,7 @@ func build(z) -> void:
 	_graveyard(Vector3(6, 0, -46))
 	_goblin_camp(Vector3(52, 0, -14))
 	_ruins(Vector3(-4, 0, 60))
-	_portal(Vector3(66, 0, 56))
+	_portal(portal_point)
 	_scatter()
 	_boundary()
 	_flush_batches()
@@ -215,6 +218,19 @@ func _camp(c: Vector3) -> void:
 		if (a > 15 and a < 40) or (a > 105 and a < 130) or (a > 185 and a < 210) or (a > 255 and a < 280) or a > 340 or a < 3: continue
 		var p := c + Vector3(0, 0, 12).rotated(Vector3.UP, deg_to_rad(a))
 		_add("cylinder", p + Vector3.UP * 1.0, Vector3(0.35, 1.0, 0.35), WOOD * 0.9)
+	# лавка торговца: прилавок, навес, мешки
+	merchant_point = c + Vector3(-3.4, 0, -5.6)
+	var mp := merchant_point
+	_add("box", mp + Vector3(0, 0.5, -0.9), Vector3(2.6, 1.0, 0.7), WOOD * 1.25)
+	_add("box", mp + Vector3(0, 1.03, -0.9), Vector3(2.7, 0.06, 0.8), Color(0.55, 0.3, 0.15), Vector3.ZERO, false)
+	for sx in [-1.3, 1.3]:
+		_add("cylinder", mp + Vector3(sx, 1.3, -1.6), Vector3(0.1, 1.3, 0.1), WOOD, Vector3.ZERO, false)
+		_add("cylinder", mp + Vector3(sx, 1.3, -0.7), Vector3(0.1, 1.3, 0.1), WOOD, Vector3.ZERO, false)
+	_add("box", mp + Vector3(0, 2.65, -1.25), Vector3(3.0, 0.08, 1.2), Color(0.7, 0.2, 0.15), Vector3(-10, 0, 0), false)
+	_add("sphere", mp + Vector3(-0.8, 1.2, -0.9), Vector3(0.35, 0.3, 0.35), Color(0.8, 0.15, 0.2), Vector3.ZERO, false)
+	_add("sphere", mp + Vector3(-0.4, 1.2, -0.9), Vector3(0.3, 0.28, 0.3), Color(0.2, 0.4, 0.85), Vector3.ZERO, false)
+	_add("box", mp + Vector3(0.7, 1.2, -0.9), Vector3(0.6, 0.3, 0.4), Color(0.6, 0.45, 0.25), Vector3(0, 20, 0), false)
+	_add("cylinder", mp + Vector3(1.8, 0.35, -0.2), Vector3(0.55, 0.35, 0.55), Color(0.65, 0.55, 0.35))
 	var sp := c + Vector3(2.5, 0, -6)
 	_add("cylinder", sp + Vector3.UP * 0.8, Vector3(0.12, 0.8, 0.12), WOOD)
 	_add("box", sp + Vector3.UP * 1.5, Vector3(1.2, 0.5, 0.08), WOOD * 1.3)
