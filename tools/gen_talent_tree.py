@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Генератор пассивного дерева талантов (PoE-стиль).
-Запуск: python3 tools/gen_talent_tree.py  -> Assets/Resources/Talents/talent_tree.json
+Запуск: python3 tools/gen_talent_tree.py  -> data/talent_tree.json
 Файл JSON можно править вручную: узлы, связи, статы.
 """
 import json, math, os, random
@@ -108,6 +108,6 @@ for i, rid in enumerate(names):
 
 regions = [{"id":r[0],"name":r[2],"color":r[3]} for r in REGIONS]
 out = {"version": 1, "regions": regions, "nodes": nodes}
-p = os.path.join(os.path.dirname(__file__), "..", "Assets", "Resources", "Talents", "talent_tree.json")
+p = os.path.join(os.path.dirname(__file__), "..", "data", "talent_tree.json")
 with open(p, "w", encoding="utf-8") as f: json.dump(out, f, ensure_ascii=False, indent=1)
 print("nodes:", len(nodes))
