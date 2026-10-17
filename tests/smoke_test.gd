@@ -837,7 +837,7 @@ func _settings_tests(z) -> void:
 	var qb: Button = sp.find_child("Quality", true, false)
 	var before: String = qb.text
 	qb.pressed.emit(); await frames(1)
-	check(qb.text != before and Game.quality == (q0 + 1) % 4, "пресет переключается кнопкой (%s → %s)" % [before, qb.text])
+	check(qb.text != before and Game.quality == (q0 + 1) % (Game.max_quality() + 1), "пресет переключается кнопкой (%s → %s)" % [before, qb.text])
 	Game.apply_preset(0)
 	check(Game.fps_cap == 30 and not Game.shadows_enabled and is_equal_approx(get_tree().root.scaling_3d_scale, 0.6) and Game.particle_mul < 0.5, "пресет «Экономия батареи»: 30 к/с, без теней, 3D 60%")
 	check(get_viewport().msaa_3d == Viewport.MSAA_DISABLED and not Game.glow, "экономия: MSAA и свечение выключены")

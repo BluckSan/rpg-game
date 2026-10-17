@@ -33,8 +33,25 @@ func close() -> void:
 func _build() -> void:
 	_section("Графика")
 	_cycle("Quality", "Пресет", func(): return Game.QUALITY_NAMES[Game.quality], func():
-		Game.apply_preset((Game.quality + 1) % 4)
+		Game.apply_preset((Game.quality + 1) % (Game.max_quality() + 1))
 		_refresh_all())
+	if Game.max_quality() >= 4:
+		var gi := _cycle("UltraGI", "Ультра: глоб. освещение", func(): return ("вкл" if Game.ultra_gi else "выкл") if Game.gi_supported() else "не поддерж.", func():
+			Game.ultra_gi = not Game.ultra_gi
+			Game.apply_settings())
+		var ssr := _cycle("UltraSSR", "Ультра: отражения", func(): return "вкл" if Game.ultra_ssr else "выкл", func():
+			Game.ultra_ssr = not Game.ultra_ssr
+			Game.apply_settings())
+		var vf := _cycle("UltraFog", "Ультра: объёмный туман", func(): return "вкл" if Game.ultra_fog else "выкл", func():
+			Game.ultra_fog = not Game.ultra_fog
+			Game.apply_settings())
+		_refreshers.append(func():
+			for b in [gi, ssr, vf]:
+				if is_instance_valid(b): b.disabled = Game.quality < 4
+			if is_instance_valid(gi): gi.disabled = Game.quality < 4 or not Game.gi_supported())
+		var uh := UIK.label(rows, "«Ультра» — тяжёлые эффекты для мощных видеокарт. Если картинка тёмная или с артефактами — выберите «Высокое». Зажмите Shift при запуске для безопасного режима.", 22, UIK.MUTED)
+		uh.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_refresh_all.call_deferred()
 	_cycle("RenderScale", "Разрешение 3D", func(): return "%d%%" % roundi(Game.render_scale * 100), func():
 		var i := _nearest(Game.RENDER_SCALES, Game.render_scale)
 		Game.render_scale = Game.RENDER_SCALES[(i + 1) % Game.RENDER_SCALES.size()]

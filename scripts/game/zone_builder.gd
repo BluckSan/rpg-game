@@ -138,36 +138,50 @@ func apply_graphics() -> void:
 	for n in get_tree().get_nodes_in_group("view_range"):
 		(n as GeometryInstance3D).visibility_range_end = Game.view_distance + CELL
 
-## ПК «Высокое» (Forward+): глобальное освещение SDFGI (половинное разрешение), SSAO, объёмный туман,
-## отражения SSR, мягкие тени (PCSS), сильнее свечение. Иначе всё выключено — телефон не нагружается.
+## ПК «Высокое» (Forward+): SSAO, мягкие тени (без PCSS — он шумит без TAA), сильнее свечение.
+## «Ультра»: + SDFGI, SSR, объёмный туман (по переключателям). Окружающий свет всегда от неба/цвета —
+## не зависит от GI, автоэкспозиции нет. Иначе всё выключено — телефон не нагружается.
 func _heavy_env(e: Environment, sun: DirectionalLight3D) -> void:
 	var on := Game.heavy_fx()
-	e.sdfgi_enabled = on
+	var ult := Game.ultra()
+	e.sdfgi_enabled = Game.gi_on()
 	e.ssao_enabled = on
-	e.ssr_enabled = on
-	e.volumetric_fog_enabled = on
+	e.ssil_enabled = false
+	e.ssr_enabled = Game.ssr_on()
+	e.volumetric_fog_enabled = Game.vfog_on()
+	e.tonemap_exposure = 1.05
 	if on:
+		e.ssao_radius = 1.2; e.ssao_intensity = 1.4; e.ssao_power = 1.3
+		e.ssao_light_affect = 0.0; e.ssao_ao_channel_affect = 0.0
+		e.glow_intensity = 0.5; e.glow_bloom = 0.05
+		e.glow_hdr_threshold = 1.0
+		e.set_glow_level(1, 1.0); e.set_glow_level(3, 0.8); e.set_glow_level(5, 0.6)
+	else:
+		e.glow_intensity = 0.35; e.glow_bloom = 0.04
+	if e.sdfgi_enabled:
 		e.sdfgi_cascades = 4
 		e.sdfgi_min_cell_size = 0.4
 		e.sdfgi_use_occlusion = true
-		e.sdfgi_energy = 0.9
-		e.ssao_radius = 1.4; e.ssao_intensity = 1.8; e.ssao_power = 1.4
+		e.sdfgi_read_sky_light = true
+		e.sdfgi_energy = 0.8
+	if e.ssr_enabled:
 		e.ssr_max_steps = 48; e.ssr_fade_in = 0.15; e.ssr_fade_out = 2.0
+	if e.volumetric_fog_enabled:
 		e.volumetric_fog_density = 0.008 if not is_dungeon_env() else 0.014
 		e.volumetric_fog_albedo = Color(0.85, 0.85, 0.9) if not is_dungeon_env() else Color(0.55, 0.5, 0.7)
 		e.volumetric_fog_anisotropy = 0.55
 		e.volumetric_fog_length = 70.0
 		e.volumetric_fog_sky_affect = 0.2
-		e.glow_intensity = 0.55; e.glow_bloom = 0.07
-		e.set_glow_level(1, 1.0); e.set_glow_level(3, 0.8); e.set_glow_level(5, 0.6)
-	else:
-		e.glow_intensity = 0.35; e.glow_bloom = 0.04
+		e.volumetric_fog_ambient_inject = 0.0
 	if sun:
-		sun.light_angular_distance = 0.6 if on else 0.0
+		sun.light_angular_distance = 0.5 if ult else 0.0
 		sun.shadow_blur = 1.0 if on else 1.5
 		if on: sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 		sun.light_volumetric_fog_energy = 1.0
-	RenderingServer.directional_soft_shadow_filter_set_quality(RenderingServer.SHADOW_QUALITY_SOFT_HIGH if on else RenderingServer.SHADOW_QUALITY_SOFT_LOW)
+	var sq := RenderingServer.SHADOW_QUALITY_SOFT_LOW
+	if ult: sq = RenderingServer.SHADOW_QUALITY_SOFT_HIGH
+	elif on: sq = RenderingServer.SHADOW_QUALITY_SOFT_MEDIUM
+	RenderingServer.directional_soft_shadow_filter_set_quality(sq)
 	RenderingServer.positional_soft_shadow_filter_set_quality(RenderingServer.SHADOW_QUALITY_SOFT_MEDIUM if on else RenderingServer.SHADOW_QUALITY_SOFT_LOW)
 
 func is_dungeon_env() -> bool: return false

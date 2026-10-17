@@ -39,6 +39,9 @@ func _draw() -> void:
 	var r := size.x / 2
 	draw_circle(c, r * 0.86, Color(0.08, 0.1, 0.07, 0.78))
 	draw_circle(c, r * 0.5, Color(1, 1, 1, 0.03))
+	# подземелье: стены, путь и следующая цель
+	if zone.has_method("is_dungeon") and zone.is_dungeon() and zone.builder and zone.builder.has_method("guide_target"):
+		_draw_route(c, r)
 	# враги
 	for e in zone.enemies:
 		if not e.alive or e.def.boss: continue
@@ -66,6 +69,17 @@ func _draw() -> void:
 	var w := _font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	draw_string_outline(_font, c + n + Vector2(-w / 2, 9), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 6, Color.BLACK)
 	draw_string(_font, c + n + Vector2(-w / 2, 9), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 0.4, 0.3))
+
+func _draw_route(c: Vector2, r: float) -> void:
+	var b = zone.builder
+	var pts := PackedVector2Array()
+	for p in b.ROUTE: pts.append(c + _clampv(to_map(p), r * 0.8))
+	draw_polyline(pts, Color(1, 0.8, 0.4, 0.35), 5.0, true)
+	var t: Vector3 = b.guide_target()
+	var m := _clampv(to_map(t), r * 0.7)
+	var pr := 9.0 + sin(Time.get_ticks_msec() * 0.008) * 3.0
+	draw_circle(c + m, pr, Color(1, 0.8, 0.3, 0.85))
+	draw_arc(c + m, pr + 4, 0, TAU, 20, Color(0, 0, 0, 0.8), 2.0)
 
 func _marker(c: Vector2, r: float, p: Vector3, ic: String, col: Color, pulse := false) -> void:
 	var m := to_map(p)

@@ -42,9 +42,11 @@ func build(z) -> void:
 	_colliders.add_child(cs)
 	_add("box", Vector3(0, -0.5, 60), Vector3(80, 1, 160), Color(0.12, 0.11, 0.14), Vector3.ZERO, false)
 	_room(-8, 8, -4, 16, [[-4, 4]], [])          # зал входа (выход — в коридор)
-	_room(-4, 4, 16, 40, [], [])                   # коридор шипов
+	# коридоры открыты с обоих концов (проём 7 м между стенами коридора)
+	_room(-4, 4, 16, 40, [[-4, 4]], [[-4, 4]])     # коридор шипов
 	_room(-12, 12, 40, 64, [[-4, 4]], [[-4, 4]])   # зал рычагов
-	_room(-4, 4, 64, 86, [], [])                   # огненный коридор
+	_room(-4, 4, 64, 86, [[-4, 4]], [[-4, 4]])     # огненный коридор
+	_guides()
 	_arena()
 	_decor()
 	_exit_portal()
@@ -187,6 +189,27 @@ func _decor() -> void:
 	for i in 8:
 		_glow("box", Vector3(_r(-10, 10), 0.3, _r(42, 62)), Vector3(0.25, 0.6, 0.25), Color(0.6, 0.4, 1.0), 2.5, preload("res://scripts/game/spin.gd"))
 
+## Подсказки пути: светящиеся проёмы (пара огней по краям) и стрелки на полу к следующей цели
+const DOORWAYS := [16.0, 40.0, 64.0, 86.0]
+var guide_arrows: Array = []
+func _guides() -> void:
+	for dz in DOORWAYS:
+		for sx in [-1, 1]:
+			_glow("box", Vector3(sx * 3.2, 2.0, dz - 0.6), Vector3(0.18, 4.0, 0.18), Color(1.0, 0.75, 0.35), 3.0)
+		_light(Vector3(0, 3.6, dz - 1.2), Color(1.0, 0.8, 0.5), 1.6, 8.0)
+	var zs := [6.0, 12.0, 30.0, 37.0, 47.0, 57.0, 61.0, 79.0, 83.5]
+	for z in zs: guide_arrows.append(_arrow(Vector3(0, 0.04, z)))
+
+func _arrow(p: Vector3) -> Node3D:
+	var n := Node3D.new(); add_child(n); n.position = p
+	var m := U.fx_mat(Color(1.0, 0.8, 0.4, 0.55))
+	for k in 2:
+		for sx in [-1, 1]:
+			var b := U.prim("box", n, Vector3(sx * 0.32, 0, k * 0.55), Vector3(0.9, 0.02, 0.18), Color(1, 0.8, 0.4))
+			b.rotation_degrees.y = sx * 35.0
+			b.material_override = m
+	return n
+
 func _exit_portal() -> void:
 	var c := exit_point
 	for s in [-1, 1]:
@@ -210,13 +233,13 @@ func _lever_hall() -> void:
 		levers[id] = l
 		var lid: String = id
 		zone.interactables.append({"pos": l.global_position, "r": 2.4, "text": "Рычаг: " + ORDER_NAMES[id], "icon": "cog", "cb": func(): pull_lever(lid), "visible": func(): return not flag("lever_solved")})
-	# табличка с подсказкой
-	_add("box", Vector3(0, 1.2, 62.6), Vector3(3.6, 1.6, 0.25), Color(0.25, 0.22, 0.2))
+	# табличка с подсказкой — у стены слева от решётки, проход не загораживает
+	_add("box", Vector3(-8, 1.2, 63.2), Vector3(3.6, 1.6, 0.25), Color(0.25, 0.22, 0.2))
 	var lbl := Label3D.new()
 	lbl.font = UIK.title_font(); lbl.text = "«Пламя рождает Лёд,\nЛёд хранит Тень»\nПламя → Лёд → Тень"
 	lbl.font_size = 48; lbl.pixel_size = 0.0052; lbl.outline_size = 8; lbl.modulate = Color(1, 0.9, 0.7)
 	add_child(lbl)
-	lbl.position = Vector3(0, 1.25, 62.45); lbl.rotation_degrees.y = 180
+	lbl.position = Vector3(-8, 1.25, 63.05); lbl.rotation_degrees.y = 180
 	# решётка
 	gate_body = StaticBody3D.new(); add_child(gate_body)
 	var gcs := CollisionShape3D.new(); var gbs := BoxShape3D.new(); gbs.size = Vector3(8, 5, 0.6)
@@ -279,6 +302,18 @@ func boss_enemy():
 	for e in zone.enemies:
 		if is_instance_valid(e) and e.alive and e.kind == "warden": return e
 	return null
+
+## Маршрут (для мини-карты) и следующая цель
+const ROUTE := [Vector3(0, 0, 3), Vector3(0, 0, 16), Vector3(0, 0, 40), Vector3(0, 0, 52), Vector3(0, 0, 64), Vector3(0, 0, 86), Vector3(0, 0, 104)]
+func guide_target() -> Vector3:
+	var p: Vector3 = zone.player.global_position
+	if p.z < 40: return Vector3(0, 0, 41)
+	if not flag("lever_solved"):
+		var k := lever_input.size()
+		return levers[ORDER[clampi(k, 0, 2)]].global_position
+	if p.z < 86: return Vector3(0, 0, 87)
+	if boss_enemy() != null: return arena_center
+	return exit_point
 
 ## Сколько групп осталось
 func packs_left() -> int:

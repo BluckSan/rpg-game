@@ -255,6 +255,7 @@ func show_settings() -> void:
 func quit_game() -> void:
 	Game.save_settings()
 	if "--no-quit" in OS.get_cmdline_user_args(): return
+	Game.clear_lock()
 	get_tree().quit()
 
 # ---------------- экран выбора ----------------

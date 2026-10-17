@@ -12,14 +12,22 @@ var shadows_enabled := true
 var desktop := false
 var fullscreen := true
 var resolution := Vector2i(1920, 1080)
-## Пресет графики: 0 экономия батареи, 1 низкое, 2 среднее, 3 высокое
+## Пресет графики: 0 экономия батареи, 1 низкое, 2 среднее, 3 высокое, 4 ультра (только ПК)
 var quality := 2
 var ui_scale := 1.0
 var render_scale := 1.0    # доля разрешения 3D-сцены (интерфейс всегда в полном разрешении)
 var fps_cap := 60
 var vsync := true          # только ПК
 const RESOLUTIONS := [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440), Vector2i(3840, 2160)]
-const QUALITY_NAMES := ["Экономия батареи", "Низкое", "Среднее", "Высокое"]
+const QUALITY_NAMES := ["Экономия батареи", "Низкое", "Среднее", "Высокое", "Ультра"]
+## «Ультра» (ПК, Forward+): отдельные переключатели тяжёлых эффектов
+var ultra_gi := true       # глобальное освещение SDFGI
+var ultra_ssr := true      # экранные отражения
+var ultra_fog := true      # объёмный туман
+## Безопасный запуск: прошлая сессия не завершилась штатно, зажат Shift или --safe-graphics → «Среднее»
+const SESSION_LOCK := "user://session.lock"
+var safe_start := false
+var safe_reason := ""
 const UI_SCALES := [0.85, 1.0, 1.1]
 const RENDER_SCALES := [0.5, 0.6, 0.75, 0.85, 1.0]
 const FPS_MOBILE := [30, 45, 60, 90, 120]
@@ -54,7 +62,10 @@ func _ready() -> void:
 		shadows_enabled = cfg.get_value("video", "shadows", true)
 		fullscreen = cfg.get_value("video", "fullscreen", fullscreen)
 		resolution = cfg.get_value("video", "resolution", resolution)
-		quality = clampi(cfg.get_value("video", "preset", quality), 0, 3)
+		quality = clampi(cfg.get_value("video", "preset", quality), 0, max_quality())
+		ultra_gi = cfg.get_value("video", "ultra_gi", ultra_gi)
+		ultra_ssr = cfg.get_value("video", "ultra_ssr", ultra_ssr)
+		ultra_fog = cfg.get_value("video", "ultra_fog", ultra_fog)
 		render_scale = clampf(cfg.get_value("video", "render_scale", render_scale), 0.5, 1.0)
 		fps_cap = int(cfg.get_value("video", "fps_cap", fps_cap))
 		if not fps_cap in fps_options(): fps_cap = 60
@@ -66,11 +77,75 @@ func _ready() -> void:
 		skill_layout = str(cfg.get_value("ui", "skill_layout", ""))
 	if not skill_layout in ["mobile", "pc"]: skill_layout = default_skill_layout()
 	_setup_audio()
+	_check_safe_start()
 	apply_settings.call_deferred()
+	if desktop and is_pc_platform(): get_tree().create_timer(0.6).timeout.connect(_late_safe_key)
 
-## Тяжёлые эффекты (SDFGI, SSAO, объёмный туман, мягкие тени, трава, вода) — только ПК, «Высокое», Forward+
+## «Высокое» на ПК (Forward+): SSAO, мягкие тени без PCSS, трава, вода, свечение. Освещение — небо + солнце, без GI.
 func heavy_fx() -> bool:
 	return desktop and is_pc_platform() and quality >= 3 and RenderingServer.get_current_rendering_method() == "forward_plus"
+
+## «Ультра»: SDFGI / SSR / объёмный туман — по отдельным переключателям
+func ultra() -> bool:
+	return heavy_fx() and quality >= 4
+
+func max_quality() -> int:
+	return 4 if desktop and is_pc_platform() else 3
+
+func gi_on() -> bool: return ultra() and ultra_gi and gi_supported()
+func ssr_on() -> bool: return ultra() and ultra_ssr
+func vfog_on() -> bool: return ultra() and ultra_fog
+
+## SDFGI отключается на видеокартах, где он известен чёрным экраном/артефактами:
+## AMD GCN (Radeon HD 7xxx, R7/R9, RX 4xx/5xx Polaris, Vega), и любом программном рендере кроме тестов.
+func gi_supported() -> bool:
+	if "--no-sdfgi" in OS.get_cmdline_user_args(): return false
+	if "--force-sdfgi" in OS.get_cmdline_user_args(): return true
+	return not gpu_gi_blocked(RenderingServer.get_video_adapter_vendor(), RenderingServer.get_video_adapter_name())
+
+static func gpu_gi_blocked(vendor: String, adapter: String) -> bool:
+	var v := vendor.to_lower(); var a := adapter.to_lower()
+	var amd := v.contains("amd") or v.contains("ati") or v.contains("1002") or a.contains("radeon") or a.contains("amd")
+	if not amd: return false
+	for k in ["polaris", "vega", "ellesmere", "baffin", "lexa", "tonga", "fiji", "hawaii", "tahiti", "pitcairn", "bonaire", "gcn", "hd 7", "hd 8", "r5 ", "r7 ", "r9 ", "rx 4", "rx 5", "rx460", "rx470", "rx480", "rx550", "rx560", "rx570", "rx580", "rx590", "vii", "graphics (ryzen"]:
+		if a.contains(k):
+			# RX 5500/5600/5700 — это RDNA1, не GCN
+			if k == "rx 5" and (a.contains("rx 55") or a.contains("rx 56") or a.contains("rx 57")): continue
+			return true
+	return false
+
+func _check_safe_start() -> void:
+	if not (desktop and is_pc_platform()): return
+	var why := ""
+	if "--safe-graphics" in OS.get_cmdline_user_args(): why = "запуск с --safe-graphics"
+	elif FileAccess.file_exists(SESSION_LOCK) and not "--ignore-lock" in OS.get_cmdline_user_args(): why = "прошлая игра завершилась некорректно"
+	elif Input.is_key_pressed(KEY_SHIFT): why = "зажат Shift"
+	_write_lock()
+	if why != "": _enter_safe(why)
+
+func _late_safe_key() -> void:
+	if not safe_start and Input.is_key_pressed(KEY_SHIFT) and quality > 2:
+		_enter_safe("зажат Shift"); apply_settings()
+
+func _enter_safe(why: String) -> void:
+	safe_start = true; safe_reason = why
+	if quality > 2:
+		quality = 2; render_scale = 1.0
+		save_settings()
+	toast.call_deferred("Безопасный запуск (%s): графика «Среднее»" % why, 5.0)
+
+func _write_lock() -> void:
+	var f := FileAccess.open(SESSION_LOCK, FileAccess.WRITE)
+	if f: f.store_string(Time.get_datetime_string_from_system()); f.close()
+
+func clear_lock() -> void:
+	if FileAccess.file_exists(SESSION_LOCK): DirAccess.remove_absolute(ProjectSettings.globalize_path(SESSION_LOCK))
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_PREDELETE: clear_lock()
+
+func _exit_tree() -> void:
+	clear_lock()
 
 ## Детальная земля (шейдер) — ПК от «Среднего»
 func pc_detail() -> bool:
@@ -89,6 +164,9 @@ func save_settings() -> void:
 	cfg.set_value("video", "fullscreen", fullscreen)
 	cfg.set_value("video", "resolution", resolution)
 	cfg.set_value("video", "preset", quality)
+	cfg.set_value("video", "ultra_gi", ultra_gi)
+	cfg.set_value("video", "ultra_ssr", ultra_ssr)
+	cfg.set_value("video", "ultra_fog", ultra_fog)
 	cfg.set_value("video", "render_scale", render_scale)
 	cfg.set_value("video", "fps_cap", fps_cap)
 	cfg.set_value("video", "vsync", vsync)
@@ -104,12 +182,12 @@ func fps_options() -> Array:
 
 ## Выбор пресета: задаёт и рекомендуемые масштаб 3D/кадры/тени (их можно поменять отдельно)
 func apply_preset(p: int) -> void:
-	quality = clampi(p, 0, 3)
+	quality = clampi(p, 0, max_quality())
 	match quality:
 		0: render_scale = 0.6; fps_cap = 30; shadows_enabled = false
 		1: render_scale = 0.7 if not desktop else 0.85; fps_cap = mini(fps_cap, 60) if not desktop else fps_cap; shadows_enabled = true
 		2: render_scale = 0.75 if not desktop else 1.0; shadows_enabled = true
-		3: render_scale = 0.85 if not desktop else 1.0; shadows_enabled = true
+		3, 4: render_scale = 0.85 if not desktop else 1.0; shadows_enabled = true
 	apply_settings()
 
 ## Применить окно/качество/масштаб интерфейса
