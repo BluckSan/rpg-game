@@ -680,6 +680,7 @@ func _update_enemy_bars() -> void:
 		# сопротивления/уязвимости — у элит, редких, боссов и у ближних врагов
 		var rl: Label = b.get_node("Res")
 		rl.text = Combat.resist_text(e.kind, e.rank, e.def.boss) if (e.rank != "normal" or e.def.boss or dist < 9.0) else ""
+		if not e.affixes.is_empty(): rl.text = "[" + e.affix_text() + "]" + ("\n" + rl.text if rl.text != "" else "")
 	for i in range(used, bar_pool.size()): bar_pool[i].visible = false
 	boss_panel.visible = boss != null
 	if boss != null:

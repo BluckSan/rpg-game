@@ -5,6 +5,8 @@ class_name BossBrain
 ## Фаза 2: + рывок-таран, призыв гоблинов.
 ## Фаза 3 (ярость): быстрее и сильнее, двойные волны, град камней, призыв скелетов.
 ## Всё честно: у каждой атаки есть красная зона-предупреждение; волну можно перепрыгнуть, от всего — уйти кувырком.
+## Боссы мира (v0.5.1) используют тот же мозг с набором приёмов из DB.ENEMIES[kind].moves и подмогой .adds:
+## breath — огненный конус, spores — ядовитые круги у героя, nova — кольцо вокруг босса (внутри безопасно).
 
 var e            # Enemy
 var phase := 1
@@ -40,8 +42,9 @@ func update(delta: float) -> void:
 	summon_timer -= delta
 	if special_timer > 0: return
 	special_timer = [0.0, 6.5, 5.0, 3.8][phase]
-	var options := ["slam", "rock"]
-	if phase >= 2: options += ["charge", "slam"]
+	var moves: Array = e.def.get("moves", ["slam", "rock", "charge"])
+	var options: Array = moves.slice(0, 2)
+	if phase >= 2: options = moves.duplicate() + [moves[0]]
 	if phase >= 2 and summon_timer <= 0 and _alive_adds() < 3: options = ["summon"]
 	run(options.pick_random(), t)
 
@@ -57,6 +60,9 @@ func run(kind: String, t) -> void:
 		"rock": _rock(t)
 		"charge": _charge(t)
 		"summon": _summon()
+		"breath": _breath(t)
+		"spores": _spores(t)
+		"nova": _nova()
 
 func _wait(sec: float) -> bool:
 	await e.get_tree().create_timer(sec, false).timeout
@@ -75,10 +81,11 @@ func _phase_change(p: int) -> void:
 	e._model_action("roar")
 	z.shake(0.5)
 	CombatFX.burst(z.fx_root, e.global_position + Vector3.UP * 2.0, Color(1, 0.4, 0.2), 40, 9.0, 0.15, 0.8, Vector3.UP, 90, -4)
+	var bn: String = e.def.name
 	match p:
-		2: Game.toast("Тролль в гневе! Фаза 2: рывки и подмога", 3.0)
+		2: Game.toast(("Тролль в гневе! Фаза 2: рывки и подмога" if e.kind == "troll" else "%s в гневе! Фаза 2" % bn), 3.0)
 		3:
-			Game.toast("ЯРОСТЬ ТРОЛЛЯ! Фаза 3: он быстрее и сильнее", 3.0)
+			Game.toast(("ЯРОСТЬ ТРОЛЛЯ! Фаза 3: он быстрее и сильнее" if e.kind == "troll" else "%s в ярости! Фаза 3" % bn), 3.0)
 			enraged = true
 			e.speed_mult = 1.35
 			e.damage_mult = 1.3
@@ -142,6 +149,7 @@ func _rock(t) -> void:
 		target.y = z.ground_y(target)
 		var r := Rock.new()
 		r.zone = z; r.from = e.global_position + Vector3.UP * 3.6 + e.global_basis.z * 0.8; r.to = target
+		if e.def.has("proj"): r.color = e.def.proj
 		r.damage = e._damage() * 1.3; r.flight = 1.3
 		z.fx_root.add_child(r)
 		z.fx("telegraph", target, Rock.RADIUS, Color.RED, r.flight)
@@ -203,7 +211,8 @@ func _summon() -> void:
 	e._model_action("roar")
 	z.shake(0.3)
 	if not await _wait(0.9): return
-	var kind := "goblin" if phase < 3 else "skeleton"
+	var ad: Array = e.def.get("adds", ["goblin", "skeleton"])
+	var kind: String = ad[0] if phase < 3 else ad[mini(1, ad.size() - 1)]
 	for i in 2:
 		var pos: Vector3 = e.global_position + Vector3(-3.5 if i == 0 else 3.5, 0, randf_range(-1.5, 1.5))
 		CombatFX.burst(z.fx_root, pos + Vector3.UP * 0.5, Color(0.5, 0.3, 0.8), 24, 4.0, 0.12, 0.6, Vector3.UP, 60, -1)
@@ -212,8 +221,81 @@ func _summon() -> void:
 		a._aggro = true
 		if a.model is MobModel: a.model.play_action("spawn", 1.2)
 		adds.append(a)
-	Game.toast("Тролль призывает подмогу!", 2.0)
+	Game.toast("Тролль призывает подмогу!" if e.kind == "troll" else "%s призывает подмогу!" % e.def.name, 2.0)
 	if not await _wait(0.8): return
+	busy = false
+
+# ---------- огненный конус (дракон, серафим) ----------
+func _breath(t) -> void:
+	busy = true
+	log.append("breath")
+	var z = zone()
+	_face(t.global_position)
+	var dir := U.flat(t.global_position - e.global_position).normalized()
+	var reach := 9.0
+	var col: Color = e.def.get("proj", Color(1, 0.45, 0.1))
+	# предупреждение: 5 кругов по конусу
+	var spots: Array = []
+	for i in 5:
+		var a := deg_to_rad(-30.0 + i * 15.0)
+		var c: Vector3 = e.global_position + dir.rotated(Vector3.UP, a) * reach * 0.62
+		c.y = z.ground_y(c)
+		spots.append(c)
+		z.fx("telegraph", c, 2.6, Color.RED, 1.2 if phase < 3 else 0.95)
+	e._model_action("roar")
+	if not await _wait(1.2 if phase < 3 else 0.95): return
+	e._model_action("attack")
+	for c in spots: z.fx("burst", c + Vector3.UP * 0.8, 2.6, col, 0.5)
+	var p = z.player
+	if p and not p.dead:
+		var to := U.flat(p.global_position - e.global_position)
+		if to.length() < reach + 1.0 and to.normalized().dot(dir) > cos(deg_to_rad(38.0)):
+			p.take_damage(e._damage() * 1.8, e.global_position)
+	if not await _wait(0.6): return
+	busy = false
+
+## Ядовитые круги у героя (3, со сдвигом); стоять в круге в момент вспышки — урон
+func _spores(t) -> void:
+	busy = true
+	log.append("spores")
+	var z = zone()
+	e._model_action("cast")
+	var col: Color = e.def.get("proj", Color(0.6, 0.95, 0.2))
+	var spots: Array = []
+	var n := 3 if phase < 3 else 5
+	for i in n:
+		var c: Vector3 = t.global_position + (Vector3.ZERO if i == 0 else Vector3(randf_range(-5, 5), 0, randf_range(-5, 5)))
+		c.y = z.ground_y(c)
+		spots.append(c)
+		z.fx("telegraph", c, 2.4, Color.RED, 1.3)
+	if not await _wait(1.3): return
+	var p = z.player
+	for c in spots:
+		z.fx("burst", c + Vector3.UP * 0.5, 2.4, col, 0.6)
+		if p and not p.dead and U.flat_dist(p.global_position, c) < 2.4: p.take_damage(e._damage() * 1.2, c)
+	if not await _wait(0.5): return
+	busy = false
+
+## Кольцо вокруг босса: безопасно вплотную (r < 3) и далеко (r > 9)
+func _nova() -> void:
+	busy = true
+	log.append("nova")
+	var z = zone()
+	var c: Vector3 = e.global_position
+	var col: Color = e.def.get("proj", Color(0.6, 0.9, 1.0))
+	e._model_action("roar")
+	var ring := CombatFX.ground_ring(z.fx_root, c, 9.0, 0.67, Color(1, 0.1, 0.05, 0.35))
+	if not await _wait(1.3 if phase < 3 else 1.05):
+		if is_instance_valid(ring): ring.queue_free()
+		return
+	if is_instance_valid(ring): ring.queue_free()
+	z.fx("ring", c, 9.0, col, 0.4)
+	z.shake(0.35)
+	var p = z.player
+	if p and not p.dead:
+		var d := U.flat_dist(p.global_position, c)
+		if d > 3.0 and d < 9.0: p.take_damage(e._damage() * 1.6, c)
+	if not await _wait(0.5): return
 	busy = false
 
 # ======================================================================
@@ -256,10 +338,12 @@ class Rock extends Node3D:
 	var to := Vector3.ZERO
 	var flight := 1.3
 	var damage := 10.0
+	var color := Color(0.42, 0.38, 0.33)
 	var _t := 0.0
 	var _mesh: MeshInstance3D
 	func _ready() -> void:
-		_mesh = U.prim("sphere", self, Vector3.ZERO, Vector3(0.9, 0.75, 0.85), Color(0.42, 0.38, 0.33), 0.95)
+		_mesh = U.prim("sphere", self, Vector3.ZERO, Vector3(0.9, 0.75, 0.85), color, 0.95)
+		if color != Color(0.42, 0.38, 0.33): _mesh.material_override = U.fx_mat(Color(color.r, color.g, color.b, 0.9))
 		global_position = from
 	func _process(delta: float) -> void:
 		_t += delta

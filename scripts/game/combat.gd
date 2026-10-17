@@ -35,6 +35,31 @@ const ENEMY_DEF := {
 	"goblin": {"armor": 2.0, "res": {"fire": 20, "poison": -20}},
 	"ether_guard": {"armor": 2.5, "res": {"arcane": 50, "lightning": 30, "shadow": -25}},
 	"troll": {"armor": 4.5, "res": {"poison": 40, "ice": 25, "fire": -35}},
+	# v0.5.1 — семейства открытого мира
+	"rat": {"armor": 0.8, "res": {"poison": 30, "fire": -20}},
+	"bull": {"armor": 2.4, "res": {"ice": 20, "lightning": -25}},
+	"spider": {"armor": 1.2, "res": {"poison": 60, "fire": -40}},
+	"mushnub": {"armor": 0.8, "res": {"poison": 75, "fire": -50}},
+	"goblin_shaman": {"armor": 1.2, "res": {"arcane": 30, "shadow": 20}},
+	"bee": {"armor": 0.8, "res": {"poison": 40, "ice": -30}},
+	"orc": {"armor": 2.6, "res": {"fire": 20, "shadow": -20}},
+	"cactoro": {"armor": 2.0, "res": {"fire": 40, "poison": 30, "ice": -35}},
+	"drake": {"armor": 1.8, "res": {"fire": 75, "ice": -40}},
+	"frog": {"armor": 1.4, "res": {"poison": 60, "lightning": -35}},
+	"crab": {"armor": 4.0, "res": {"ice": 30, "poison": 20, "lightning": -40}},
+	"ghost": {"armor": 0.6, "res": {"shadow": 75, "poison": 75, "holy": -50}},
+	"bat": {"armor": 0.8, "res": {"shadow": 30, "lightning": -30}},
+	"yeti": {"armor": 2.8, "res": {"ice": 75, "fire": -40}},
+	"hywirl": {"armor": 1.4, "res": {"ice": 75, "lightning": 30, "fire": -45}},
+	"imp": {"armor": 1.6, "res": {"arcane": 40, "fire": 30, "holy": -30}},
+	"demon": {"armor": 1.8, "res": {"fire": 50, "shadow": 40, "holy": -40}},
+	"bluedemon": {"armor": 3.0, "res": {"shadow": 40, "ice": 30, "holy": -40}},
+	"boss_ogron": {"armor": 4.5, "res": {"fire": 25, "poison": 25, "shadow": -30}},
+	"boss_root": {"armor": 4.5, "res": {"poison": 75, "ice": 25, "fire": -40}},
+	"boss_urgal": {"armor": 5.0, "res": {"fire": 75, "arcane": 25, "ice": -35}},
+	"boss_gnil": {"armor": 4.5, "res": {"poison": 75, "ice": 20, "lightning": -35}},
+	"boss_hyalm": {"armor": 5.0, "res": {"ice": 75, "poison": 25, "fire": -40}},
+	"boss_seraph": {"armor": 5.0, "res": {"fire": 50, "shadow": 50, "arcane": 30, "holy": -35}},
 	"warden": {"armor": 5.5, "res": {"arcane": 55, "shadow": 40, "lightning": 25, "holy": -30}},
 }
 const RANK_ARMOR := {"normal": 1.0, "elite": 1.3, "rare": 1.6, "boss": 1.0}   # боссы: высокая базовая броня в ENEMY_DEF
@@ -89,9 +114,10 @@ static func reward_factor(player_level: int, enemy_level: int) -> float:
 static func player_vs_enemy(e, elem: String, att_level: int, pen: float, res_red: float) -> float:
 	var f := level_factor(att_level, e.level)
 	if elem == "phys":
-		f *= armor_factor(enemy_armor(e.kind, e.level, e.rank, e.def.boss), att_level, pen)
+		f *= armor_factor(enemy_armor(e.kind, e.level, e.rank, e.def.boss) * (float(e.armor_mult) if "armor_mult" in e else 1.0), att_level, pen)
 	else:
-		f *= resist_factor(enemy_resist(e.kind, elem, e.rank, e.def.boss), res_red)
+		var rb: float = float(e.res_bonus) if "res_bonus" in e else 0.0
+		f *= resist_factor(clampf(enemy_resist(e.kind, elem, e.rank, e.def.boss) + rb, RES_MIN, RES_CAP), res_red)
 	return f
 
 ## Подпись сопротивлений: "Уязв.: огонь · Стоек: яд, лёд"

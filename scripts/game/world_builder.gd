@@ -697,7 +697,7 @@ func _world_spawners() -> void:
 			placed.append(p)
 			var lv := WorldData.level_at(p.x, p.y)
 			var kind: String = (b.mobs as Array)[n % (b.mobs as Array).size()]
-			var s := WorldSpawner.make(zone, enemies_root, Vector3(p.x, 0, p.y), kind, maxi(int(b.lv[0]), lv - 1), mini(int(b.lv[1]), lv + 1), rr.randi_range(3, 5), 9.0, 45.0)
+			var s := WorldSpawner.make(zone, enemies_root, Vector3(p.x, 0, p.y), kind, maxi(int(b.lv[0]), lv - 1), mini(int(b.lv[1]), lv + 1), rr.randi_range(3, 5) * (2 if DB.ENEMIES[kind].get("ai", "") == "swarm" else 1), 9.0, 45.0)
 			s.sid = "%s_%d" % [b.id, n]; s.biome = bi; s.elite_chance = 0.12
 			spawners.append(s)
 			n += 1
@@ -717,7 +717,7 @@ func _world_spawners() -> void:
 		var bi: int = p.boss
 		var b: Dictionary = WorldData.BIOMES[bi]
 		var bp := Vector3(p.pos.x, 0, p.pos.y)
-		var bsp := WorldSpawner.make(zone, enemies_root, bp, "troll", int(b.lv[1]) + 1, int(b.lv[1]) + 1, 1, 1.0, 600.0)
+		var bsp := WorldSpawner.make(zone, enemies_root, bp, String(b.get("boss_kind", "troll")), int(b.lv[1]) + 1, int(b.lv[1]) + 1, 1, 1.0, 600.0)
 		bsp.sid = "%s_boss" % b.id; bsp.biome = bi; bsp.rank = "boss"; bsp.rare_name = b.boss
 		bsp.kill_flag = "boss_" + b.id
 		spawners.append(bsp)

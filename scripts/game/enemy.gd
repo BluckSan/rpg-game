@@ -33,7 +33,18 @@ var damage_mult := 1.0
 var rank := "normal"   # normal | elite | rare | boss (мир)
 var speed_mult := 1.0
 var hits_taken := 0
-var curse_timer := 0.0   # проклятие: +30% получаемого урона
+var curse_timer := 0.0
+var ai := "melee"          # melee | ranged | charger | caster | swarm | exploder | healer (DB.ENEMIES[kind].ai)
+var affixes: Array = []     # аффиксы элит/редких (AFFIXES)
+var armor_mult := 1.0       # «Каменнокожий»
+var res_bonus := 0.0        # «Заговорённый»: + к сопротивлениям
+var busy := false           # особое действие (рывок, взрыв, заклинание) — обычный ИИ ждёт
+var ability_cd := 2.0
+var _aura_t := 1.0
+var _summoned := false
+var ability_log: Array = [] # для тестов: «charge», «cast», «heal», «explode», «summon»…
+var model_base_scale := Vector3.ONE   # исходный масштаб модели (ранг, размер) — восстанавливается всегда
+var _squash: Tween   # проклятие: +30% получаемого урона
 
 ## Физика: тело на слое 4 (враги), сталкивается только со статикой уровня (слой 1) — стены не проходит.
 ## Друг друга и героя не толкают (раздвигание — мягкое, в _move_towards). В подземелье путь — по навмешу.
@@ -65,6 +76,7 @@ static func spawn(z, k: String, lvl: int, pos: Vector3, parent: Node) -> Enemy:
 	e.kind = k
 	e.def = DB.ENEMIES[k]
 	e.level = lvl
+	e.ai = String(e.def.get("ai", "ranged" if e.def.ranged else "melee"))
 	e.radius = e.def.radius
 	e.max_hp = e.def.hp * (1 + (lvl - 1) * 0.22)
 	e.hp = e.max_hp
@@ -84,6 +96,7 @@ static func spawn(z, k: String, lvl: int, pos: Vector3, parent: Node) -> Enemy:
 	e.global_position = Vector3(pos.x, z.ground_y(pos), pos.z)
 	e.rotation.y = randf() * TAU
 	e._build_model()
+	if e.model: e.model_base_scale = e.model.scale
 	if not e.def.boss: U.set_view_range(e, Game.view_distance * 0.85)
 	if e.def.boss:
 		e.brain = WardenBrain.new() if k == "warden" else BossBrain.new()
@@ -92,8 +105,34 @@ static func spawn(z, k: String, lvl: int, pos: Vector3, parent: Node) -> Enemy:
 	return e
 
 var display_name: String:
-	get: return ("★ " if rank == "elite" else ("◆ " if rank == "rare" else "")) + "%s (%d)" % [def.name, level]
+	get:
+		var pre := ""
+		if not affixes.is_empty() and rank == "elite": pre = String(AFFIXES[affixes[0]].name) + " "
+		return ("★ " if rank == "elite" else ("◆ " if rank == "rare" else "")) + pre + "%s (%d)" % [def.name, level]
 
+func affix_text() -> String:
+	var a := []
+	for x in affixes: a.append(AFFIXES[x].name)
+	return ", ".join(a)
+
+func add_affix(x: String) -> void:
+	if affixes.has(x) or not AFFIXES.has(x): return
+	affixes.append(x)
+	match x:
+		"fast": speed_mult *= 1.3
+		"stone": armor_mult *= 2.0
+		"warded": res_bonus += 25.0
+
+## Аффиксы элит (1) и редких (2): видны в имени и на табличке
+const AFFIXES := {
+	"fast": {"name": "Стремительный", "desc": "быстрее на 30%"},
+	"stone": {"name": "Каменнокожий", "desc": "броня ×2"},
+	"vampire": {"name": "Вампирический", "desc": "лечится от своих ударов"},
+	"explosive": {"name": "Взрывной", "desc": "взрывается после гибели"},
+	"burning": {"name": "Пылающий", "desc": "огненная аура"},
+	"summoner": {"name": "Призыватель", "desc": "зовёт подмогу на половине здоровья"},
+	"warded": {"name": "Заговорённый", "desc": "+25% ко всем сопротивлениям"},
+}
 const RANK_COLORS := {"elite": Color(1.0, 0.8, 0.3), "rare": Color(0.75, 0.45, 1.0), "boss": Color(1.0, 0.35, 0.25)}
 
 ## Ранг в открытом мире: элита (×2 здоровья), редкий именной (×3,5), босс зоны (имя). Больше урона, опыта и добычи (Loot.drop_for).
@@ -106,10 +145,16 @@ func make_rank(r: String, title := "") -> void:
 		"rare": hp_k = 3.5; dmg_k = 1.5; xp_k = 5.0; sc = 1.32
 		"boss": hp_k = 1.0; dmg_k = 1.0; xp_k = 1.5; sc = 1.0
 	if title != "": def.name = title
+	if r in ["elite", "rare"]:
+		var pool: Array = AFFIXES.keys()
+		pool.shuffle()
+		for i in (1 if r == "elite" else 2): add_affix(pool[i])
 	def.xp = float(def.xp) * xp_k
 	max_hp *= hp_k; hp = max_hp
 	damage_mult *= dmg_k
-	if model and sc != 1.0: model.scale *= sc
+	if model and sc != 1.0:
+		model_base_scale *= sc
+		model.scale = model_base_scale
 	if r != "normal":
 		var ring := MeshInstance3D.new(); ring.name = "RankRing"
 		var tm := TorusMesh.new(); tm.inner_radius = radius * 1.1 * sc; tm.outer_radius = radius * 1.1 * sc + 0.12
@@ -159,7 +204,12 @@ func _build_model() -> void:
 			if kind == "warden": model._build_fx("embers", Color(0.7, 0.4, 1.0), model)
 		_:
 			model = MobModel.new(); add_child(model)
-			model.setup("slime")
+			var mk: String = def.get("model", "slime")
+			var opts := {"scale": float(def.get("model_scale", 1.0))}
+			if def.has("tint"): opts["tint"] = def.tint
+			if def.has("emission"): opts["emission"] = def.emission
+			model.setup(mk, opts)
+			model.walk_ref = maxf(1.0, def.speed * 0.6); model.run_ref = maxf(2.0, def.speed * 1.3)
 
 func _model_action(a: String) -> void:
 	if model and model.has_method("play_action"): model.play_action(a)
@@ -190,11 +240,15 @@ func knockback(dir: Vector3, force: float) -> void:
 	if not alive: return
 	var k := 0.08 if def.boss else (0.5 if kind in ["troll", "goblin"] else 1.0)
 	_kb += U.flat(dir).normalized() * force * k
-	if model:
-		var base := model.scale
-		var tw := create_tween()
-		tw.tween_property(model, "scale", Vector3(base.x * 1.08, base.y * 0.92, base.z * 1.08), 0.05)
-		tw.tween_property(model, "scale", base, 0.12)
+	# «упругий» отклик — только у обычных врагов и всегда от исходного масштаба (раньше масштаб брался
+	# посреди прошлого отклика и при частых ударах босс сплющивался). Боссы не деформируются вовсе.
+	if model and not def.boss:
+		if _squash and _squash.is_valid(): _squash.kill()
+		var base := model_base_scale
+		model.scale = base
+		_squash = create_tween()
+		_squash.tween_property(model, "scale", Vector3(base.x * 1.06, base.y * 0.95, base.z * 1.06), 0.05)
+		_squash.tween_property(model, "scale", base, 0.12)
 
 func slow(factor: float, t: float) -> void:
 	_slow_factor = factor; _slow_timer = t
@@ -216,6 +270,7 @@ func _die() -> void:
 	# дымка/искры души при гибели
 	CombatFX.burst(zone.fx_root, global_position + Vector3.UP * (2.0 if def.boss else 0.8), Color(0.85, 0.85, 1.0, 0.7), 16 if not def.boss else 40, 2.5, 0.16, 0.9, Vector3.UP, 50, 1.5)
 	if on_death.is_valid(): on_death.call(self)
+	if affixes.has("explosive"): _death_blast(global_position, _damage() * 1.6)
 	if model and model.has_method("set_dead"): model.set_dead(true)
 	# тело остаётся на земле, затем уходит под землю
 	var tw := create_tween()
@@ -263,6 +318,9 @@ func _process(delta: float) -> void:
 	if _stun_timer > 0:
 		_stun_timer -= delta
 		return
+	if busy: return
+	if ability_cd > 0: ability_cd -= delta
+	if not affixes.is_empty(): _affix_tick(delta)
 	var speed: float = def.speed * _slow_factor * speed_mult
 	var home_dist := U.flat_dist(global_position, home)
 	if home_dist > (22.0 if def.boss else 28.0):
@@ -277,6 +335,7 @@ func _process(delta: float) -> void:
 		_aggro = true
 		var to := U.flat(target.global_position - global_position)
 		_face(to, delta)
+		if _role_tick(to, speed, delta): return
 		if to.length() > def.range * 0.9:
 			_move_towards(target.global_position, speed, delta)
 		elif _attack_timer <= 0:
@@ -294,11 +353,15 @@ func _process(delta: float) -> void:
 
 func _attack() -> void:
 	_anim = 0; _lunge = 0.25
-	_model_action("attack")
+	if ai == "caster":
+		_cast_aoe(target); return
+	if ai == "exploder":
+		_fuse(); return
+	_model_action("attack" if randf() < 0.7 else "attack2")
 	if def.ranged:
-		var origin := global_position + Vector3.UP * 1.3 + global_basis.z * 0.4
+		var origin := global_position + Vector3.UP * float(def.get("shot_h", 1.3)) + global_basis.z * 0.4
 		var dir := U.flat(target.global_position - global_position).normalized()
-		Projectile.fire(zone, origin, dir, 13.0, def.range + 4, Color(0.6, 0.9, 1), 0.25, false, Callable(), _damage())
+		Projectile.fire(zone, origin, dir, float(def.get("proj_speed", 13.0)), def.range + 4, def.get("proj", Color(0.6, 0.9, 1)), 0.25, false, Callable(), _damage())
 	else:
 		var t := target
 		await get_tree().create_timer(0.25 if not def.boss else 0.45, false).timeout
@@ -308,6 +371,8 @@ func _attack() -> void:
 
 func _deal_to(t: Node3D, dmg: float) -> void:
 	if t == null or not is_instance_valid(t): return
+	if affixes.has("vampire") and alive:
+		hp = minf(max_hp, hp + dmg * 0.5)
 	if t is Player: t.take_damage(dmg, global_position)
 	elif t.has_method("take_damage"): t.take_damage(dmg)
 
@@ -364,3 +429,137 @@ func _animate(delta: float) -> void:
 	if _flash > 0: _flash -= delta
 	if model:
 		model.rotation.z = sin(Time.get_ticks_msec() * 0.02) * 0.14 if _stun_timer > 0 else 0.0
+
+# ================= роли врагов (v0.5.1) =================
+## Особое поведение по роли; true — кадр занят (обычная атака/движение пропускаются)
+func _role_tick(to: Vector3, speed: float, delta: float) -> bool:
+	var d := to.length()
+	match ai:
+		"charger":
+			if ability_cd <= 0 and d > 4.5 and d < 14.0:
+				_charge(target); return true
+		"healer":
+			if ability_cd <= 0 and _heal_ally(): return true
+			if d < def.range * 0.45:   # держит дистанцию
+				_move_towards(global_position - to.normalized() * 4.0, speed * 0.8, delta); return true
+		"caster", "ranged":
+			if d < def.range * 0.35 and not def.boss:
+				_move_towards(global_position - to.normalized() * 4.0, speed * 0.7, delta); return true
+	return false
+
+## Таран: красная полоса-предупреждение, разгон, удар с отбрасыванием (как у тролля, но короче)
+func _charge(t) -> void:
+	busy = true; ability_cd = 7.0
+	ability_log.append("charge")
+	var start := global_position
+	var dir := U.flat(t.global_position - start).normalized()
+	var length := clampf(U.flat_dist(t.global_position, start) + 3.0, 6.0, 13.0)
+	var tele := MeshInstance3D.new()
+	var bm := BoxMesh.new(); bm.size = Vector3(radius * 2.2 + 0.6, 0.02, length)
+	tele.mesh = bm
+	tele.material_override = U.fx_mat(Color(1, 0.1, 0.05, 0.35))
+	tele.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	zone.fx_root.add_child(tele)
+	tele.global_position = start + dir * length / 2 + Vector3.UP * 0.06
+	tele.rotation.y = atan2(dir.x, dir.z)
+	rotation.y = atan2(dir.x, dir.z)
+	_model_action("roar")
+	await get_tree().create_timer(0.75, false).timeout
+	tele.queue_free()
+	if not alive: return
+	_model_action("charge")
+	var traveled := 0.0; var hit := false
+	while traveled < length and alive:
+		var dt := get_process_delta_time()
+		await get_tree().process_frame
+		if not is_instance_valid(self) or not alive: return
+		var step := 13.0 * maxf(dt, 0.001)
+		traveled += step
+		slide_move(dir * step)
+		var p = zone.player
+		if not hit and p and not p.dead and U.flat_dist(p.global_position, global_position) < radius + 1.0:
+			hit = true
+			p.take_damage(_damage() * 1.5, global_position)
+			if p.invuln <= 0: p.knockback(dir, 6.0)
+	busy = false
+
+## Заклинание по площади у цели: круг-предупреждение 1.1 с, затем удар стихией
+func _cast_aoe(t) -> void:
+	if t == null or not is_instance_valid(t): return
+	busy = true
+	ability_log.append("cast")
+	_model_action("cast")
+	var c: Vector3 = t.global_position
+	c.y = zone.ground_y(c)
+	var r := 2.4
+	var col: Color = def.get("proj", Color(0.8, 0.4, 1.0))
+	zone.fx("telegraph", c, r, Color.RED, 1.1)
+	await get_tree().create_timer(1.1, false).timeout
+	if not is_instance_valid(self): return
+	busy = false
+	if not alive: return
+	zone.fx("burst", c + Vector3.UP * 0.4, r, col, 0.4)
+	zone.fx("ring", c, r, col, 0.3)
+	var p = zone.player
+	if p and not p.dead and U.flat_dist(p.global_position, c) < r: p.take_damage(_damage() * 1.3, c)
+	for m in zone.minions.duplicate():
+		if is_instance_valid(m) and U.flat_dist(m.global_position, c) < r: m.take_damage(_damage() * 1.3)
+
+## Взрывун: подбегает, шипит 0.9 с (круг) и взрывается, погибая
+func _fuse() -> void:
+	busy = true
+	ability_log.append("explode")
+	_model_action("roar")
+	zone.fx("telegraph", global_position, 2.8, Color.RED, 0.9)
+	await get_tree().create_timer(0.9, false).timeout
+	if not is_instance_valid(self) or not alive: return
+	_death_blast(global_position, _damage(), 2.8, false)
+	busy = false
+	hp = 0; _die()
+
+func _death_blast(c: Vector3, dmg: float, r := 3.0, delayed := true) -> void:
+	var z = zone
+	if delayed:
+		z.fx("telegraph", c, r, Color.RED, 1.0)
+		await z.get_tree().create_timer(1.0, false).timeout
+	z.fx("burst", c + Vector3.UP * 0.6, r, Color(1, 0.55, 0.2), 0.45)
+	z.shake(0.25)
+	var p = z.player
+	if p and not p.dead and U.flat_dist(p.global_position, c) < r: p.take_damage(dmg, c)
+
+## Шаман: лечит самого раненого союзника рядом (25% здоровья); true — лечение было
+func _heal_ally() -> bool:
+	var best = null; var bf := 0.8
+	for o in zone.enemies:
+		if not is_instance_valid(o) or not o.alive or o.def.boss: continue
+		if U.flat_dist(o.global_position, global_position) > 12.0: continue
+		var f: float = o.hp / maxf(1.0, o.max_hp)
+		if f < bf: bf = f; best = o
+	if best == null: return false
+	ability_cd = 5.0
+	ability_log.append("heal")
+	_model_action("cast")
+	var amt: float = best.max_hp * 0.25
+	best.hp = minf(best.max_hp, best.hp + amt)
+	Tele.bolt(zone.fx_root, global_position + Vector3.UP * 1.4, best.global_position + Vector3.UP * 1.0, Color(0.4, 1.0, 0.5), 0.3, 0.06)
+	zone.float_text(best.global_position + Vector3.UP * 2.2, "+%d" % int(amt), Color(0.4, 1.0, 0.5))
+	return true
+
+func _affix_tick(delta: float) -> void:
+	if affixes.has("burning"):
+		_aura_t -= delta
+		if _aura_t <= 0:
+			_aura_t = 1.0
+			var p = zone.player
+			if p and not p.dead and U.flat_dist(p.global_position, global_position) < 3.2:
+				p.take_damage(_damage() * 0.3, global_position)
+			CombatFX.burst(zone.fx_root, global_position + Vector3.UP * 0.6, Color(1, 0.45, 0.1), 8, 2.5, 0.12, 0.5, Vector3.UP, 120, 0.5)
+	if affixes.has("summoner") and not _summoned and hp < max_hp * 0.5:
+		_summoned = true
+		ability_log.append("summon")
+		var mk: String = def.get("minion", kind)
+		for i in 2:
+			var pos := global_position + Vector3(-2.0 if i == 0 else 2.0, 0, randf_range(-1, 1))
+			var a := Enemy.spawn(zone, mk, maxi(1, level - 2), pos, get_parent())
+			a._aggro = true; a.home = home
+			zone.fx("burst", pos + Vector3.UP * 0.5, 1.2, Color(0.6, 0.3, 0.9), 0.4)
