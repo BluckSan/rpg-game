@@ -6,16 +6,34 @@ class_name CharVisual
 ## при беге — только верх тела) + смерть.
 
 const UPPER_ROOT := "spine_01"
+## Оружие: [кость, модель, "grip" (хват в кулаке — точно по кости кисти) или смещение, поворот, масштаб]
 const WEAPONS := {
-	"warrior": [["hand_r", "props/sword1", Vector3(0.0, 0.04, 0.0), Vector3(0, 0, -90), 0.42],
+	"warrior": [["hand_r", "props/sword1", "grip", Vector3.ZERO, 0.42],
 		["lowerarm_l", "props/shield1", Vector3(0.0, 0.18, -0.07), Vector3(0, 0, 90), 0.25]],
-	"archer": [["hand_l", "props/bow", Vector3(0.0, 0.05, 0.03), Vector3(0, 0, 0), 0.62],
+	"archer": [["hand_l", "props/bow", "grip", Vector3.ZERO, 0.62],
 		["spine_03", "props/arrow", Vector3(0.1, 0.05, -0.17), Vector3(10, 0, 150), 0.42],
 		["spine_03", "props/arrow", Vector3(0.05, 0.05, -0.18), Vector3(12, 0, 160), 0.42]],
-	"mage": [["hand_r", "props/staff", Vector3(0.0, 0.14, 0.02), Vector3(180, 0, 0), 0.62]],
-	"goblin": [["hand_r", "props/axe", Vector3(0.0, 0.05, 0.0), Vector3(0, 0, -90), 0.55]],
-	"troll": [["hand_r", "props/axe", Vector3(0.0, 0.06, 0.0), Vector3(0, 0, -90), 0.8]],
+	"mage": [["hand_r", "props/staff", "grip", Vector3.ZERO, 0.58]],
+	"goblin": [["hand_r", "props/axe", "grip", Vector3.ZERO, 0.55]],
+	"troll": [["hand_r", "props/axe", "grip", Vector3.ZERO, 0.8]],
 }
+## Хват: точка на оси модели (y в единицах модели), где смыкается кулак, и поворот вокруг оси (°)
+const GRIP := {"props/staff": [-0.134, 0.0], "props/sword1": [-0.07, 0.0], "props/axe": [-0.12, 0.0], "props/bow": [0.0, 0.0]}
+## Центр кулака в системе кости кисти (измерено по костям пальцев скелета UAL: ладонь — x≈0,
+## согнутые пальцы — x≈-0.05, костяшки — y≈0.11; ось кулака — Z, большой палец — +Z)
+const GRIP_CENTER_R := Vector3(-0.028, 0.082, 0.0)
+static func grip_center(side: float) -> Vector3:
+	return Vector3(GRIP_CENTER_R.x * side, GRIP_CENTER_R.y, GRIP_CENTER_R.z)
+
+## Трансформ оружия в кости кисти: ось модели Y идёт по оси кулака (+Z кости), кулак — на точке хвата
+static func grip_transform(side: float, prop_name: String, sc: float, roll := 0.0) -> Transform3D:
+	var g: Array = GRIP.get(prop_name, [0.0, 0.0])
+	var b := Basis(Vector3(0, 1, 0), Vector3(0, 0, 1), Vector3(1, 0, 0))  # X→Y, Y→Z, Z→X
+	b = b * Basis(Vector3.UP, deg_to_rad(float(g[1]) + roll))
+	b = b * Basis.from_scale(Vector3.ONE * sc)
+	var c := grip_center(side)
+	return Transform3D(b, c - b * Vector3(0, float(g[0]), 0))
+
 ## Внешность монстров-гуманоидов
 const MONSTERS := {
 	"goblin": {"look": {"gender": 0, "height": 0.86, "build": 1.25, "head": 1.06, "hair": 0, "brows": 2, "beard": 0,
@@ -64,6 +82,7 @@ var _bow_ba: BoneAttachment3D
 var _bow_rest: Array = []
 var _bow_aiming := false
 var _cur_action := ""
+var _cur_kind := ""
 const TRAILS := {"props/sword1": [Vector3(0, 0.5, 0), Vector3(0, 2.25, 0)], "props/staff": [Vector3(0, 0.9, 0), Vector3(0, 1.6, 0)],
 	"props/axe": [Vector3(0, 0.35, 0), Vector3(0, 0.86, 0)]}
 
@@ -75,7 +94,7 @@ func build(l: Dictionary, cls: String, asc: String, monster_kind := "") -> void:
 	else:
 		look = CharAssets.normalize_look(l)
 	for c in get_children(): c.queue_free()
-	model = null; beast = null; fx = null; skel = null; tree = null; meshes = {}; weapon = null; trail = null; _bow_ba = null
+	model = null; beast = null; fx = null; skel = null; tree = null; meshes = {}; weapon = null; trail = null; _bow_ba = null; grips = {}; _bow_aiming = false
 	dead = false
 	if asc == "druid":
 		beast = MobModel.new(); add_child(beast)
@@ -201,7 +220,12 @@ func _build_weapons() -> void:
 		skel.add_child(ba)
 		var inst: Node3D = CharAssets.prop(w[1]).instantiate()
 		ba.add_child(inst)
-		inst.position = w[2]; inst.rotation_degrees = w[3]; inst.scale = Vector3.ONE * float(w[4])
+		if w[2] is String:
+			var side := 1.0 if w[0].ends_with("_r") else -1.0
+			inst.transform = grip_transform(side, w[1], float(w[4]))
+			_add_grip(w[0], w[1])
+		else:
+			inst.position = w[2]; inst.rotation_degrees = w[3]; inst.scale = Vector3.ONE * float(w[4])
 		if w[1] == "props/staff":
 			_staff_orb(inst, TRAILS[w[1]][1])
 		if weapon == null and TRAILS.has(w[1]):
@@ -216,9 +240,40 @@ func _build_weapons() -> void:
 			trail.setup(inst, TRAILS[w[1]][0], TRAILS[w[1]][1], tc)
 		elif weapon == null and w[1] == "props/bow":
 			weapon = inst; weapon_tip = Vector3(0, 1.0, 0)
-			_bow_ba = ba; _bow_rest = [w[0], w[2], w[3]]
+			_bow_ba = ba; _bow_rest = [w[0], inst.transform, float(w[4])]
 		if asc_id == "paladin" or asc_id == "elementalist" or asc_id == "berserker":
 			_tint_weapon(inst, CharAssets.ASC_LOOK[asc_id].fx_color)
+
+## Доводка кисти: посох и лук в покое/на бегу стоят вертикально
+var grips := {}   # кость -> GripAlign
+func _add_grip(bone_name: String, prop_name: String) -> void:
+	if not prop_name in ["props/staff", "props/bow", "props/sword1"]: return
+	var m := GripAlign.new()
+	m.name = "Grip_" + bone_name
+	skel.add_child(m)
+	m.side = 1.0 if bone_name.ends_with("_r") else -1.0
+	m.setup(bone_name)
+	grips[bone_name] = m
+
+## Вес доводки в зависимости от действия
+func _update_grips() -> void:
+	if grips.is_empty(): return
+	var acting := is_acting()
+	for bn in grips:
+		var g: GripAlign = grips[bn]
+		var w := 1.0
+		if class_id == "mage":
+			# удары посохом и броски заклинаний — по анимации; стойка/бег/каст — посох вертикально
+			# заклинания — посох навершием вверх; взмахи посохом (комбо) — по анимации
+			if acting and not (_cur_action in ["cast", "cast_enter", "consume", "cheer", "interact", "hit"] \
+					or _cur_kind in ["fireball", "frost_nova", "meteor", "summon", "drink", "hit", "pickup", "cheer"]): w = 0.0
+		elif class_id == "warrior":
+			# меч в стойке — клинок чуть вверх, а не вбок; в ударах — по анимации
+			w = 0.0 if acting else 0.45
+		else:
+			w = 0.0 if _bow_aiming or (acting and _cur_action in ["roll", "dash"]) else 0.85
+		if dead: w = 0.0
+		g.target_weight = w
 
 ## Светящийся кристалл на навершии посоха
 func _staff_orb(inst: Node3D, tip: Vector3) -> void:
@@ -403,6 +458,7 @@ func play_action(kind: String) -> void:
 	if not lib.has_animation(a[0]): return
 	_act_node.animation = "h/" + a[0]
 	_cur_action = a[0]
+	_cur_kind = kind
 	_oneshot.filter_enabled = bool(a[2]) and _speed > 0.6
 	tree.set("parameters/act_ts/scale", a[1])
 	tree.set("parameters/act/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
@@ -423,6 +479,7 @@ func play_anim(anim: String, speed := 1.0, upper := true, trail_time := 0.0) -> 
 	if not CharAssets.anim_library(_gender).has_animation(anim): return
 	_act_node.animation = "h/" + anim
 	_cur_action = anim
+	_cur_kind = ""
 	_oneshot.filter_enabled = upper and _speed > 0.6
 	tree.set("parameters/act_ts/scale", speed)
 	tree.set("parameters/act/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
@@ -474,10 +531,10 @@ func _update_bow() -> void:
 	var w: Node3D = _bow_ba.get_child(0)
 	if aim:
 		_bow_ba.bone_name = "hand_r"
-		w.position = Vector3(0, 0.02, 0.02); w.rotation_degrees = Vector3(90, 0, 0)
+		w.transform = grip_transform(1.0, "props/bow", _bow_rest[2], 180.0)
 	else:
 		_bow_ba.bone_name = _bow_rest[0]
-		w.position = _bow_rest[1]; w.rotation_degrees = _bow_rest[2]
+		w.transform = _bow_rest[1]
 
 func _process(delta: float) -> void:
 	var p := global_position
@@ -491,6 +548,7 @@ func _process(delta: float) -> void:
 		return
 	if tree == null: return
 	_update_bow()
+	_update_grips()
 	var s := _speed / maxf(0.5, model.scale.x if monster != "" else 1.0)
 	tree.set("parameters/loco/blend_position", clampf(s, 0, 8))
 	tree.set("parameters/loco_ts/scale", 1.0 if s < 5.5 else clampf(s / 5.5, 1.0, 1.4))

@@ -219,6 +219,7 @@ func _combo_tests(z, p: Player, cls: String) -> void:
 	dummy.max_hp = 99999; dummy.hp = 99999
 	dummy.def = dummy.def.duplicate(); dummy.def.aggro = 0.0
 	await frames(2)
+	_grip_tests(p, cls)
 	p.face_towards(dummy.global_position)
 	p.combo_step = 0; p.combo_timer = 0
 	var n0 := p.combo_count
@@ -280,6 +281,21 @@ func _desktop_tests(z, p: Player) -> void:
 	h._hotkey(KEY_SPACE)
 	h._hotkey(KEY_1)
 	await secs(0.6)
+
+## Хват: оружие в кулаке (точка хвата у центра кулака), посох/лук в стойке вертикально
+func _grip_tests(p: Player, cls: String) -> void:
+	var v: CharVisual = p.visual
+	if v.weapon == null or v.skel == null: return
+	var side := -1.0 if cls == "archer" else 1.0
+	var hb := v.skel.find_bone("hand_l" if cls == "archer" else "hand_r")
+	var ht: Transform3D = v.skel.global_transform * v.skel.get_bone_global_pose(hb)
+	var fist: Vector3 = ht * CharVisual.grip_center(side)
+	var pn: String = {"warrior": "props/sword1", "archer": "props/bow", "mage": "props/staff"}[cls]
+	var gp: Vector3 = v.weapon.global_transform * Vector3(0, float(CharVisual.GRIP[pn][0]), 0)
+	check(gp.distance_to(fist) < 0.03, "[%s] оружие в кулаке (%.3f м)" % [cls, gp.distance_to(fist)])
+	var ax := (v.weapon.global_basis * Vector3.UP).normalized()
+	if cls != "warrior":
+		check(rad_to_deg(ax.angle_to(Vector3.UP)) < 20.0, "[%s] в стойке оружие вертикально (%d°)" % [cls, rad_to_deg(ax.angle_to(Vector3.UP))])
 
 func _roll_tests(z, p: Player) -> void:
 	p.recalc(true)
