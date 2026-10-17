@@ -309,6 +309,7 @@ func _open(which: String) -> void:
 		"talents": window = preload("res://scripts/ui/talent_tree_ui.gd").new()
 		"hero": window = preload("res://scripts/ui/inventory_ui.gd").new()
 		"shop": window = preload("res://scripts/ui/shop_ui.gd").new()
+		"stash": window = preload("res://scripts/ui/stash_ui.gd").new()
 		"skills": window = preload("res://scripts/ui/skills_ui.gd").new()
 		_: window = preload("res://scripts/ui/pause_menu.gd").new()
 	window.name = "Window_" + which

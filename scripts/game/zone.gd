@@ -15,6 +15,7 @@ var _autosave := 30.0
 var last_boss_drop := {}
 var merchant: Node3D
 var merchant_point := Vector3.ZERO
+var stash_point := Vector3.INF
 var arena_point := Vector3.ZERO
 var portal_point := Vector3.ZERO
 var dungeon_gate_point := Vector3.ZERO
@@ -72,6 +73,7 @@ func _ready() -> void:
 	else:
 		DB.shop_ensure(data)
 		_spawn_merchant()
+		if "stash_point" in builder: spawn_stash(builder.stash_point)
 	var arrive: String = data.get("arrive", "")
 	if arrive == "dungeon" and not data.get("has_pos", false):
 		data["pos"] = [dungeon_gate_point.x + 3.5, 0.1, dungeon_gate_point.z - 2.0]
@@ -113,6 +115,25 @@ func _spawn_merchant() -> void:
 	ic.billboard = BaseMaterial3D.BILLBOARD_ENABLED; ic.no_depth_test = true
 	ic.render_priority = 10
 	m.add_child(ic); ic.position = Vector3(0, 3.6, 0.6)
+
+## Сундук лагеря (общий, 100 ячеек): модель Kenney Survival Kit (CC0) + точка взаимодействия
+func spawn_stash(p: Vector3) -> void:
+	stash_point = p
+	var ch: Node3D = (load("res://assets/kenney/survival/chest.glb") as PackedScene).instantiate()
+	ch.name = "Stash"
+	add_child(ch)
+	ch.scale = Vector3.ONE * 2.6
+	ch.global_position = p
+	ch.rotation.y = atan2(spawn_point.x - p.x, spawn_point.z - p.z)
+	var l := Label3D.new()
+	l.font = UIK.title_font(); l.text = "Сундук"; l.font_size = 48; l.pixel_size = 0.006
+	l.outline_size = 10; l.modulate = Color(0.75, 0.85, 1.0); l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true; l.render_priority = 10; l.outline_render_priority = 9
+	add_child(l); l.global_position = p + Vector3(0, 1.6, 0)
+	interactables.append({"pos": p, "r": 2.4, "text": "Сундук", "icon": "treasure-map", "cb": func(): hud._open("stash")})
+
+func near_stash() -> bool:
+	return stash_point != Vector3.INF and player != null and U.flat_dist(player.global_position, stash_point) < 2.4
 
 func is_dungeon() -> bool:
 	return builder is DungeonBuilder

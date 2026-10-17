@@ -16,6 +16,7 @@ const PATHS := [[Vector3(0,0,0), Vector3(28,0,22)], [Vector3(0,0,0), Vector3(-42
 var zone
 var spawn_point := Vector3(0, 0.1, -3.5)
 var merchant_point := Vector3(-3.4, 0, -5.6)
+var stash_point := Vector3(0.6, 0, -6.6)
 var arena_point := Vector3(-4, 0.8, 64)
 var portal_point := Vector3(66, 0, 56)
 var dungeon_gate_point := Vector3(-27, 0, 55)
@@ -414,6 +415,7 @@ func _camp(c: Vector3) -> void:
 		_add("cylinder", p + Vector3.UP * 1.0, Vector3(0.35, 1.0, 0.35), WOOD * 0.9)
 	# лавка торговца: прилавок, навес, мешки
 	merchant_point = c + Vector3(-3.4, 0, -5.6)
+	stash_point = c + Vector3(0.8, 0, -6.9)
 	var mp := merchant_point
 	_add("box", mp + Vector3(0, 0.5, -0.9), Vector3(2.6, 1.0, 0.7), WOOD * 1.25)
 	_add("box", mp + Vector3(0, 1.03, -0.9), Vector3(2.7, 0.06, 0.8), Color(0.55, 0.3, 0.15), Vector3.ZERO, false)

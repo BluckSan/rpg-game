@@ -70,6 +70,10 @@ func _ready() -> void:
 		await _v040_shots(z); return
 	if want("v041"):
 		await _v041_shots(z); return
+	if want("v050ui"):
+		await _v050_ui_shots(z); return
+	if want("v050world"):
+		await _v050_world_shots(z); return
 	# --- сцены-витрины в зоне (своя камера) ---
 	var cam := Camera3D.new(); z.add_child(cam)
 	var base := Vector3(-4, 0.8, 65)
@@ -415,3 +419,58 @@ func _v041_shots(z) -> void:
 	await w(1.6)
 	d.player.teleport(Vector3(0, 0.1, 104)); d.cam_rig.yaw = 0.0; await w(1.0)
 	await shot("t8_return_portal")
+
+## v0.5: окна предметов (герой, лавка, сундук), подсказка комплекта, массовый выбор
+func _v050_ui_shots(z) -> void:
+	out = "/workspace/rpg-shots/v050"; DirAccess.make_dir_recursive_absolute(out)
+	var p: Player = z.player
+	p.god_mode = true
+	var d: Dictionary = z.data
+	d["level"] = 16; d["gold"] = 4820; d["dust"] = 37; p.recalc(true)
+	d["inventory"].clear()
+	d["equipped"].clear()
+	d["equipped"].append(Items.roll(15, "warrior", 0.3, false, 0))
+	for i in [0, 1, 2, 3]:
+		var it := Items.roll_set(15, "warrior", "north", i)
+		var cur = Items.get_equipped(d, int(it.slot))
+		if cur: d["equipped"].erase(cur)
+		d["equipped"].append(it)
+	d["equipped"].append(Items.roll(14, "warrior", 0.4, false, 3))
+	d["equipped"].append(Items.roll(15, "warrior", 0.4, false, 6))
+	d["inventory"].append(Items.roll_set(15, "warrior", "north", 4))
+	d["inventory"].append(Items.roll_set(15, "", "blood", 2))
+	d["inventory"].append(Items.roll(22, "warrior", 0.5, false, 1))
+	d["inventory"].append(Items.roll(9, "archer", 0.3, false, 0))
+	d["inventory"].append(Items.roll(12, "mage", 0.3, false, 2))
+	for i in 17: d["inventory"].append(Items.roll(randi_range(8, 17), "warrior", 0.15))
+	p.recalc(true)
+	z.hud._open("hero"); await w(0.6)
+	var win = z.hud.window
+	win._select(d["inventory"][0], false); await w(0.3)
+	await shot("u1_hero_set_tooltip")
+	win._select(d["inventory"][2], false); await w(0.3)
+	await shot("u2_hero_level_lock")
+	win.inv_grid.select_mode = true
+	win.inv_grid.set_selection(Items.select_junk(d, win.inv_grid.view)); win.refresh(); await w(0.3)
+	await shot("u3_mass_select_junk")
+	z.hud.close_window(); await w(0.3)
+	z.hud._open("shop"); await w(0.6)
+	win = z.hud.window
+	win.inv_grid.set_selection(Items.select_by_rarity(win.inv_grid.view, 1)); win.refresh()
+	win._set_focus(d["shop"]["stock"][1], "stock"); await w(0.3)
+	await shot("u4_shop_grid")
+	z.hud.close_window(); await w(0.3)
+	for i in 60: d["stash"].append(Items.roll(randi_range(5, 18), "warrior", 0.2))
+	z.hud._open("stash"); await w(0.6)
+	win = z.hud.window
+	win.side_grid.set_selection([str(d["stash"][0].uid), str(d["stash"][1].uid), str(d["stash"][2].uid)]); win.refresh(); await w(0.3)
+	await shot("u5_stash_100")
+	z.hud.close_window(); await w(0.3)
+	get_tree().paused = false
+	p.teleport(z.stash_point + Vector3(1.5, 0.1, 2.5)); z.cam_rig.yaw = 200.0; await w(1.0)
+	await shot("u6_camp_stash_chest")
+	get_tree().quit()
+
+func _v050_world_shots(z) -> void:
+	get_tree().quit()
+
