@@ -15,4 +15,5 @@ void fragment() {
 	SPECULAR = 0.35;
 	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
 	EMISSION = emission_color.rgb + rim_color.rgb * ALBEDO * rim * 0.12;
+	RIM = 0.22; RIM_TINT = 0.7;   // v0.5.1
 }

@@ -12,4 +12,5 @@ void fragment() {
 	ROUGHNESS = 0.55;
 	SPECULAR = 0.35;
 	EMISSION = emission_color.rgb;
+	RIM = 0.22; RIM_TINT = 0.7;   // v0.5.1
 }

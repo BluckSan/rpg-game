@@ -68,6 +68,7 @@ func setup(z) -> void:
 	close.anchor_left = 1; close.anchor_right = 1; close.offset_left = -230; close.offset_right = -24; close.offset_top = 18; close.offset_bottom = 96
 	map_rect = Control.new(); map_rect.name = "Map"
 	map_rect.clip_contents = true
+	map_rect.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	map_rect.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(map_rect)
 	map_rect.anchor_right = 1; map_rect.anchor_bottom = 1
@@ -216,7 +217,9 @@ func collect_markers() -> Array:
 		out.append({"cat": "town", "pos": t.pos, "name": t.name, "text": "%s · %s, ур. %d–%d\nТорговец, сундук-хранилище, путевой камень" % ["Город" if t.kind == "town" else "Лагерь", b.name, b.lv[0], b.lv[1]], "label": true})
 	for wp in wb.waypoints:
 		var known: bool = open.has(wp.id)
-		out.append({"cat": "waypoint", "pos": Vector2(wp.pos.x, wp.pos.z), "name": wp.name if known else "Неизвестный камень",
+		var nt := false
+		for t2 in WorldData.TOWNS: if (t2.pos as Vector2).distance_to(Vector2(wp.pos.x, wp.pos.z)) < 45.0: nt = true
+		out.append({"cat": "waypoint", "near_town": nt, "pos": Vector2(wp.pos.x, wp.pos.z), "name": wp.name if known else "Неизвестный камень",
 			"text": "Путевой камень открыт — можно переместиться" if known else "Подойдите, чтобы открыть", "wp": wp.id if known else "", "known": known})
 	for bs in wb.bosses:
 		var dead := killed.has("boss_" + WorldData.BIOMES[bs.biome].id)
@@ -334,6 +337,7 @@ func _draw_map() -> void:
 		mk["screen"] = m
 		markers.append(mk)
 		var show_name: bool = mk.get("label", false) or (cat == "waypoint" and (mk.get("known", false) or zoom >= 2.0)) or zoom >= 3.2
+		if cat == "waypoint" and mk.get("near_town", false): show_name = false   # камень в городе — подпись города уже есть
 		if cat == "boss" and mk.has("sub"):
 			_text(m + Vector2(0, 32), mk.sub, 16, Color(0.6, 0.6, 0.6) if mk.get("dead", false) else Color(1, 0.6, 0.5))
 			if zoom >= 2.0: _text(m + Vector2(0, 52), mk.name, 18, Color(1, 0.8, 0.75))

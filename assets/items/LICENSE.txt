@@ -1,0 +1,6 @@
+Item icons (v0.5.1)
+- Idylwild — "Idylwild's Armory", "Idylwild's Arsenal", "Idylwild's Arcanum", "Idylwild's Inventory"
+  https://opengameart.org/content/idylwilds-armory · https://opengameart.org/content/idylwilds-arsenal
+  https://idylwild.itch.io/ — License: CC0 1.0 (public domain). Some icons recoloured for tiers (robe, cloak, hood, rune sword).
+- hat_t*, circlet_t*, belt_t*: drawn for this game in the Idylwild palette (no third-party source).
+Upscaled 4x (nearest neighbour) to 128x128.

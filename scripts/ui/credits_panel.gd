@@ -16,14 +16,22 @@ game-icons.net — авторы [b]Lorc[/b], [b]Delapouite[/b], [b]Skoll[/b], [b
 
 [b][color=#f2c46d]Персонажи, монстры, анимации, оружие — CC0 1.0[/color][/b]
 [b]Quaternius[/b] (quaternius.com): Universal Base Characters, Universal Animation Library 1 и 2,
-Modular Character Outfits – Fantasy, Ultimate Animated Animals, Ultimate Monsters, оружие и щиты (poly.pizza).
-Предметы в иконках инвентаря отрисованы из этих моделей.
+Modular Character Outfits – Fantasy, Ultimate Animated Animals (в т.ч. бык), Ultimate Monsters,
+модели Spider, Bat, Goblin, Bee, Crab, Rat, оружие и щиты (poly.pizza).
+
+[b][color=#f2c46d]Иконки снаряжения — CC0 1.0[/color][/b]
+[b]Idylwild[/b] (idylwild.itch.io, OpenGameArt): Armory, Arsenal, Arcanum, Inventory.
+Часть иконок перекрашена под тиры; шляпы, обручи и пояса дорисованы в той же палитре.
 
 [b][color=#f2c46d]Текстуры рельефа — CC0 1.0[/color][/b]
 [b]ambientCG[/b] (ambientcg.com): Grass004, Ground037, Ground048, Ground080, Ground054, Snow006, Rock030
+(цвет и карты нормалей NormalGL)
+
+[b][color=#f2c46d]Логотип и иконка приложения[/color][/b]
+Эмблема «кристалл в рунном кольце» нарисована для игры (процедурно, без сторонних изображений).
 
 [b][color=#f2c46d]Шрифты — SIL Open Font License 1.1[/color][/b]
-Rubik · Philosopher (Ярослав Захаров)
+Rubik · Philosopher (Ярослав Захаров) · Cormorant SC (Christian Thalmann) — надпись логотипа
 
 [b][color=#f2c46d]Движок[/color][/b]
 Godot Engine (godotengine.org) — лицензия MIT, © Juan Linietsky, Ariel Manzur и сообщество Godot.

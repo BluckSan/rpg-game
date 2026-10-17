@@ -14,6 +14,7 @@ uniform float metal_add = 0.0;
 uniform float rough_mul = 1.0;
 uniform vec4 emission_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
 uniform float emission_strength = 0.0;
+uniform float rim_amount = 0.28;   // v0.5.1: контровой свет (силуэт читается на тёмном фоне)
 
 vec3 rgb2hsv(vec3 c) {
 	vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
@@ -44,4 +45,6 @@ void fragment() {
 	METALLIC = clamp(orm.b + metal_add, 0.0, 1.0);
 	NORMAL_MAP = texture(normal_tex, UV).rgb;
 	EMISSION = emission_color.rgb * emission_strength * m;
+	RIM = rim_amount * (1.0 - METALLIC * 0.5); RIM_TINT = 0.55;
+	SPECULAR = 0.5;
 }

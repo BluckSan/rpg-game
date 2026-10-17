@@ -228,22 +228,29 @@ func show_title() -> void:
 	var tr := TextureRect.new(); tr.texture = gm; tr.stretch_mode = TextureRect.STRETCH_SCALE
 	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	s.add_child(tr); UIK.place(tr, 0.0, 0.0, 0.5, 1.0)
-	var title := UIK.label(s, "ОСКОЛКИ ЭФИРА", 96, UIK.ACCENT)
-	title.add_theme_font_override("font", UIK.title_font())
-	title.add_theme_color_override("font_outline_color", Color(0.1, 0.05, 0.02)); title.add_theme_constant_override("outline_size", 10)
-	title.autowrap_mode = TextServer.AUTOWRAP_OFF
-	UIK.place(title, 0.05, 0.7, 0.6, 0.86)
+	# v0.5.1: логотип — эмблема-кристалл в рунном кольце + золотая надпись
+	var logo := _logo_rect(s)
+	UIK.place(logo, 0.025, 0.665, 0.42, 0.985)
 	var sub := UIK.label(s, "Офлайн-RPG · классы, пути превращения, лут", 30, UIK.MUTED)
 	sub.autowrap_mode = TextServer.AUTOWRAP_OFF
-	UIK.place(sub, 0.055, 0.64, 0.6, 0.7)
+	UIK.place(sub, 0.055, 0.615, 0.6, 0.665)
 	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 22)
-	s.add_child(v); UIK.place(v, 0.055, 0.12, 0.32, 0.61)
+	s.add_child(v); UIK.place(v, 0.055, 0.1, 0.32, 0.6)
 	var bp := UIK.button(v, "Играть", show_select, UIK.GOLD, 46, "crossed-swords"); bp.name = "PlayButton"; UIK.min_h(bp, 120)
 	var bs := UIK.button(v, "Настройки", show_settings, UIK.BUTTON, 38, "cog"); bs.name = "SettingsButton"; UIK.min_h(bs, 104)
 	var bc := UIK.button(v, "Авторы", show_credits, UIK.BUTTON, 38, "book-cover"); bc.name = "CreditsButton"; UIK.min_h(bc, 104)
 	var bq := UIK.button(v, "Выход", quit_game, UIK.RED, 38); bq.name = "QuitButton"; UIK.min_h(bq, 104)
 	var ver := UIK.label(s, "v%s" % ProjectSettings.get_setting("application/config/version"), 24, Color(1, 1, 1, 0.45), HORIZONTAL_ALIGNMENT_RIGHT)
 	UIK.place(ver, 0.6, 0.93, 0.98, 0.99)
+
+func _logo_rect(parent: Control) -> TextureRect:
+	var tr := TextureRect.new(); tr.name = "Logo"
+	tr.texture = load("res://assets/ui/brand/logo.png")
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tr.tooltip_text = "Осколки Эфира"
+	parent.add_child(tr)
+	return tr
 
 func show_settings() -> void:
 	var sp := SettingsPanel.new()
@@ -279,8 +286,8 @@ func show_select() -> void:
 	_set_title_mode(false)
 	s.name = "SelectScreen"
 	target_x = 0.3
-	var title := UIK.label(s, "ОСКОЛКИ ЭФИРА", 72, UIK.ACCENT)
-	UIK.place(title, 0.03, 0.86, 0.6, 0.98)
+	var title := _logo_rect(s)
+	UIK.place(title, 0.015, 0.865, 0.2, 0.995)
 	UIK.place(UIK.label(s, "Выбор персонажа", 34), 0.03, 0.8, 0.5, 0.87)
 	var lp := UIK.panel(s)
 	UIK.place(lp, 0.03, 0.16, 0.36, 0.79)
