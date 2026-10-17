@@ -91,7 +91,35 @@ static func spawn(z, k: String, lvl: int, pos: Vector3, parent: Node) -> Enemy:
 	return e
 
 var display_name: String:
-	get: return "%s (%d)" % [def.name, level]
+	get: return ("★ " if rank == "elite" else ("◆ " if rank == "rare" else "")) + "%s (%d)" % [def.name, level]
+
+const RANK_COLORS := {"elite": Color(1.0, 0.8, 0.3), "rare": Color(0.75, 0.45, 1.0), "boss": Color(1.0, 0.35, 0.25)}
+
+## Ранг в открытом мире: элита (×2 здоровья), редкий именной (×3,5), босс зоны (имя). Больше урона, опыта и добычи (Loot.drop_for).
+func make_rank(r: String, title := "") -> void:
+	rank = r
+	def = def.duplicate()
+	var hp_k := 1.0; var dmg_k := 1.0; var xp_k := 1.0; var sc := 1.0
+	match r:
+		"elite": hp_k = 2.0; dmg_k = 1.3; xp_k = 2.5; sc = 1.18
+		"rare": hp_k = 3.5; dmg_k = 1.5; xp_k = 5.0; sc = 1.32
+		"boss": hp_k = 1.0; dmg_k = 1.0; xp_k = 1.5; sc = 1.0
+	if title != "": def.name = title
+	def.xp = float(def.xp) * xp_k
+	max_hp *= hp_k; hp = max_hp
+	damage_mult *= dmg_k
+	if model and sc != 1.0: model.scale *= sc
+	if r != "normal":
+		var ring := MeshInstance3D.new(); ring.name = "RankRing"
+		var tm := TorusMesh.new(); tm.inner_radius = radius * 1.1 * sc; tm.outer_radius = radius * 1.1 * sc + 0.12
+		tm.rings = 32; tm.ring_segments = 6
+		ring.mesh = tm
+		var m := StandardMaterial3D.new(); m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.albedo_color = RANK_COLORS.get(r, Color.WHITE); m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; m.albedo_color.a = 0.8
+		ring.material_override = m
+		ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		ring.scale = Vector3(1, 0.15, 1)
+		add_child(ring); ring.position = Vector3(0, 0.08, 0)
 
 func _damage() -> float:
 	return def.dmg * (1 + (level - 1) * 0.18) * damage_mult

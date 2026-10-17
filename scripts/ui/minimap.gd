@@ -17,7 +17,14 @@ func _ready() -> void:
 	for n in ["skull-crossed-bones", "two-coins", "castle", "person"]: _icons[n] = UIK.icon(n)
 
 func _process(_d: float) -> void:
+	if zone and zone.builder is WorldBuilder and mouse_filter != Control.MOUSE_FILTER_STOP:
+		mouse_filter = Control.MOUSE_FILTER_STOP   # в мире касание мини-карты открывает карту мира
 	queue_redraw()
+
+func _gui_input(ev: InputEvent) -> void:
+	if zone and zone.builder is WorldBuilder and ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+		if zone.hud.window == null: zone.hud._open("map")
+		accept_event()
 
 ## Мировая точка -> точка на карте (вверх = направление взгляда камеры)
 func to_map(p: Vector3) -> Vector2:
@@ -51,8 +58,15 @@ func _draw() -> void:
 	var boss_alive := false
 	for e in zone.enemies:
 		if e.alive and e.def.boss: boss_alive = true
-	if zone.merchant != null: _marker(c, r, zone.merchant_point, "two-coins", Color(1, 0.85, 0.3))
-	_marker(c, r, zone.portal_point, "castle", Color(0.6, 0.75, 1))
+	if zone.builder is WorldBuilder:
+		var wb: WorldBuilder = zone.builder
+		for mp in wb.merchant_points: _marker(c, r, mp, "two-coins", Color(1, 0.85, 0.3))
+		var open: Array = wb.world_state()["wp"]
+		for wp in wb.waypoints:
+			var m := to_map(wp.pos)
+			if m.length() < r * 0.78: draw_circle(c + m, 6.0, Color(0.35, 0.8, 1.0) if open.has(wp.id) else Color(0.5, 0.5, 0.5))
+	elif zone.merchant != null: _marker(c, r, zone.merchant_point, "two-coins", Color(1, 0.85, 0.3))
+	if zone.portal_point != Vector3.ZERO: _marker(c, r, zone.portal_point, "castle", Color(0.6, 0.75, 1))
 	if zone.dungeon_gate_point != Vector3.ZERO: _marker(c, r, zone.dungeon_gate_point, "castle", Color(0.75, 0.5, 1.0), DB.zone_lock_reason(zone.data, "dungeon") == "")
 	if boss_alive: _marker(c, r, zone.arena_point, "skull-crossed-bones", Color(1, 0.35, 0.3), true)
 	# игрок (стрелка — направление персонажа относительно камеры)
@@ -69,6 +83,17 @@ func _draw() -> void:
 	var w := _font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	draw_string_outline(_font, c + n + Vector2(-w / 2, 9), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 6, Color.BLACK)
 	draw_string(_font, c + n + Vector2(-w / 2, 9), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 0.4, 0.3))
+	# название зоны и уровни (мир)
+	if zone.builder is WorldBuilder:
+		var pp: Vector3 = zone.player.global_position
+		var b := WorldData.biome_at(pp.x, pp.z)
+		var lv: Array = WorldData.BIOMES[b].lv
+		var zt := "%s · %d–%d" % [WorldData.BIOMES[b].name, lv[0], lv[1]]
+		var zfs := 20
+		var zw := _font.get_string_size(zt, HORIZONTAL_ALIGNMENT_LEFT, -1, zfs).x
+		var zp := Vector2(c.x - zw / 2, size.y + 18)
+		draw_string_outline(_font, zp, zt, HORIZONTAL_ALIGNMENT_LEFT, -1, zfs, 6, Color.BLACK)
+		draw_string(_font, zp, zt, HORIZONTAL_ALIGNMENT_LEFT, -1, zfs, Color(1, 0.9, 0.7))
 
 func _draw_route(c: Vector2, r: float) -> void:
 	var b = zone.builder

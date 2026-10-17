@@ -294,7 +294,9 @@ func _hotkey(k: int) -> bool:
 		KEY_I, KEY_C: _open("hero")
 		KEY_U, KEY_P: _open("skills")
 		KEY_T, KEY_N: _open("talents")
-		KEY_M: minimap.toggle_big()
+		KEY_M:
+			if zone.builder is WorldBuilder: _open("map")
+			else: minimap.toggle_big()
 		KEY_ESCAPE: _open("pause")
 		KEY_E:
 			if not interact(): return false
@@ -310,6 +312,7 @@ func _open(which: String) -> void:
 		"hero": window = preload("res://scripts/ui/inventory_ui.gd").new()
 		"shop": window = preload("res://scripts/ui/shop_ui.gd").new()
 		"stash": window = preload("res://scripts/ui/stash_ui.gd").new()
+		"map": window = preload("res://scripts/ui/world_map_ui.gd").new()
 		"skills": window = preload("res://scripts/ui/skills_ui.gd").new()
 		_: window = preload("res://scripts/ui/pause_menu.gd").new()
 	window.name = "Window_" + which
@@ -661,7 +664,9 @@ func _update_enemy_bars() -> void:
 		var nl: Label = b.get_node("Name")
 		nl.text = e.display_name
 		var diff: int = e.level - zone.data["level"]
-		nl.add_theme_color_override("font_color", Color(1, 0.35, 0.3) if diff >= 3 else (Color(0.7, 0.7, 0.7) if diff <= -3 else Color.WHITE))
+		var nc := Color(1, 0.35, 0.3) if diff >= 3 else (Color(0.7, 0.7, 0.7) if diff <= -3 else Color.WHITE)
+		if e.rank in ["elite", "rare"]: nc = Enemy.RANK_COLORS[e.rank]
+		nl.add_theme_color_override("font_color", nc)
 	for i in range(used, bar_pool.size()): bar_pool[i].visible = false
 	boss_panel.visible = boss != null
 	if boss != null:

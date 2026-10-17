@@ -131,11 +131,11 @@ var ENEMIES := {
 	"troll": {"name": "Древний тролль", "hp": 2200.0, "dmg": 28.0, "speed": 3.2, "range": 3.2, "interval": 1.8, "aggro": 16.0, "radius": 1.6, "xp": 500.0, "ranged": false, "boss": true, "color": Color(0.4,0.5,0.45)},
 }
 
-## Зоны. Чтобы добавить глобальную карту: сделать сборщик мира в zone.gd для "global" и поставить available = true.
+## Зоны: стартовая долина, подземелье, открытый мир «Земли Эфира» (WorldBuilder).
 var ZONES := {
 	"starter": {"name": "Пепельная долина", "scene": "res://scenes/zone.tscn", "available": true, "min_level": 1},
 	"dungeon": {"name": "Склеп Эфира", "scene": "res://scenes/zone.tscn", "available": true, "min_level": 1, "requires": ["starter", "boss_troll_killed"]},
-	"global": {"name": "Земли Эфира", "scene": "res://scenes/zone.tscn", "available": false, "min_level": 10},
+	"global": {"name": "Земли Эфира", "scene": "res://scenes/zone.tscn", "available": true, "min_level": 5},
 }
 
 # ---------------- Дерево талантов ----------------

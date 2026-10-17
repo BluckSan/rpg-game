@@ -35,6 +35,7 @@ func add_height_ramp(low: Vector3, high: Vector3, half_w: float) -> void: _h_ram
 
 ## Высота земли в точке (для врагов, лута)
 func ground_y(p: Vector3) -> float:
+	if builder is WorldBuilder: return builder.height_at(p)
 	var y := 0.0
 	for d in _h_discs:
 		if Vector2(p.x - d[0].x, p.z - d[0].z).length() <= d[1]: y = maxf(y, d[2])
@@ -59,7 +60,9 @@ func _ready() -> void:
 	fx_root = Node3D.new(); fx_root.name = "FX"; add_child(fx_root)
 	if not DB.ZONES.has(data.get("zone", "")) or (data["zone"] == "dungeon" and DB.zone_lock_reason(data, "dungeon") != ""):
 		data["zone"] = "starter"
-	builder = DungeonBuilder.new() if data["zone"] == "dungeon" else StarterZoneBuilder.new()
+	if data["zone"] == "dungeon": builder = DungeonBuilder.new()
+	elif data["zone"] == "global": builder = WorldBuilder.new()
+	else: builder = StarterZoneBuilder.new()
 	builder.name = "World"
 	add_child(builder)
 	builder.build(self)
@@ -70,6 +73,8 @@ func _ready() -> void:
 	dungeon_gate_point = builder.dungeon_gate_point
 	if builder is DungeonBuilder:
 		pillars = builder.pillars; pillar_r = builder.pillar_r
+	elif builder is WorldBuilder:
+		DB.shop_ensure(data)
 	else:
 		DB.shop_ensure(data)
 		_spawn_merchant()
@@ -77,6 +82,9 @@ func _ready() -> void:
 	var arrive: String = data.get("arrive", "")
 	if arrive == "dungeon" and not data.get("has_pos", false):
 		data["pos"] = [dungeon_gate_point.x + 3.5, 0.1, dungeon_gate_point.z - 2.0]
+		data["has_pos"] = true
+	if arrive == "world" and not data.get("has_pos", false):
+		data["pos"] = [portal_point.x - 3.0, 0.1, portal_point.z - 3.0]
 		data["has_pos"] = true
 	data.erase("arrive")
 
@@ -119,17 +127,15 @@ func _spawn_merchant() -> void:
 ## Сундук лагеря (общий, 100 ячеек): модель Kenney Survival Kit (CC0) + точка взаимодействия
 func spawn_stash(p: Vector3) -> void:
 	stash_point = p
-	var ch: Node3D = (load("res://assets/kenney/survival/chest.glb") as PackedScene).instantiate()
+	var ch := WorldBuilder.prop(self, "survival_chest", p, 0, 4.2)
 	ch.name = "Stash"
-	add_child(ch)
-	ch.scale = Vector3.ONE * 2.6
-	ch.global_position = p
 	ch.rotation.y = atan2(spawn_point.x - p.x, spawn_point.z - p.z)
 	var l := Label3D.new()
 	l.font = UIK.title_font(); l.text = "Сундук"; l.font_size = 48; l.pixel_size = 0.006
 	l.outline_size = 10; l.modulate = Color(0.75, 0.85, 1.0); l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	l.no_depth_test = true; l.render_priority = 10; l.outline_render_priority = 9
 	add_child(l); l.global_position = p + Vector3(0, 1.6, 0)
+	l.visibility_range_end = 40.0
 	interactables.append({"pos": p, "r": 2.4, "text": "Сундук", "icon": "treasure-map", "cb": func(): hud._open("stash")})
 
 func near_stash() -> bool:
@@ -150,7 +156,12 @@ func nearest_interactable() -> Dictionary:
 	return best
 
 func near_merchant() -> bool:
-	return merchant != null and player != null and U.flat_dist(player.global_position, merchant_point) < 3.2
+	if player == null: return false
+	if builder is WorldBuilder:
+		for mp in builder.merchant_points:
+			if U.flat_dist(player.global_position, mp) < 3.2: return true
+		return false
+	return merchant != null and U.flat_dist(player.global_position, merchant_point) < 3.2
 
 func _process(delta: float) -> void:
 	_autosave -= delta
@@ -175,6 +186,7 @@ func on_player_died() -> void:
 	player.visual.rotation_degrees.x = -90
 	await get_tree().create_timer(3.0, false).timeout
 	player.visual.rotation_degrees.x = 0
+	if builder is WorldBuilder: spawn_point = builder.respawn_point(player.global_position)
 	player.respawn(spawn_point)
 	save()
 
