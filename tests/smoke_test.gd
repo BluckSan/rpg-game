@@ -860,6 +860,24 @@ func _settings_tests(z) -> void:
 	var before: String = qb.text
 	qb.pressed.emit(); await frames(1)
 	check(qb.text != before and Game.quality == (q0 + 1) % (Game.max_quality() + 1), "пресет переключается кнопкой (%s → %s)" % [before, qb.text])
+	# «Ультра» и безопасность графики
+	check(Game.gpu_gi_blocked("AMD", "AMD Radeon RX 580 Series (RADV POLARIS10)") and Game.gpu_gi_blocked("ATI Technologies Inc.", "Radeon RX 470") and Game.gpu_gi_blocked("AMD", "AMD Radeon Vega 8 Graphics"), "SDFGI блокируется на AMD GCN (RX 580/470, Vega)")
+	check(not Game.gpu_gi_blocked("AMD", "AMD Radeon RX 6700 XT") and not Game.gpu_gi_blocked("AMD", "AMD Radeon RX 5700 XT") and not Game.gpu_gi_blocked("NVIDIA", "NVIDIA GeForce GTX 1060"), "SDFGI не блокируется на RDNA и NVIDIA")
+	if Game.desktop:
+		check(Game.max_quality() == 4 and Game.QUALITY_NAMES[4] == "Ультра", "на ПК есть пресет «Ультра»")
+		Game.apply_preset(3)
+		check(not Game.gi_on() and not Game.ssr_on() and not Game.vfog_on(), "«Высокое»: без SDFGI/SSR/объёмного тумана")
+		Game.apply_preset(4)
+		check(Game.quality == 4 and sp.find_child("UltraGI", true, false) != null and sp.find_child("UltraFog", true, false) != null, "«Ультра» и переключатели эффектов в настройках")
+		Game.ultra_fog = false; Game.apply_settings()
+		check(not Game.vfog_on(), "переключатель «объёмный туман» выключает туман")
+		Game.ultra_fog = true
+		var q4 := Game.quality
+		Game._enter_safe("тест")
+		check(Game.safe_start and Game.quality == 2, "безопасный запуск понижает графику до «Среднего» (%d → %d)" % [q4, Game.quality])
+		Game.safe_start = false
+	else:
+		check(Game.max_quality() == 3, "на телефоне «Ультра» нет")
 	Game.apply_preset(0)
 	check(Game.fps_cap == 30 and not Game.shadows_enabled and is_equal_approx(get_tree().root.scaling_3d_scale, 0.6) and Game.particle_mul < 0.5, "пресет «Экономия батареи»: 30 к/с, без теней, 3D 60%")
 	check(get_viewport().msaa_3d == Viewport.MSAA_DISABLED and not Game.glow, "экономия: MSAA и свечение выключены")
