@@ -68,6 +68,8 @@ func _ready() -> void:
 	if want("zone"): await shot("07_zone")
 	if want("v040"):
 		await _v040_shots(z); return
+	if want("v041"):
+		await _v041_shots(z); return
 	# --- сцены-витрины в зоне (своя камера) ---
 	var cam := Camera3D.new(); z.add_child(cam)
 	var base := Vector3(-4, 0.8, 65)
@@ -363,3 +365,53 @@ func _v040_shots(z) -> void:
 		while b.brain.cast_name == "" and Time.get_ticks_msec() - t0 < 12000: await w(0.2)
 		await w(0.8)
 		await shot("50_warden_telegraph")
+
+
+func _v041_shots(z) -> void:
+	out = "/workspace/rpg-shots/v041"
+	var p: Player = z.player
+	p.god_mode = true
+	z.data["level"] = 14; z.data["class_level"] = 3; p.recalc(true)
+	z.hud._open("talents"); await w(0.6)
+	var tw = z.hud.window
+	tw.zoom = 0.5; tw.center_on_start(); await w(0.4)
+	await shot("t1_talents_default")
+	tw.zoom = 1.0; tw.center_on_start(); await w(0.4)
+	await shot("t2_talents_zoom1")
+	tw.zoom = tw.ZOOM_MAX; tw.center_on_start(); await w(0.4)
+	await shot("t3_talents_zoom_max")
+	tw.zoom = 0.2; tw.center_on_start(); await w(0.4)
+	await shot("t4_talents_far")
+	z.hud.close_window(); await w(0.3)
+	z.hud._open("pause"); await w(0.4)
+	z.hud.window.open_settings(); await w(0.5)
+	Game.apply_preset(4); await w(0.2)
+	var sp = z.hud.window.find_child("SettingsPanel", true, false)
+	if sp: sp._refresh_all()
+	await w(0.3)
+	await shot("t5_settings_ultra")
+	Game.apply_preset(3)
+	z.hud.close_window(); await w(0.3)
+	get_tree().paused = false
+	DB.set_zone_flag(z.data, "starter", "boss_troll_killed")
+	Game.travel("dungeon"); await w(3.0)
+	var d = get_tree().current_scene
+	d.player.god_mode = true
+	d.cam_rig.yaw = 180.0; d.cam_rig.distance = 9.0
+	d.player.teleport(Vector3(0, 0.1, 10)); await w(1.2)
+	await shot("t6_crypt_doorway_guides")
+	d.player.teleport(Vector3(0, 0.1, 58)); await w(1.0)
+	await shot("t7_lever_hall_gate")
+	for e in d.enemies.duplicate():
+		if is_instance_valid(e) and e.kind != "warden": e.queue_free(); d.enemies.erase(e)
+	DB.set_zone_flag(d.data, "dungeon", "lever_solved")
+	d.builder._open_gate(true)
+	d.player.teleport(Vector3(0, 0.1, 100)); await w(1.0)
+	var b = d.builder.boss_enemy()
+	var g := 0
+	while b and is_instance_valid(b) and b.alive and g < 60:
+		if b.brain: b.brain.invulnerable = false
+		b.take_damage(b.max_hp * 2.0, false); await w(0.05); g += 1
+	await w(1.6)
+	d.player.teleport(Vector3(0, 0.1, 104)); d.cam_rig.yaw = 0.0; await w(1.0)
+	await shot("t8_return_portal")

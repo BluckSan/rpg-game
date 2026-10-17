@@ -84,15 +84,15 @@ func _build_tools() -> void:
 	search = LineEdit.new()
 	search.placeholder_text = "Поиск: имя или эффект…"
 	search.add_theme_font_size_override("font_size", 24)
-	search.custom_minimum_size = Vector2(330, 0)
+	search.custom_minimum_size = Vector2(260, 0)
 	search.text_changed.connect(func(_t): _update_matches())
 	search.text_submitted.connect(func(_t): find_next())
 	bar.add_child(search)
 	var fb := UIK.button(bar, "Найти", find_next, UIK.BUTTON, 22, "magnifying-glass")
-	fb.custom_minimum_size.x = 130
+	fb.custom_minimum_size.x = 160
 	for f in FILTERS:
 		var b := UIK.button(bar, f[1], set_filter.bind(f[0]), Color(0.22, 0.2, 0.26), 20)
-		b.custom_minimum_size.x = 104
+		b.custom_minimum_size.x = 136
 		filter_btns[f[0]] = b
 	var zb := VBoxContainer.new(); zb.add_theme_constant_override("separation", 8)
 	canvas.add_child(zb)
