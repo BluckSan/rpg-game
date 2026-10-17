@@ -202,7 +202,7 @@ static func class_xp_to_next(cl: int) -> int:
 
 func new_character(char_name: String, class_id: String, look: Dictionary) -> Dictionary:
 	return {
-		"version": 1, "id": "%x%x" % [Time.get_ticks_usec(), randi()], "name": char_name, "class": class_id, "look": look,
+		"version": 2, "id": "%x%x" % [Time.get_ticks_usec(), randi()], "name": char_name, "class": class_id, "look": CharAssets.normalize_look(look),
 		"level": 1, "xp": 0, "class_level": 1, "class_xp": 0,
 		"talents": [start_node(class_id)], "ascendancy": "",
 		"gold": 0, "potions": 3, "inventory": [], "equipped": [starter_weapon(class_id)],

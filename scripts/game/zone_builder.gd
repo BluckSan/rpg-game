@@ -51,8 +51,11 @@ func build(z) -> void:
 
 func _lighting() -> void:
 	var sun := DirectionalLight3D.new()
-	sun.light_color = Color(1, 0.93, 0.8)
-	sun.light_energy = 1.15
+	sun.light_color = Color(1, 0.9, 0.76)
+	sun.light_energy = 1.35
+	sun.shadow_blur = 1.5
+	sun.shadow_bias = 0.04
+	sun.shadow_normal_bias = 1.2
 	sun.shadow_enabled = Game.shadows_enabled
 	sun.directional_shadow_max_distance = 45
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
@@ -61,17 +64,41 @@ func _lighting() -> void:
 	sun.name = "Sun"
 	var we := WorldEnvironment.new()
 	var e := Environment.new()
-	e.background_mode = Environment.BG_COLOR
-	e.background_color = Color(0.62, 0.7, 0.78)
-	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	var sky := Sky.new()
+	var sm := ProceduralSkyMaterial.new()
+	sm.sky_top_color = Color(0.3, 0.48, 0.75)
+	sm.sky_horizon_color = Color(0.7, 0.74, 0.78)
+	sm.ground_horizon_color = Color(0.62, 0.66, 0.66)
+	sm.ground_bottom_color = Color(0.22, 0.25, 0.2)
+	sm.sun_angle_max = 20
+	sky.sky_material = sm
+	sky.radiance_size = Sky.RADIANCE_SIZE_64
+	sky.process_mode = Sky.PROCESS_MODE_QUALITY
+	e.background_mode = Environment.BG_SKY
+	e.sky = sky
+	e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	e.ambient_light_sky_contribution = 0.75
 	e.ambient_light_color = Color(0.55, 0.58, 0.62)
-	e.ambient_light_energy = 0.9
+	e.ambient_light_energy = 1.0
+	e.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	e.fog_enabled = true
 	e.fog_mode = Environment.FOG_MODE_DEPTH
-	e.fog_light_color = Color(0.62, 0.7, 0.78)
-	e.fog_depth_begin = 45
-	e.fog_depth_end = 130
-	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	e.fog_light_color = Color(0.66, 0.72, 0.78)
+	e.fog_sun_scatter = 0.25
+	e.fog_density = 0.6
+	e.fog_depth_begin = 38
+	e.fog_depth_end = 125
+	e.fog_sky_affect = 0.35
+	e.tonemap_mode = Environment.TONE_MAPPER_ACES
+	e.tonemap_exposure = 1.05
+	e.tonemap_white = 6.0
+	e.glow_enabled = true
+	e.glow_intensity = 0.35
+	e.glow_bloom = 0.04
+	e.glow_hdr_threshold = 1.1
+	e.adjustment_enabled = true
+	e.adjustment_saturation = 1.08
+	e.adjustment_contrast = 1.04
 	we.environment = e
 	add_child(we)
 
@@ -256,17 +283,54 @@ func _goblin_camp(c: Vector3) -> void:
 	_add("cylinder", c + Vector3.UP * 0.1, Vector3(1.5, 0.1, 1.5), Color(0.2, 0.18, 0.15))
 	for i in 4: _add("box", c + _circle(4) + Vector3.UP * 0.25, Vector3(0.6, 0.5, 0.4), Color(0.85, 0.8, 0.7), Vector3(0, _r(0, 360), 0), false)
 
+## Руины с ареной босса: каменная платформа высотой ARENA_H, пологий пандус от тропы (юг)
+## и ступень-уступ с востока, на которую нужно запрыгнуть.
+const ARENA_H := 0.8
+const ARENA_R := 12.0
+
 func _ruins(c: Vector3) -> void:
-	_add("cylinder", c + Vector3(0, 0.1, 4), Vector3(24, 0.1, 24), STONE * 0.75)
+	var a := c + Vector3(0, 0, 4)
+	_add("cylinder", a + Vector3(0, ARENA_H / 2, 0), Vector3(ARENA_R * 2, ARENA_H / 2, ARENA_R * 2), STONE * 0.72)
+	_add("cylinder", a + Vector3(0, ARENA_H + 0.01, 0), Vector3(ARENA_R * 1.6, 0.01, ARENA_R * 1.6), STONE * 0.62, Vector3.ZERO, false)
+	_add("cylinder", a + Vector3(0, ARENA_H + 0.02, 0), Vector3(5, 0.01, 5), Color(0.35, 0.25, 0.45), Vector3.ZERO, false)
+	# пандус: от земли (юг) до края платформы
+	var low := Vector3(a.x, 0, a.z - ARENA_R - 5.4)
+	var high := Vector3(a.x, ARENA_H, a.z - ARENA_R + 0.6)
+	_ramp(low, high, 4.6)
+	for sx in [-1, 1]:
+		_add("box", Vector3(a.x + sx * 2.6, 0.55, (low.z + high.z) / 2 + 0.6), Vector3(0.5, 1.1, 4.0), STONE * 0.85)
+	zone.add_height_ramp(low, high, 2.3)
+	zone.add_height_disc(a, ARENA_R, ARENA_H)
+	# уступ с востока: ступень 0.45 м, дальше прыжок на платформу
+	var step := Vector3(a.x + ARENA_R + 0.7, 0.225, a.z)
+	_add("box", step, Vector3(2.4, 0.45, 3.4), STONE * 0.8)
+	zone.add_height_box(step, Vector3(1.2, 0, 1.7), 0.45)
 	for i in 12:
-		if i == 6: continue
-		var p := c + Vector3(0, 0, 4) + Vector3(0, 0, 11).rotated(Vector3.UP, deg_to_rad(i * 30))
+		if i == 6 or i == 3: continue  # проходы: юг (пандус) и восток (уступ)
+		var p := a + Vector3(0, 0, 11).rotated(Vector3.UP, deg_to_rad(i * 30))
 		var h := _r(1, 2.5) if i % 3 == 0 else _r(4, 6)
-		_add("cylinder", p + Vector3.UP * h / 2, Vector3(1.2, h / 2, 1.2), STONE * 0.9)
-		if i % 3 == 0: _rock(p + Vector3(1.5, 0, 1), 0.8)
-	_add("box", c + Vector3(0, 1.5, 14), Vector3(8, 3, 1.5), STONE * 0.8)
-	_glow("box", c + Vector3(0, 3.8, 14), Vector3(1, 1.6, 1), Color(0.5, 0.3, 0.9), 2.5, preload("res://scripts/game/spin.gd"))
-	_light(c + Vector3(0, 4.5, 12), Color(0.6, 0.4, 1), 1.8, 14)
+		_add("cylinder", p + Vector3.UP * (ARENA_H + h / 2), Vector3(1.2, h / 2, 1.2), STONE * 0.9)
+		_add("box", p + Vector3.UP * (ARENA_H + 0.12), Vector3(1.6, 0.24, 1.6), STONE * 0.8)
+		if i % 3 == 0: _rock(p + Vector3(1.5, ARENA_H, 1), 0.8)
+	_add("box", c + Vector3(0, ARENA_H + 1.5, 14), Vector3(8, 3, 1.5), STONE * 0.8)
+	_glow("box", c + Vector3(0, ARENA_H + 3.8, 14), Vector3(1, 1.6, 1), Color(0.5, 0.3, 0.9), 2.5, preload("res://scripts/game/spin.gd"))
+	_light(c + Vector3(0, ARENA_H + 4.5, 12), Color(0.6, 0.4, 1), 1.8, 14)
+	for sx in [-1, 1]:
+		_light(Vector3(a.x + sx * 3.2, 1.9, low.z + 1.0), Color(1, 0.6, 0.25), 1.2, 7, true)
+		_glow("sphere", Vector3(a.x + sx * 3.2, 1.25, low.z + 1.0), Vector3.ONE * 0.25, Color(1, 0.55, 0.2), 4.0)
+		_add("cylinder", Vector3(a.x + sx * 3.2, 0.55, low.z + 1.0), Vector3(0.3, 0.55, 0.3), STONE * 0.7)
+
+## Наклонная плита: верхняя грань идёт от low до high (по оси Z), ширина w.
+func _ramp(low: Vector3, high: Vector3, w: float) -> void:
+	var d := high - low
+	var length := d.length()
+	var ang := atan2(d.y, Vector2(d.x, d.z).length())
+	var yaw := atan2(d.x, d.z)
+	var thick := 1.2
+	var basis := Basis.from_euler(Vector3(-ang, yaw, 0))
+	var top_mid := (low + high) / 2
+	var center := top_mid - basis.y * thick / 2
+	_add("box", center, Vector3(w, thick, length), STONE * 0.78, Vector3(rad_to_deg(-ang), rad_to_deg(yaw), 0))
 
 func _portal(c: Vector3) -> void:
 	var rot := -135.0

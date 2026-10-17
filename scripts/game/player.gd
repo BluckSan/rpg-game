@@ -17,6 +17,18 @@ var move_input := Vector2.ZERO
 var attack_held := false
 var _dash_vel := Vector3.ZERO
 var _dash_time := 0.0
+## Прыжок: скорость, «время койота» и буфер нажатия
+const JUMP_VELOCITY := 7.6
+const GRAVITY := 20.0
+const COYOTE_TIME := 0.14
+const JUMP_BUFFER := 0.15
+var _coyote := 0.0
+var _jump_buffer := 0.0
+var _was_on_floor := true
+var jumps := 0
+## Для тестов: принудительное направление движения в мировых координатах
+var force_move := Vector3.ZERO
+var god_mode := false
 
 func setup(d: Dictionary) -> void:
 	data = d
@@ -34,7 +46,9 @@ func setup(d: Dictionary) -> void:
 	recalc(true)
 
 func rebuild_visual() -> void:
+	data["look"] = CharAssets.normalize_look(data["look"])
 	visual.build(data["look"], data["class"], data["ascendancy"])
+	visual.attack_speed = 1.0
 
 func recalc(fill := false) -> void:
 	var hp_frac: float = hp / stats.max_hp if not stats.is_empty() else 1.0
@@ -66,6 +80,7 @@ func _physics_process(delta: float) -> void:
 		fwd = -cam.global_basis.z; fwd.y = 0; fwd = fwd.normalized()
 		right = cam.global_basis.x; right.y = 0; right = right.normalized()
 	var move := fwd * input.y + right * input.x
+	if force_move != Vector3.ZERO: move = Vector3(force_move.x, 0, force_move.z)
 	if move.length() > 1: move = move.normalized()
 	var v: Vector3
 	if _dash_time > 0:
@@ -76,10 +91,34 @@ func _physics_process(delta: float) -> void:
 		if move.length() > 0.05:
 			rotation.y = lerp_angle(rotation.y, atan2(move.x, move.z), minf(1.0, delta * 12))
 	velocity.x = v.x; velocity.z = v.z
-	velocity.y = -2.0 if is_on_floor() else velocity.y - 20.0 * delta
+	# --- гравитация и прыжок ---
+	var on_floor := is_on_floor()
+	if on_floor:
+		_coyote = COYOTE_TIME
+		if velocity.y < 0: velocity.y = -2.0
+	else:
+		_coyote -= delta
+		velocity.y -= GRAVITY * delta
+	if Input.is_key_pressed(KEY_J): request_jump()
+	if _jump_buffer > 0:
+		_jump_buffer -= delta
+		if _coyote > 0 and _dash_time <= 0:
+			velocity.y = JUMP_VELOCITY
+			_coyote = 0; _jump_buffer = 0
+			jumps += 1
+			visual.play_action("jump")
 	move_and_slide()
+	var now_floor := is_on_floor()
+	if now_floor and not _was_on_floor and velocity.y <= 0.1: visual.play_action("land")
+	_was_on_floor = now_floor
+	visual.in_air = not now_floor and (velocity.y > 1.0 or _coyote < -0.15)
 	if global_position.y < -10: teleport(zone().spawn_point)
 	if attack_held or Input.is_key_pressed(KEY_SPACE): try_use(0)
+
+## Нажатие прыжка (кнопка HUD / клавиатура). Сработает в течение буфера, если персонаж на земле или только что сошёл с края.
+func request_jump() -> void:
+	if dead: return
+	_jump_buffer = JUMP_BUFFER
 
 func teleport(p: Vector3) -> void:
 	global_position = p
@@ -95,18 +134,22 @@ func forward() -> Vector3:
 func respawn(p: Vector3) -> void:
 	teleport(p)
 	dead = false
+	visual.set_dead(false)
 	recalc(true)
 
 # ---------------- урон и опыт ----------------
 func take_damage(dmg: float, _from: Vector3) -> void:
-	if dead: return
+	if dead or god_mode: return
 	var dr: float = stats.dr + (0.5 if shield_timer > 0 else 0.0)
 	var final := dmg * (1.0 - clampf(dr, 0, 0.85))
 	hp -= final
 	zone().damage_number(global_position + Vector3.UP * 2.2, final, false, true)
 	if hp <= 0:
 		hp = 0; dead = true
+		visual.set_dead(true)
 		zone().on_player_died()
+	elif final > stats.max_hp * 0.08:
+		visual.play_action("hit")
 
 func heal(a: float) -> void:
 	if not dead: hp = minf(stats.max_hp, hp + a)
@@ -161,6 +204,7 @@ func use_potion() -> void:
 		return
 	data["potions"] -= 1
 	heal(stats.max_hp * 0.45)
+	visual.play_action("drink")
 	zone().fx("burst", global_position + Vector3.UP, 1.5, Color(1, 0.2, 0.3), 0.5)
 
 func try_use(slot: int) -> bool:
@@ -226,7 +270,8 @@ func _execute(s: Dictionary) -> void:
 	var z = zone()
 	var target = find_target(maxf(s.range, cls.range) + 2)
 	if target != null and s.kind != "dash": face_towards(target.global_position)
-	visual.play_attack()
+	visual.attack_speed = stats.attack_speed * (1.5 if rage_timer > 0 else 1.0)
+	visual.play_action("attack" if s.kind in ["melee", "projectile"] else s.kind)
 	var origin := global_position + Vector3.UP * 1.3 + forward() * 0.6
 	match s.kind:
 		"melee":

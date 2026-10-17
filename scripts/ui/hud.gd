@@ -13,6 +13,7 @@ var talent_badge: Label
 var skill_btns := []      # [0] атака, [1..3] умения
 var potion_btn: SkillButton
 var potion_label: Label
+var jump_btn: SkillButton
 var joy_base: Control
 var joy_knob: Control
 var joy_default := Vector2(260, 840)
@@ -70,6 +71,7 @@ func setup(z) -> void:
 	potion_btn = _skill_button("Зелье", Vector2(-470, -40), 110, Color(0.8, 0.15, 0.25))
 	potion_label = UIK.label(potion_btn, "", 26, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT)
 	potion_label.position = Vector2(0, 70); potion_label.size = Vector2(110, 40)
+	jump_btn = _skill_button("Прыжок", Vector2(-480, -260), 130, Color(0.25, 0.5, 0.75))
 
 	joy_base = Control.new(); joy_base.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	joy_base.size = Vector2(JOY_R * 2, JOY_R * 2)
@@ -180,6 +182,11 @@ func _touch_down(idx: int, p: Vector2) -> void:
 			if i == 0: player.attack_held = true
 			else: player.try_use(i)
 			return
+	if jump_btn.hit(p):
+		touches[idx] = {"role": "jump"}
+		jump_btn.set_held(true)
+		press_jump()
+		return
 	if potion_btn.hit(p):
 		touches[idx] = {"role": "potion"}
 		potion_btn.set_held(true)
@@ -230,8 +237,14 @@ func _touch_up(idx: int) -> void:
 			if t["slot"] == 0: player.attack_held = false
 		"potion":
 			potion_btn.set_held(false)
+		"jump":
+			jump_btn.set_held(false)
 	touches.erase(idx)
 	pinch_last = 0
+
+## Кнопка «Прыжок» (и для автотестов)
+func press_jump() -> void:
+	if player: player.request_jump()
 
 func _set_joy(center: Vector2, knob: Vector2) -> void:
 	joy_base.position = center - Vector2(JOY_R, JOY_R)

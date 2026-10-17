@@ -12,6 +12,31 @@ var enemies: Array = []   # живые враги
 var minions: Array = []
 var fx_root: Node3D
 var _autosave := 30.0
+## Возвышенности для наземных врагов (у игрока — физика): диски, коробки, пандусы
+var _h_discs: Array = []
+var _h_boxes: Array = []
+var _h_ramps: Array = []
+
+func add_height_disc(c: Vector3, r: float, h: float) -> void: _h_discs.append([c, r, h])
+func add_height_box(c: Vector3, half: Vector3, h: float) -> void: _h_boxes.append([c, half, h])
+func add_height_ramp(low: Vector3, high: Vector3, half_w: float) -> void: _h_ramps.append([low, high, half_w])
+
+## Высота земли в точке (для врагов, лута)
+func ground_y(p: Vector3) -> float:
+	var y := 0.0
+	for d in _h_discs:
+		if Vector2(p.x - d[0].x, p.z - d[0].z).length() <= d[1]: y = maxf(y, d[2])
+	for b in _h_boxes:
+		if absf(p.x - b[0].x) <= b[1].x and absf(p.z - b[0].z) <= b[1].z: y = maxf(y, b[2])
+	for r in _h_ramps:
+		var a: Vector3 = r[0]; var bb: Vector3 = r[1]
+		var ab := Vector2(bb.x - a.x, bb.z - a.z)
+		var ap := Vector2(p.x - a.x, p.z - a.z)
+		var t := ap.dot(ab) / ab.length_squared()
+		if t < 0 or t > 1: continue
+		if absf(ap.cross(ab.normalized())) > r[2]: continue
+		y = maxf(y, lerpf(a.y, bb.y, t))
+	return y
 
 func _ready() -> void:
 	instance = self

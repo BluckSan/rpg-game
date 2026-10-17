@@ -16,12 +16,13 @@ static func spawn(z, pos: Vector3, owner_p, m: float, lifetime: float) -> Minion
 	mn.hp = owner_p.stats.max_hp * 0.5
 	z.fx_root.add_child(mn)
 	mn.global_position = Vector3(pos.x, 0, pos.z)
-	mn.model = Node3D.new(); mn.add_child(mn.model)
-	var c := Color(0.75, 0.7, 0.95)
-	U.prim("capsule", mn.model, Vector3(0, 1.0, 0), Vector3(0.35, 0.5, 0.25), c)
-	U.prim("sphere", mn.model, Vector3(0, 1.7, 0), Vector3.ONE * 0.35, c)
-	for s in [-0.08, 0.08]: U.prim("sphere", mn.model, Vector3(s, 1.73, 0.15), Vector3.ONE * 0.08, Color(0.6, 1, 0.6), 0.3, 3.0)
-	U.prim("box", mn.model, Vector3(0.3, 1.0, 0.4), Vector3(0.05, 0.05, 0.8), Color(0.6, 0.6, 0.62))
+	var mm := MobModel.new(); mn.add_child(mm)
+	mm.setup("skeleton", {"tint": Color(0.7, 0.68, 0.85), "emission": Color(0.4, 1.0, 0.5)})
+	mm.walk_ref = 2.0; mm.run_ref = 4.5
+	mm.attach("R.DownLeg.001", "props/sword2", Vector3(0, 0.1, 0), Vector3(180, 0, 0), 0.36)
+	mm.play_action("spawn", 1.5)
+	mn.model = mm
+	var c := Color(0.6, 1.0, 0.6)
 	z.minions.append(mn)
 	z.fx("burst", mn.global_position + Vector3.UP, 1.2, c, 0.4)
 	return mn
@@ -58,4 +59,4 @@ func _process(delta: float) -> void:
 	elif t != null and attack_timer <= 0:
 		attack_timer = 1.0
 		owner_player.hit(t, mult, true)
-	model.position.y = absf(sin(Time.get_ticks_msec() * 0.008)) * 0.08
+		(model as MobModel).play_action("attack", 1.3)

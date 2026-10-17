@@ -8,6 +8,10 @@ var preview: CharVisual
 var yaw := 0.0
 var auto_spin := 1.0
 var target_x := 0.3
+var cam: Camera3D
+var focus := false
+var _focus_t := 0.0
+var _head_y := -1.0
 
 var chars: Array = []
 var selected = null
@@ -31,9 +35,10 @@ func _build_stage() -> void:
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	e.ambient_light_color = Color(0.45, 0.43, 0.5)
 	e.ambient_light_energy = 0.8
+	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.environment = e
 	add_child(env)
-	var cam := Camera3D.new()
+	cam = Camera3D.new()
 	cam.fov = 35
 	add_child(cam)
 	cam.position = Vector3(0, 1.3, 5.6)
@@ -42,6 +47,12 @@ func _build_stage() -> void:
 	var sun := DirectionalLight3D.new()
 	sun.light_color = Color(1, 0.92, 0.82)
 	sun.shadow_enabled = true
+	sun.light_energy = 1.25
+	sun.directional_shadow_max_distance = 12
+	var fill := DirectionalLight3D.new()
+	fill.light_color = Color(0.6, 0.7, 1.0); fill.light_energy = 0.45
+	add_child(fill)
+	fill.rotation_degrees = Vector3(-15, -130, 0)
 	add_child(sun)
 	sun.rotation_degrees = Vector3(-35, 30, 0)
 	var rim := OmniLight3D.new()
@@ -61,15 +72,42 @@ func show_preview(look, class_id := "warrior", asc := "") -> void:
 	if look != null:
 		preview.build(look, class_id, asc)
 
+## Крупный план лица (редактор внешности)
+func set_focus(v: bool) -> void:
+	focus = v
+	if preview: preview.set_neutral(v)
+	if v:
+		yaw = fposmod(yaw + PI, TAU) - PI
+		auto_spin = 0
+
 func rotate_preview(dx: float) -> void:
 	yaw -= dx * 0.008
 	auto_spin = 0
 
 func _process(delta: float) -> void:
 	stage_pivot.position.x = lerpf(stage_pivot.position.x, target_x, delta * 6)
-	auto_spin = move_toward(auto_spin, 1, delta * 0.3)
+	if focus:
+		auto_spin = 0
+		yaw = lerpf(yaw, clampf(yaw, -0.9, 0.9), delta * 2)
+	else:
+		auto_spin = move_toward(auto_spin, 1, delta * 0.3)
 	yaw += delta * 0.2 * auto_spin
 	stage_pivot.rotation.y = yaw
+	_focus_t = move_toward(_focus_t, 1.0 if focus else 0.0, delta * 2.5)
+	var t := smoothstep(0.0, 1.0, _focus_t)
+	var hy := 1.62
+	if preview and preview.skel and is_instance_valid(preview.skel):
+		var hb: int = preview.skel.find_bone(preview._head_bone())
+		if hb >= 0:
+			var target_y: float = (preview.skel.global_transform * preview.skel.get_bone_global_pose(hb)).origin.y + 0.1
+			_head_y = target_y if _head_y < 0 else lerpf(_head_y, target_y, minf(1.0, delta * 3))
+			hy = _head_y
+	var px := stage_pivot.position.x
+	var body_pos := Vector3(0, 1.3, 5.6)
+	var face_pos := Vector3(px - 0.2, hy + 0.03, 1.15)
+	cam.position = body_pos.lerp(face_pos, t)
+	cam.look_at(Vector3(0, 1.0, 0).lerp(Vector3(px - 0.2, hy - 0.02, 0), t))
+	cam.fov = lerpf(35, 30, t)
 
 # ---------------- экран выбора ----------------
 func _new_screen() -> Control:
