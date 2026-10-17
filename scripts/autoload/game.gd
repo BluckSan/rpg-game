@@ -374,9 +374,12 @@ func normalize(c: Dictionary) -> Dictionary:
 	for k in c.get("ranks", {}): rk[str(k)] = int(c["ranks"][k])
 	if c.has("ranks"): c["ranks"] = rk
 	DB.migrate_talents(c)
-	for list_name in ["inventory", "equipped"]:
+	for list_name in ["inventory", "equipped", "stash", "buyback"]:
 		for it in c.get(list_name, []):
 			it["slot"] = int(it["slot"]); it["rarity"] = int(it["rarity"]); it["ilvl"] = int(it["ilvl"])
+			if it.has("req"): it["req"] = int(it["req"])
+	c["dust"] = int(c.get("dust", 0))
+	Items.migrate(c)
 	if not c.has("zones") or not (c["zones"] is Dictionary): c["zones"] = {}
 	var look: Dictionary = c.get("look", {})
 	for k in ["gender", "skin", "face", "hair", "hair_color", "eye_color"]:

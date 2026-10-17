@@ -18,8 +18,11 @@ static func drop_for(z, e) -> void:
 		return
 	spawn(z, pos + _rand(), "gold", int(round(randi_range(2, 5) * (1 + lvl * 0.5))))
 	if randf() < 0.1: spawn(z, pos + _rand(), "potion", 1)
-	if randf() < 0.28:
-		spawn(z, pos + _rand(), "item", 1, DB.roll_item(lvl, z.data["class"], 0.0))
+	# добыча для всех классов; элиты/редкие — больше и лучше, иногда комплекты
+	var rank: String = e.rank if "rank" in e else "normal"
+	if rank != "normal": spawn(z, pos + _rand(), "gold", int(round(randi_range(4, 8) * (1 + lvl * 0.5) * (2 if rank == "elite" else 4))))
+	for it in Items.drop_items(lvl, z.data["class"], rank):
+		spawn(z, pos + _rand(), "item", 1, it)
 
 ## Босс: много золота, 2 зелья, 4 предмета (минимум один редкий), при первой победе — гарантированный уникальный
 static func _boss_drop(z, e) -> void:
@@ -34,12 +37,14 @@ static func _boss_drop(z, e) -> void:
 	spawn(z, pos + _rand(2.5), "potion", 1)
 	spawn(z, pos + _rand(2.5), "potion", 1)
 	for i in 4:
-		var it := DB.roll_item(lvl + 1, d["class"], 0.5)
+		var it := Items.roll(lvl + 1, d["class"], 0.5)
 		if i == 0 and it.rarity < 2:
-			while it.rarity < 2: it = DB.roll_item(lvl + 1, d["class"], 0.5)
+			while it.rarity < 2: it = Items.roll(lvl + 1, d["class"], 0.5)
 		if i == 1 and first:
-			while it.rarity < 3: it = DB.roll_item(lvl + 1, d["class"], 0.9)
+			while it.rarity < 3: it = Items.roll(lvl + 1, d["class"], 0.9)
 		spawn(z, pos + _rand(2.5), "item", 1, it)
+	for it in Items.drop_items(lvl, d["class"], "dungeon" if e.kind == "warden" else "boss"):
+		if int(it.get("rarity", 0)) == Items.SET_RARITY: spawn(z, pos + _rand(2.5), "item", 1, it)
 	var uniq := ""
 	if e.kind == "warden":
 		# уникальная добыча Хранителя: оружие своего класса (первая победа — гарантированно), иногда печать

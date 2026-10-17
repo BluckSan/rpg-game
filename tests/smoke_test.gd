@@ -46,6 +46,7 @@ func _ready() -> void:
 	for c in list:
 		if c["id"] == ids[0]: loaded = c
 	check(loaded != null and loaded["talents"][0] is int, "типы восстановлены после JSON")
+	_item_tests()
 	# 3. главное меню
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 	await frames(10)
@@ -1199,3 +1200,115 @@ func _bfs(from: int, to: int) -> Array:
 		path.push_front(cur); cur = prev[cur]
 	path.pop_front()
 	return path
+
+# ---------- v0.5: предметы, комплекты, сундук, массовые операции ----------
+func _item_tests() -> void:
+	var c := DB.new_character("Предметы", "warrior", {})
+	# 1. жёсткий запрет по уровню
+	c["level"] = 3
+	var hi := Items.roll(12, "warrior", 0.0, false, 4)
+	c["inventory"].append(hi)
+	check(int(hi.req) == 12, "требование уровня = уровень предмета (%d)" % int(hi.req))
+	check(Items.equip(c, hi) == "Нужен уровень 12", "нельзя надеть предмет выше уровня")
+	check(not c["equipped"].has(hi) and c["inventory"].has(hi), "предмет остался в инвентаре")
+	check("[color=#ff5555]Требуется уровень 12" in Items.tooltip(c, hi), "требование уровня красным в подсказке")
+	c["equipped"].append(hi)   # «взломанное» сохранение — характеристики не учитываются
+	var base_hp: float = DB.compute_stats(c).max_hp
+	c["equipped"].erase(hi)
+	check(is_equal_approx(base_hp, DB.compute_stats(c).max_hp), "запрещённый предмет не даёт характеристик")
+	c["level"] = 12
+	check(Items.equip(c, hi) == "" and c["equipped"].has(hi), "на 12 уровне предмет надевается")
+	# 2. ограничение по классу
+	var bow := Items.roll(5, "archer", 0.0, false, 0)
+	check(bow.cls == "archer" and Items.equip_block(c, bow).begins_with("Только для класса"), "лук — только для лучника")
+	check("не ваш класс" in Items.tooltip(c, bow), "подсказка помечает чужой класс")
+	# 3. добыча для всех классов
+	var cnt := {"warrior": 0, "archer": 0, "mage": 0, "": 0}
+	for i in 900:
+		for it in Items.drop_items(10, "warrior", "elite"): cnt[str(it.get("cls", ""))] += 1
+	check(cnt.warrior > 0 and cnt.archer > 0 and cnt.mage > 0 and cnt[""] > 0, "добыча: воин %d, лучник %d, маг %d, общие %d" % [cnt.warrior, cnt.archer, cnt.mage, cnt[""]])
+	check(cnt.warrior > cnt.archer and cnt.warrior > cnt.mage, "своего класса выпадает больше")
+	var sets_seen := 0
+	for i in 400:
+		for it in Items.drop_items(26, "mage", "boss"):
+			if it.get("set", "") != "":
+				sets_seen += 1
+	check(sets_seen > 40, "боссы роняют комплекты (%d/400)" % sets_seen)
+	var low_ok := true
+	for i in 300:
+		var it := Items.roll_set(6, "warrior")
+		if int(Items.SETS[it.set].lvl) > 6: low_ok = false
+	check(low_ok, "комплекты по уровню: на 6 ур. только тир 5")
+	# 4. комплекты: включение и выключение бонусов
+	var w := DB.new_character("Комплект", "warrior", {})
+	w["level"] = 30
+	w["equipped"].clear()
+	var pieces := []
+	for i in 6: pieces.append(Items.roll_set(25, "warrior", "veteran", i))
+	var hp0: float = DB.compute_stats(w).max_hp
+	for i in 6:
+		w["inventory"].append(pieces[i])
+		check(Items.equip(w, pieces[i]) == "", "надет кусок комплекта %d" % (i + 1))
+		var st := DB.compute_stats(w)
+		var n := Items.set_count(w, "veteran")
+		check(n == i + 1, "счётчик комплекта %d" % n)
+		check(st.fx.has("combo_wave") == (n >= 6), "бонус (6) %s при %d/6" % ["активен" if n >= 6 else "не активен", n])
+	var st6 := DB.compute_stats(w)
+	var tip := Items.tooltip(w, pieces[0])
+	check("(6/6)" in tip and "— активно" in tip and "✔" in tip, "подсказка: 6/6, тиры активны, куски отмечены")
+	check(Items.unequip(w, pieces[5]) == "", "снят 6-й кусок")
+	var st5 := DB.compute_stats(w)
+	check(not st5.fx.has("combo_wave") and not st5.fx.has("thorns"), "бонус (6) выключился после снятия")
+	check(st5.armor < st6.armor or st5.max_hp <= st6.max_hp, "характеристики пересчитаны")
+	for p in [pieces[4], pieces[3]]: Items.unequip(w, p)
+	var st3 := DB.compute_stats(w)
+	check(Items.set_count(w, "veteran") == 3, "3/6 после снятия")
+	check(DB.compute_stats(w).max_hp >= hp0 + 59.0 or st3.max_hp >= hp0 + 59.0, "бонус (2) +60 HP держится на 3/6")
+	var tip3 := Items.tooltip(w, pieces[0])
+	check("(3/6)" in tip3 and "◦" in tip3, "подсказка: 3/6 и куски в сумке отмечены «есть»")
+	Items.unequip(w, pieces[1]); Items.unequip(w, pieces[2])
+	check(Items.set_count(w, "veteran") == 1 and Items.set_bonuses(w).mods.is_empty(), "1/6 — бонусов нет")
+	# 5. сундук на 100 ячеек
+	var s := DB.new_character("Сундук", "mage", {})
+	s["inventory"].clear(); s["stash"] = []
+	var moved := 0
+	for batch in 4:
+		s["inventory"].clear()
+		for i in 30: s["inventory"].append(Items.roll(5, "mage"))
+		var uids := []
+		for it in s["inventory"]: uids.append(str(it.uid))
+		moved += Items.to_stash(s, uids)
+	check(s["stash"].size() == Items.STASH_SIZE and moved == 100, "сундук вмещает ровно 100 (%d)" % s["stash"].size())
+	check(s["inventory"].size() == 20, "лишнее осталось в инвентаре")
+	var back := []
+	for i in 25: back.append(str(s["stash"][i].uid))
+	s["inventory"].clear()
+	check(Items.from_stash(s, back) == 25 and s["stash"].size() == 75, "массовый перенос из сундука")
+	var all_uids := []
+	for it in s["stash"]: all_uids.append(str(it.uid))
+	check(Items.from_stash(s, all_uids) == Items.INVENTORY_SIZE - 25, "перенос ограничен размером инвентаря")
+	# 6. массовые операции
+	var m := DB.new_character("Масса", "warrior", {})
+	m["inventory"].clear(); m["gold"] = 0
+	for r in [0, 0, 0, 1, 1, 2, 3, 4]:
+		var it := Items.roll(8, "warrior") if r < 4 else Items.roll_set(8, "warrior")
+		it.rarity = r
+		m["inventory"].append(it)
+	var commons := Items.select_by_rarity(m["inventory"], 0)
+	check(commons.size() == 3, "выбрать обычные: %d" % commons.size())
+	check(Items.select_by_rarity(m["inventory"], 2).size() == 6, "выбрать до редких (уник/комплект не берутся)")
+	var g := Items.sell_many(m, commons)
+	check(g > 0 and int(m["gold"]) == g and m["inventory"].size() == 5, "массовая продажа: +%d золота" % g)
+	check(m["buyback"].size() >= 3, "проданное — в выкуп")
+	var magic := Items.select_by_rarity(m["inventory"], 1)
+	var d := Items.dismantle_many(m, magic)
+	check(d > 0 and int(m["dust"]) == d and m["inventory"].size() == 3, "массовая разборка: +%d пыли" % d)
+	check(Items.sorted(m["inventory"], "rarity")[0].rarity == 3, "сортировка: уникальное первым")
+	# 7. миграция старого сохранения
+	var old := {"class": "archer", "level": 4, "inventory": [{"name": "Кольчуга", "slot": 1, "ilvl": 9, "rarity": 1, "base": 10, "mods": []}],
+		"equipped": [{"name": "Длинный лук", "slot": 0, "ilvl": 7, "rarity": 0, "base": 12, "mods": []}], "gold": 0}
+	Items.migrate(old)
+	check(old.has("stash") and old.has("dust"), "миграция: сундук и пыль")
+	check(old["equipped"].size() == 1 and old["equipped"][0].type == "bow" and int(old["equipped"][0].req) <= 4, "миграция: лук остаётся надетым")
+	check(old["inventory"][0].cls == "" and old["inventory"][0].type == "plate", "миграция: старая броня — для всех классов")
+

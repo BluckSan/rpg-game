@@ -30,6 +30,7 @@ var _flash := 0.0
 var _kb := Vector3.ZERO
 var brain   # BossBrain для босса
 var damage_mult := 1.0
+var rank := "normal"   # normal | elite | rare | boss (мир)
 var speed_mult := 1.0
 var hits_taken := 0
 var curse_timer := 0.0   # проклятие: +30% получаемого урона

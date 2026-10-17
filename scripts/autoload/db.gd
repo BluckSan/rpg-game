@@ -9,11 +9,11 @@ const EYE_COLORS := [Color(0.3,0.2,0.1), Color(0.2,0.45,0.9), Color(0.25,0.65,0.
 const HAIR_STYLES := ["Короткая", "Ёжик", "Длинная", "Хвост", "Ирокез", "Лысый"]
 const FACES := ["Обычное", "Острое", "Борода", "Шрам"]
 
-const RARITY_NAMES := ["Обычный", "Магический", "Редкий", "Уникальный"]
-const RARITY_COLORS := [Color(0.9,0.9,0.9), Color(0.4,0.6,1), Color(1,0.9,0.3), Color(1,0.5,0.1)]
-const SLOT_NAMES := ["Оружие", "Броня", "Шлем", "Кольцо"]
+const RARITY_NAMES := ["Обычный", "Магический", "Редкий", "Уникальный", "Комплект"]
+const RARITY_COLORS := [Color(0.9,0.9,0.9), Color(0.4,0.6,1), Color(1,0.9,0.3), Color(1,0.5,0.1), Color(0.3,0.95,0.45)]
+const SLOT_NAMES := ["Оружие", "Броня", "Шлем", "Кольцо", "Перчатки", "Сапоги", "Амулет", "Пояс"]
 const MAX_SLOTS := 6
-const INVENTORY_SIZE := 30
+const INVENTORY_SIZE := 40
 const ASC_LEVEL := 8
 const ASC_REGION_POINTS := 6
 
@@ -434,7 +434,7 @@ func new_character(char_name: String, class_id: String, look: Dictionary) -> Dic
 		"version": 2, "id": "%x%x" % [Time.get_ticks_usec(), randi()], "name": char_name, "class": class_id, "look": CharAssets.normalize_look(look),
 		"level": 1, "xp": 0, "class_level": 1, "class_xp": 0,
 		"talents": [start_node(class_id)], "ranks": {}, "tree_v": TREE_VERSION, "ascendancy": "",
-		"gold": 0, "potions": 3, "inventory": [], "equipped": [starter_weapon(class_id)],
+		"gold": 0, "potions": 3, "inventory": [], "equipped": [starter_weapon(class_id)], "stash": [], "dust": 0,
 		"zone": "starter", "has_pos": false, "pos": [0, 0, 0], "zones": {},
 		"created": Time.get_unix_time_from_system(), "play_time": 0.0, "kills": 0,
 	}
@@ -470,9 +470,13 @@ func compute_stats(c: Dictionary) -> Dictionary:
 	var weapon_dmg := 0.0
 	var item_armor := 0.0
 	for it in c["equipped"]:
+		if Items.equip_block(c, it) != "": continue   # требование уровня/класса — строго
 		add.call(it["mods"])
 		if int(it["slot"]) == 0: weapon_dmg += float(it["base"])
 		else: item_armor += float(it["base"])
+	var sb := Items.set_bonuses(c)
+	add.call(sb.mods)
+	for k in sb.fx: fx[k] = float(fx.get(k, 0.0)) + float(sb.fx[k])
 	raw["dmg%"] = raw.get("dmg%", 0.0) + (int(c["class_level"]) - 1) * 3.0
 	var g := func(k): return raw.get(k, 0.0)
 	var cls: Dictionary = CLASSES[c["class"]]
@@ -514,45 +518,12 @@ func weapon_base(class_id: String, tier: int) -> String:
 	return ["Меч", "Боевой топор", "Двуручный клинок"][tier]
 
 func starter_weapon(class_id: String) -> Dictionary:
-	return {"uid": str(randi()), "name": CLASSES[class_id].weapon, "slot": 0, "rarity": 0, "ilvl": 1, "base": 3.0, "mods": []}
+	return {"uid": str(randi()), "name": CLASSES[class_id].weapon, "slot": 0, "rarity": 0, "ilvl": 1, "base": 3.0, "mods": [],
+		"type": Items.CLASS_WEAPON[class_id][0], "cls": class_id, "req": 1}
 
-func roll_item(ilvl: int, class_id: String, rarity_bonus := 0.0) -> Dictionary:
-	var it := {"uid": str(randi()), "ilvl": ilvl, "slot": randi() % 4, "mods": []}
-	var r := randf() - rarity_bonus
-	it.rarity = 3 if r < 0.02 else (2 if r < 0.14 else (1 if r < 0.45 else 0))
-	var tier := clampi(ilvl / 4, 0, 2)
-	var base_name := ""
-	match it.slot:
-		0: base_name = weapon_base(class_id, tier); it.base = 3 + ilvl * 1.6 + randf() * 3
-		1: base_name = ARMOR_BASES[tier]; it.base = 6 + ilvl * 3.0 + randf() * 5
-		2: base_name = HELM_BASES[tier]; it.base = 3 + ilvl * 1.5 + randf() * 3
-		_: base_name = RING_BASES[tier]; it.base = 0.0
-	it.base = round(it.base)
-	var n_aff := 0
-	match it.rarity:
-		0: n_aff = 1 if it.slot == 3 else 0
-		1: n_aff = randi_range(1, 2)
-		2: n_aff = randi_range(3, 4)
-		_: n_aff = 5
-	var used := []
-	var scale := 1.0 + ilvl * 0.08
-	for i in n_aff:
-		var k := randi() % AFFIXES.size()
-		var guard := 0
-		while used.has(k) and guard < 20:
-			k = randi() % AFFIXES.size(); guard += 1
-		used.append(k)
-		var a = AFFIXES[k]
-		var v: float = randf_range(a[1], a[2]) * scale * (1.5 if it.rarity == 3 else 1.0)
-		v = round(v) if v >= 5 else round(v * 10) / 10.0
-		it.mods.append([a[0], v])
-	if it.rarity == 3:
-		it.name = UNIQUES.pick_random(); it.base = round(it.base * 1.3)
-	elif it.rarity >= 1:
-		it.name = PREFIXES.pick_random() + " " + base_name.to_lower()
-	else:
-		it.name = base_name
-	return it
+## Предмет под свой класс (торговец, тесты). Добыча с врагов — Items.drop_items (для всех классов)
+func roll_item(ilvl: int, class_id: String, rarity_bonus := 0.0, slot := -1) -> Dictionary:
+	return Items.roll(ilvl, class_id, rarity_bonus, false, slot)
 
 ## Уникальные предметы Хранителя Эфира (подземелье): у каждого класса свой, плюс общий перстень
 const WARDEN_UNIQUES := {
@@ -567,6 +538,9 @@ func warden_unique(key: String, ilvl: int) -> Dictionary:
 	var k := 1.0 + ilvl * 0.05
 	for m in u.mods: it.mods.append([m[0], round(float(m[1]) * k * 10.0) / 10.0])
 	it.base = round((3 + ilvl * 1.6) * 1.5) if u.slot == 0 else 0.0
+	it["type"] = Items.CLASS_WEAPON[key][0] if u.slot == 0 else "ring"
+	it["cls"] = key if u.slot == 0 else ""
+	it["req"] = Items.req_level(ilvl)
 	return it
 
 ## Флаг зоны (например, «босс повержен»)
@@ -601,7 +575,7 @@ func sell_price(it: Dictionary) -> int:
 	return 5 + int(it.ilvl) * 3 * (int(it.rarity) + 1)
 
 # ---------------- Торговец ----------------
-const RARITY_PRICE := [1.0, 2.2, 4.5, 9.0]
+const RARITY_PRICE := [1.0, 2.2, 4.5, 9.0, 6.0]
 const BUYBACK_SIZE := 10
 func buy_price(it: Dictionary) -> int:
 	return int(round((20 + int(it.ilvl) * 9) * RARITY_PRICE[int(it.rarity)]))
@@ -614,14 +588,13 @@ func shop_stock(level: int, class_id: String) -> Array:
 	var out := []
 	var bonus := clampf(0.08 + level * 0.015, 0.0, 0.35)
 	var names := {}
-	var slots := [0, 1, 2, 3, randi() % 4, randi() % 4]   # каждый тип снаряжения минимум раз
+	var slots := [0, 1, 2, randi_range(3, 7), randi_range(3, 7), randi_range(0, 7)]
 	for i in 6:
 		var it := {}
 		for guard in 30:
 			var ilvl := maxi(1, level + randi_range(-1, 1))
-			it = roll_item(ilvl, class_id, bonus)
+			it = roll_item(ilvl, class_id, bonus, slots[i])
 			if it.rarity == 3: continue  # уникальные — только с босса
-			if int(it.slot) != slots[i] and guard < 25: continue
 			if names.has(it.name) and guard < 28: continue
 			break
 		names[it.name] = true

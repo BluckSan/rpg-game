@@ -23,6 +23,9 @@ static func tex(path: String) -> Texture2D:
 	return _tex[path]
 
 static func icon(name: String) -> Texture2D:
+	if name.begins_with("item:"):
+		var ip := "res://assets/items/%s.png" % name.substr(5)
+		return tex(ip) if ResourceLoader.exists(ip) else icon("swap-bag")
 	var p := "res://assets/icons/%s.svg" % name
 	if not ResourceLoader.exists(p): return null
 	return tex(p)
@@ -217,7 +220,7 @@ static func icon_rect(parent: Node, name: String, sz: float, tint := Color.WHITE
 	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	t.custom_minimum_size = Vector2(sz, sz)
 	t.size = Vector2(sz, sz)
-	t.modulate = tint
+	t.modulate = tint if not name.begins_with("item:") else Color.WHITE  # 3D-иконки уже цветные
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(t)
 	return t
@@ -291,10 +294,15 @@ const SKILL_ICONS := {"w_attack": "broadsword", "w_spin": "spinning-sword", "w_d
 	"asc_storm": "lightning-storm", "asc_prison": "ice-cube", "asc_bones": "bone-knife", "asc_curse": "cursed-star",
 	"asc_knives": "thrown-daggers", "asc_vanish": "invisible", "asc_maul": "claw-slashes", "asc_regrow": "regeneration"}
 const WEAPON_ICONS := {"warrior": "broadsword", "archer": "pocket-bow", "mage": "wizard-staff"}
-const SLOT_ICONS := ["broadsword", "breastplate", "visored-helm", "ring"]
+const SLOT_ICONS := ["broadsword", "breastplate", "visored-helm", "ring", "item:gloves", "boot-kick", "gem-pendant", "item:belt"]
+const SLOT_ITEM_ICONS := ["item:sword", "item:plate", "item:helm", "item:ring", "item:gloves", "item:boots", "item:amulet", "item:belt"]
 const STAT_ICONS := {"max_hp": "heart-bottle", "max_mp": "drop", "damage": "sword-wound", "attack_speed": "lightning-frequency",
 	"crit": "crossed-swords", "armor": "checked-shield", "regen": "heart-beats", "leech": "skull-mask", "move_speed": "sprint", "cdr": "hourglass"}
 
 static func item_icon(it: Dictionary, class_id := "warrior") -> String:
-	var s := int(it.get("slot", 0))
-	return WEAPON_ICONS.get(class_id, "broadsword") if s == 0 else SLOT_ICONS[s]
+	## Рендеренная 3D-иконка по типу предмета (assets/items/<type>.png, см. tools/render_icons.gd).
+	var t := str(it.get("type", ""))
+	if t != "" and Items.TYPES.has(t): return "item:" + t
+	var s := clampi(int(it.get("slot", 0)), 0, SLOT_ITEM_ICONS.size() - 1)
+	if s == 0: return "item:" + str((Items.CLASS_WEAPON.get(class_id, ["sword"]) as Array)[0])
+	return SLOT_ITEM_ICONS[s]
