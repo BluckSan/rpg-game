@@ -30,6 +30,9 @@ const CHECKPOINTS := {"": Vector3(0, 0.1, 3), "cp_lever": Vector3(0, 0.1, 62), "
 func build(z) -> void:
 	zone = z
 	rng.seed = 4242
+	# вход из долины (не загрузка сохранения внутри) — новый забег: контрольные точки и группы сбрасываются,
+	# Хранитель появляется снова; решётка остаётся открытой, если загадка уже решена (срез пути)
+	if not zone.data.get("has_pos", false): new_run(zone.data)
 	_colliders = StaticBody3D.new(); _colliders.name = "Colliders"; _colliders.collision_layer = 1
 	add_child(_colliders)
 	enemies_root = Node3D.new(); enemies_root.name = "Enemies"; add_child(enemies_root)
@@ -77,6 +80,12 @@ func _pack(pos: Vector3, k: String, lo: int, hi: int, n: int, r: float, f: Strin
 	var s := Spawner.create(zone, enemies_root, pos, k, lo, hi, n, r, -1.0)
 	s.clear_flag = f
 	return s
+
+const RUN_FLAGS := ["cp_lever", "cp_boss", "pack1", "pack1b", "pack2", "pack2b", "pack3", "pack3b"]
+static func new_run(d: Dictionary) -> void:
+	var zs: Dictionary = d.get("zones", {}).get("dungeon", {})
+	if zs.has("flags"):
+		zs["flags"] = (zs["flags"] as Array).filter(func(f): return not RUN_FLAGS.has(f))
 
 func flag(f: String) -> bool: return DB.zone_flag(zone.data, "dungeon", f)
 func set_flag(f: String) -> void: DB.set_zone_flag(zone.data, "dungeon", f)

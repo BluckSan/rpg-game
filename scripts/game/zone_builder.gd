@@ -556,6 +556,7 @@ func _portal(c: Vector3) -> void:
 	var portal := Portal.new()
 	portal.zone = zone
 	portal.target_zone = "global"
+	portal.arrive = "world"
 	add_child(portal)
 	portal.position = c
 	_light(c + Vector3.UP * 2.5, Color(0.3, 0.8, 1), 2.0, 10)

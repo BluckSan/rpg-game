@@ -9,7 +9,7 @@ func setup(z) -> void:
 	UIK.full(UIK.panel(self, Color(0, 0, 0, 0.75), 0))
 	var p := UIK.panel(self)
 	p.anchor_left = 0.5; p.anchor_right = 0.5; p.anchor_top = 0.5; p.anchor_bottom = 0.5
-	var hh := 330
+	var hh := 390
 	p.offset_left = -360; p.offset_right = 360; p.offset_top = -hh; p.offset_bottom = hh
 	UIK.place(UIK.label(p, "Пауза", 54, UIK.ACCENT, HORIZONTAL_ALIGNMENT_CENTER), 0, 0.89, 1, 0.98)
 	var v := VBoxContainer.new()
@@ -21,7 +21,14 @@ func setup(z) -> void:
 		zone.save()
 		Game.toast("Игра сохранена"), UIK.BUTTON)
 	_btn(v, "Настройки", open_settings, UIK.BLUE)
+	_btn(v, "Авторы и лицензии", open_credits, UIK.BUTTON)
 	_btn(v, "В главное меню", func(): Game.to_menu(), UIK.RED)
+
+func open_credits() -> void:
+	var cp := CreditsPanel.new()
+	add_child(cp)
+	cp.setup()
+	UIK.pop_in(cp)
 
 ## Те же настройки, что и в главном меню
 func open_settings() -> void:

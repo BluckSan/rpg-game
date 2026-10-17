@@ -47,6 +47,7 @@ func _ready() -> void:
 		if c["id"] == ids[0]: loaded = c
 	check(loaded != null and loaded["talents"][0] is int, "типы восстановлены после JSON")
 	_item_tests()
+	_balance_tests()
 	# 3. главное меню
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 	await frames(10)
@@ -213,6 +214,17 @@ func _ready() -> void:
 		var hp0: float = pl.hp
 		await get_tree().create_timer(2.5).timeout
 		check(pl.hp < hp0 or pl.dead, "босс атакует игрока (%d → %d)" % [hp0, pl.hp])
+		# в игре: удар героя ур. 4 по троллю ур. 9 срезается бронёй и разницей уровней; огонь — уязвимость
+		var lv_was: int = pl.data["level"]
+		pl.data["level"] = 4
+		var bh: float = boss.hp
+		var dealt4: float = boss.take_damage(100.0, false, "phys")
+		var dealt_f: float = boss.take_damage(100.0, false, "fire")
+		pl.data["level"] = 9
+		var dealt9: float = boss.take_damage(100.0, false, "phys")
+		pl.data["level"] = lv_was
+		boss.hp = bh
+		check(dealt4 < 30.0 and dealt9 > dealt4 * 2.0 and dealt_f > dealt4 * 2.0, "урон по троллю: ур. 4 — %.0f, ур. 9 — %.0f, огнём (ур. 4) — %.0f из 100" % [dealt4, dealt9, dealt_f])
 		await _boss_tests(z2, pl, boss)
 		boss.take_damage(99999, true)
 		await frames(5)
@@ -220,9 +232,42 @@ func _ready() -> void:
 	await _dungeon_tests(z2, pl)
 	z2 = get_tree().current_scene
 	pl = z2.player
-	# портал
-	pl.teleport(Vector3(66, 0.1, 56))
-	await frames(10)
+	# сундук в лагере: окно, массовый перенос туда и обратно (UI)
+	check(z2.stash_point != Vector3.INF, "сундук в лагере есть")
+	pl.data["inventory"].clear()
+	for i in 6: pl.data["inventory"].append(Items.roll(3, String(pl.data["class"]), 0.2))
+	var st0: int = pl.data["stash"].size()
+	z2.hud._open("stash"); await frames(3)
+	var sw = z2.hud.window
+	check(sw != null and sw.mode == "stash" and sw.side_grid != null, "окно сундука открыто")
+	if sw:
+		sw.inv_grid.select_mode = true; sw.inv_grid.select_all()
+		var moved: int = sw.stash_selected()
+		check(moved == 6 and pl.data["stash"].size() == st0 + 6 and pl.data["inventory"].is_empty(), "массовый перенос в сундук: %d" % moved)
+		var back: Array = []
+		for it in pl.data["stash"].slice(st0, st0 + 4): back.append(str(it.uid))
+		sw.side_grid.set_selection(back)
+		var took: int = sw.take_from_stash(back)
+		check(took == 4 and pl.data["inventory"].size() == 4 and pl.data["stash"].size() == st0 + 2, "забрать выбранные из сундука: %d" % took)
+		z2.hud.close_window(); await frames(2)
+	# портал из долины в открытый мир
+	pl.data["level"] = maxi(int(pl.data["level"]), 6)
+	pl.teleport(z2.portal_point + Vector3(0, 0.1, 0.4))
+	var gw := 0
+	while get_tree().current_scene == z2 and gw < 400:
+		await frames(1); gw += 1
+	await frames(15)
+	var wz = get_tree().current_scene
+	check(wz != z2 and wz.builder is WorldBuilder, "портал долины ведёт в Земли Эфира")
+	if wz.builder is WorldBuilder:
+		check(U.flat_dist(wz.player.global_position, wz.portal_point) < 8.0, "прибытие у портала в долину (Перекрёсток)")
+		check(wz.hud.objective.text.begins_with("Цель:") and "ур." in wz.hud.objective.text, "цель в мире: %s" % wz.hud.objective.text)
+		await frames(3)
+		check(wz.hud.minimap.mouse_filter == Control.MOUSE_FILTER_STOP, "мини-карта в мире открывает карту по касанию")
+		var ev := InputEventMouseButton.new(); ev.button_index = MOUSE_BUTTON_LEFT; ev.pressed = true
+		wz.hud.minimap._gui_input(ev); await frames(2)
+		check(wz.hud.window != null and wz.hud.window.has_method("travel"), "касание мини-карты → карта мира")
+		wz.hud.close_window(); await frames(2)
 	Game.to_menu()
 	await frames(10)
 	check(get_tree().current_scene.name == "MainMenu", "возврат в меню")
@@ -690,11 +735,39 @@ func _dungeon_tests(z, pl: Player) -> void:
 	var saved = Game.load_file(Game.SAVE_DIR + "/char_%s.json" % p.data["id"])
 	var ok: bool = saved != null and DB.zone_flag(saved, "dungeon", "lever_solved") and DB.zone_flag(saved, "dungeon", "boss_warden_killed") and DB.zone_flag(saved, "dungeon", "pack1")
 	check(ok, "прогресс подземелья в сохранении")
-	# назад в долину — у входа в склеп
-	Game.travel("starter", "dungeon")
+	# назад в долину — через портал возврата, к входу в склеп
+	await frames(3)
+	check(b.return_portal != null, "после победы открыт портал возврата")
+	if b.return_portal:
+		b.return_portal._cd = 0.0
+		p.teleport(b.return_portal.global_position + Vector3(0, 0.1, 0.5))
+	else: Game.travel("starter", "dungeon")
+	g = 0
+	while get_tree().current_scene == d and g < 300:
+		await frames(1); g += 1
 	await frames(20)
 	var s2 = get_tree().current_scene
 	check(s2 != d and not s2.is_dungeon() and U.flat_dist(s2.player.global_position, s2.dungeon_gate_point) < 6.0, "возврат в долину к входу в склеп")
+	# повторный забег: снова через вход — герой у входа, контрольные точки сброшены, Хранитель и группы на месте
+	s2.player.teleport(s2.dungeon_gate_point + Vector3(0, 0.1, 0) + Basis(Vector3.UP, deg_to_rad(115.0)) * Vector3(0, 0, 0.8))
+	g = 0
+	while get_tree().current_scene == s2 and g < 300:
+		await frames(1); g += 1
+	await frames(15)
+	var d2 = get_tree().current_scene
+	check(d2 != s2 and d2.is_dungeon(), "повторный вход в склеп")
+	if d2.is_dungeon():
+		var p2: Player = d2.player
+		check(U.flat_dist(p2.global_position, DungeonBuilder.CHECKPOINTS[""]) < 3.0, "повторный забег: появление у входа, а не у портала/арены (%s)" % str(p2.global_position))
+		check(not DB.zone_flag(p2.data, "dungeon", "cp_boss") and not DB.zone_flag(p2.data, "dungeon", "cp_lever"), "контрольные точки сброшены на новый забег")
+		check(d2.spawn_point.distance_to(DungeonBuilder.CHECKPOINTS[""]) < 1.0, "точка возрождения — вход")
+		check(d2.builder.boss_enemy() != null and d2.builder.return_portal == null, "Хранитель снова на месте, портала возврата нет")
+		var pe := 0
+		for e in d2.enemies: if is_instance_valid(e) and not e.def.boss: pe += 1
+		check(pe >= 10, "группы врагов вернулись (%d)" % pe)
+		check(DB.zone_flag(p2.data, "dungeon", "boss_warden_killed") and d2.builder.gate_open(), "победа и решённая загадка сохраняются (решётка открыта)")
+		Game.travel("starter", "dungeon")
+		await frames(20)
 
 func _alive_enemy(z):
 	for e in z.enemies:
@@ -801,7 +874,7 @@ func _audio_tests() -> void:
 ## Титульный экран: кнопки, настройки, выбор героя, удаление с подтверждением
 func _title_tests(menu) -> void:
 	check(menu.screen != null and menu.screen.name == "TitleScreen" and menu.title_mode, "при запуске — титульный экран")
-	for b in ["PlayButton", "SettingsButton", "QuitButton"]:
+	for b in ["PlayButton", "SettingsButton", "CreditsButton", "QuitButton"]:
 		check(menu.screen.find_child(b, true, false) is Button, "кнопка «%s» на титульном экране" % b)
 	var qb: Button = menu.screen.find_child("QuitButton", true, false)
 	check(qb != null and qb.pressed.get_connections().size() > 0 and menu.has_method("quit_game"), "«Выход» подключён к выходу из игры")
@@ -814,6 +887,13 @@ func _title_tests(menu) -> void:
 	var sp: Node = menu.ui.find_child("SettingsPanel", true, false)
 	check(sp != null and sp.find_child("Quality", true, false) != null and sp.find_child("Music", true, false) != null, "настройки открываются из главного меню")
 	if sp: sp.close()
+	await frames(2)
+	(menu.screen.find_child("CreditsButton", true, false) as Button).pressed.emit()
+	await frames(2)
+	var cp: Node = menu.ui.find_child("CreditsPanel", true, false)
+	var ctext: String = cp.get_node("Panel/Text").text if cp and cp.has_node("Panel/Text") else (cp.find_child("Text", true, false).text if cp else "")
+	check(cp != null and "game-icons.net" in ctext and "CC BY 3.0" in ctext and "Lorc" in ctext and "Kenney" in ctext and "Quaternius" in ctext and "ambientCG" in ctext, "экран «Авторы»: game-icons (CC BY 3.0), Kenney, Quaternius, ambientCG")
+	if cp: cp.close()
 	await frames(2)
 	(menu.screen.find_child("PlayButton", true, false) as Button).pressed.emit()
 	await frames(3)
@@ -1312,3 +1392,44 @@ func _item_tests() -> void:
 	check(old["equipped"].size() == 1 and old["equipped"][0].type == "bow" and int(old["equipped"][0].req) <= 4, "миграция: лук остаётся надетым")
 	check(old["inventory"][0].cls == "" and old["inventory"][0].type == "plate", "миграция: старая броня — для всех классов")
 
+
+## Баланс v0.5: броня, сопротивления, разница уровней; бой «на бумаге» по формулам Combat
+func _balance_tests() -> void:
+	check(absf(Combat.level_factor(4, 9) - 0.55) < 0.001 and Combat.level_factor(9, 9) == 1.0 and Combat.level_factor(9, 11) == 1.0, "разница уровней: −15%/ур. сверх +2")
+	check(Combat.level_factor(1, 30) == 0.1, "урон по врагу на 29 ур. выше — не ниже 10%")
+	check(Combat.enemy_dmg_factor(9, 4) > 1.3 and Combat.enemy_dmg_factor(5, 5) == 1.0, "враг выше вас бьёт сильнее")
+	check(Combat.reward_factor(20, 5) == 0.2 and Combat.reward_factor(8, 5) == 1.0, "опыт/добыча с серых врагов снижены")
+	var a_lo := Combat.armor_factor(Combat.enemy_armor("troll", 9, "normal", true), 4, 0)
+	var a_hi := Combat.armor_factor(Combat.enemy_armor("troll", 9, "normal", true), 9, 0)
+	var a_pen := Combat.armor_factor(Combat.enemy_armor("troll", 9, "normal", true), 9, 40)
+	check(a_lo < a_hi and a_hi < a_pen and a_pen < 1.0, "броня: формула броня/(броня+K·ур.), пробивание помогает (%.2f / %.2f / %.2f)" % [a_lo, a_hi, a_pen])
+	check(Combat.armor_factor(1e9, 1, 100) > 0.0 and Combat.armor_factor(1e9, 1, 100) < 0.01, "пробивание ограничено %d%%" % int(Combat.PEN_CAP))
+	check(Combat.enemy_resist("skeleton", "poison", "boss", true) == Combat.RES_CAP, "сопротивление ограничено 75%")
+	check(Combat.enemy_resist("troll", "fire", "normal", true) < 0 and Combat.resist_factor(Combat.enemy_resist("troll", "fire", "normal", true), 0) > 1.3, "уязвимость тролля к огню")
+	check(Combat.resist_factor(40, 10) > Combat.resist_factor(40, 0), "снижение сопротивлений работает")
+	check(Combat.enemy_resist("troll", "poison", "normal", true) > Combat.enemy_resist("troll", "poison", "normal", false), "босс: доп. сопротивления")
+	check("Уязв.: огонь" in Combat.resist_text("troll", "normal", true) and "яд" in Combat.resist_text("troll", "normal", true), "подпись сопротивлений: %s" % Combat.resist_text("troll", "normal", true))
+	check(Combat.elem_of_skill({"kind": "fireball"}, "mage") == "fire" and Combat.elem_of_skill({"kind": "projectile"}, "mage") == "arcane" and Combat.elem_of_skill({"kind": "melee"}, "warrior") == "phys", "стихии умений")
+	check(Combat.boss_rec("troll", 9) >= 8 and Combat.boss_rec("troll", 9) <= 10, "рек. уровень тролля долины: %d" % Combat.boss_rec("troll", 9))
+	check(DB.STAT_NAMES.has("pen%") and DB.STAT_NAMES.has("resred"), "новые характеристики в описаниях")
+	var pen_nodes := 0
+	for id in DB.tree_nodes:
+		for m in DB.tree_nodes[id]["mods"]: if m[0] in ["pen%", "resred"]: pen_nodes += 1
+	check(pen_nodes >= 6, "пробивание/снижение сопротивлений в дереве талантов: %d" % pen_nodes)
+	# бой с Древним троллем (ур. 9): уровень 4 со стартовым снаряжением — без шансов, уровень 9 — победа
+	seed(20261018)
+	for cls in DB.CLASS_ORDER:
+		var lo := DB.new_character("Тест", cls, {})
+		lo["level"] = 4
+		var r_lo := Combat.sim_fight(lo, "troll", 9)
+		check(not r_lo.win and r_lo.ttk > 3.0 * r_lo.ttd, "%s ур. 4: тролля не одолеть (убийство %.0f с, гибель %.0f с)" % [cls, r_lo.ttk, r_lo.ttd])
+		var hi := DB.new_character("Тест", cls, {})
+		hi["level"] = 9
+		hi["equipped"].clear()
+		for sl in 8: hi["equipped"].append(Items.roll(8, cls, 0.35, false, sl))
+		for it in hi["equipped"]: it["req"] = mini(int(it.get("req", 1)), 9); it["rarity"] = maxi(1, int(it["rarity"]))
+		var r_hi := Combat.sim_fight(hi, "troll", 9)
+		var sh: Dictionary = DB.compute_stats(hi)
+		check(r_hi.win and r_hi.ttk < 240.0, "%s ур. 9: победа (убийство %.0f с, запас %.0f с; hp %.0f, dr %.2f, реген %.1f, урон босса %.1f/с)" % [cls, r_hi.ttk, r_hi.ttd, sh.max_hp, sh.dr, sh.regen, r_hi.enemy_dps])
+		check(r_hi.dps > r_lo.dps * 3.0, "%s: урон по боссу ур. 9 против ур. 4 — в %.1f раза выше" % [cls, r_hi.dps / maxf(0.01, r_lo.dps)])
+	randomize()

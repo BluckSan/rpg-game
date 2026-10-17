@@ -99,6 +99,10 @@ func _draw_map() -> void:
 		var m := to_map(Vector2(bs.pos.x, bs.pos.z))
 		var dead := killed.has("boss_" + WorldData.BIOMES[bs.biome].id)
 		map_rect.draw_texture_rect(_icons["skull-crossed-bones"], Rect2(m - Vector2(14, 14), Vector2(28, 28)), false, Color(0.6, 0.6, 0.6) if dead else Color(1, 0.35, 0.3))
+		var blv: int = int(WorldData.BIOMES[bs.biome].lv[1]) + 1
+		var rt := "рек. %d+" % Combat.boss_rec("world", blv)
+		map_rect.draw_string_outline(_font, m + Vector2(-26, 30), rt, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, 5, Color(0, 0, 0, 0.85))
+		map_rect.draw_string(_font, m + Vector2(-26, 30), rt, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.6, 0.6, 0.6) if dead else Color(1, 0.6, 0.5))
 	# города и камни
 	var open: Array = wb.world_state()["wp"]
 	for wp in wb.waypoints:

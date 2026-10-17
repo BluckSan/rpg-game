@@ -237,9 +237,10 @@ func show_title() -> void:
 	sub.autowrap_mode = TextServer.AUTOWRAP_OFF
 	UIK.place(sub, 0.055, 0.64, 0.6, 0.7)
 	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 22)
-	s.add_child(v); UIK.place(v, 0.055, 0.2, 0.32, 0.6)
+	s.add_child(v); UIK.place(v, 0.055, 0.12, 0.32, 0.61)
 	var bp := UIK.button(v, "Играть", show_select, UIK.GOLD, 46, "crossed-swords"); bp.name = "PlayButton"; UIK.min_h(bp, 120)
 	var bs := UIK.button(v, "Настройки", show_settings, UIK.BUTTON, 38, "cog"); bs.name = "SettingsButton"; UIK.min_h(bs, 104)
+	var bc := UIK.button(v, "Авторы", show_credits, UIK.BUTTON, 38, "book-cover"); bc.name = "CreditsButton"; UIK.min_h(bc, 104)
 	var bq := UIK.button(v, "Выход", quit_game, UIK.RED, 38); bq.name = "QuitButton"; UIK.min_h(bq, 104)
 	var ver := UIK.label(s, "v%s" % ProjectSettings.get_setting("application/config/version"), 24, Color(1, 1, 1, 0.45), HORIZONTAL_ALIGNMENT_RIGHT)
 	UIK.place(ver, 0.6, 0.93, 0.98, 0.99)
@@ -250,6 +251,12 @@ func show_settings() -> void:
 	sp.setup(func():
 		if title_mode: _set_title_mode(true))
 	UIK.pop_in(sp)
+
+func show_credits() -> void:
+	var cp := CreditsPanel.new()
+	ui.add_child(cp)
+	cp.setup()
+	UIK.pop_in(cp)
 
 ## Выход из игры (ПК и Android)
 func quit_game() -> void:

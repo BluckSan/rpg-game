@@ -223,5 +223,5 @@ func shake(amount: float) -> void:
 func float_text(pos: Vector3, text: String, c: Color) -> void:
 	U.float_text(fx_root, pos, text, c)
 
-func damage_number(pos: Vector3, amount: float, crit: bool, to_player: bool) -> void:
-	U.damage_number(fx_root, pos, amount, crit, to_player)
+func damage_number(pos: Vector3, amount: float, crit: bool, to_player: bool, elem := "") -> void:
+	U.damage_number(fx_root, pos, amount, crit, to_player, elem)

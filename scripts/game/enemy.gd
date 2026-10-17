@@ -48,11 +48,12 @@ var wall_hits := 0
 var _dots: Array = []     # [урон за тик, тиков осталось, таймер, цвет] — яд/кровотечение/поджог
 
 ## Урон со временем: total за dur секунд (тик 0.5 с)
-func add_dot(total: float, dur: float, c: Color) -> void:
+func add_dot(total: float, dur: float, c: Color, elem := "") -> void:
 	if not alive: return
 	var ticks := maxi(1, int(dur / 0.5))
 	if _dots.size() >= 4: _dots.pop_front()
-	_dots.append([total / ticks, ticks, 0.5, c])
+	if elem == "": elem = "poison" if c.g > c.r else ("fire" if c.g > 0.3 else "phys")
+	_dots.append([total / ticks, ticks, 0.5, c, elem])
 
 func curse(t: float) -> void:
 	curse_timer = maxf(curse_timer, t)
@@ -122,7 +123,9 @@ func make_rank(r: String, title := "") -> void:
 		add_child(ring); ring.position = Vector3(0, 0.08, 0)
 
 func _damage() -> float:
-	return def.dmg * (1 + (level - 1) * 0.18) * damage_mult
+	var pl := 1
+	if zone and zone.player: pl = int(zone.player.data["level"])
+	return def.dmg * (1 + (level - 1) * 0.18) * damage_mult * Combat.enemy_dmg_factor(level, pl)
 
 func _build_model() -> void:
 	match kind:
@@ -161,20 +164,26 @@ func _build_model() -> void:
 func _model_action(a: String) -> void:
 	if model and model.has_method("play_action"): model.play_action(a)
 
-func take_damage(dmg: float, crit: bool) -> void:
-	if not alive: return
+## Урон от героя (и его призывов): броня/сопротивления/разница уровней — Combat. elem "true" — без снижения.
+## Возвращает фактический урон.
+func take_damage(dmg: float, crit: bool, elem := "phys") -> float:
+	if not alive: return 0.0
 	if brain and brain.invulnerable: 
 		zone.float_text(global_position + Vector3.UP * 4.5, "Неуязвим", Color(0.8, 0.8, 0.8))
-		return
+		return 0.0
 	if curse_timer > 0: dmg *= 1.3
+	var p = zone.player if zone else null
+	if elem != "true" and p != null and "stats" in p and p.stats is Dictionary and not p.stats.is_empty():
+		dmg *= Combat.player_vs_enemy(self, elem, int(p.data["level"]), float(p.stats.get("pen", 0.0)), float(p.stats.get("resred", 0.0)))
 	hp -= dmg
 	hits_taken += 1
 	_flash = 0.12
 	_aggro = true; _returning = false
 	if model is MobModel: model.hit_react()
 	elif model is CharVisual and not model.is_acting() and not def.boss: model.play_action("hit")
-	zone.damage_number(global_position + Vector3.UP * (4.5 if def.boss else 2.0), dmg, crit, false)
+	zone.damage_number(global_position + Vector3.UP * (4.5 if def.boss else 2.0), dmg, crit, false, elem)
 	if hp <= 0: _die()
+	return dmg
 
 ## Отбрасывание при попадании (босс почти не сдвигается) + «упругий» отклик модели
 func knockback(dir: Vector3, force: float) -> void:
@@ -201,7 +210,7 @@ func _die() -> void:
 	if p:
 		p.data["kills"] += 1
 		var diff: int = p.data["level"] - level
-		var mult := maxf(0.2, 1.0 - (diff - 4) * 0.2) if diff > 4 else 1.0
+		var mult := Combat.reward_factor(int(p.data["level"]), level)
 		p.gain_xp(maxi(1, int(round(def.xp * (1 + (level - 1) * 0.25) * mult))))
 	Loot.drop_for(zone, self)
 	# дымка/искры души при гибели
@@ -238,7 +247,7 @@ func _process(delta: float) -> void:
 			if d[2] <= 0:
 				d[2] = 0.5; d[1] -= 1
 				if model: CombatFX.burst(zone.fx_root, global_position + Vector3.UP * 1.2, d[3], 5, 1.5, 0.08, 0.4, Vector3.UP, 120, 0.3)
-				take_damage(d[0], false)
+				take_damage(d[0], false, d[4] if d.size() > 4 else "phys")
 				if not alive: return
 				if d[1] <= 0: _dots.erase(d)
 	if _slow_timer > 0:

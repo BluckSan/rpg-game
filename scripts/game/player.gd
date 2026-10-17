@@ -271,7 +271,7 @@ func _aura_tick() -> void:
 	var any := false
 	for e in z.enemies.duplicate():
 		if is_instance_valid(e) and e.alive and U.flat_dist(e.global_position, global_position) <= 4.5 + e.radius:
-			e.take_damage(dmg, false); any = true
+			e.take_damage(dmg, false, "ice" if frost else "holy"); any = true
 			if frost and is_instance_valid(e) and e.alive: e.slow(0.6, 1.2)
 	if any:
 		aura_ticks += 1
@@ -294,7 +294,7 @@ func _on_hit_fx(e, dmg: float, crit: bool) -> void:
 		if t == null and is_instance_valid(e) and e.alive: t = e
 		if t:
 			Tele.bolt(z.fx_root, global_position + Vector3.UP * 1.6, t.global_position + Vector3.UP, Color(0.6, 0.8, 1), 0.25, 0.08)
-			t.take_damage(dmg * 0.6, false); procs += 1
+			t.take_damage(dmg * 0.6, false, "lightning"); procs += 1
 	if is_instance_valid(e) and not e.alive:
 		if fx.has("kill_heal"): heal(stats.max_hp * float(fx["kill_heal"]) / 100.0)
 		if fx.has("kill_mana"): mp = minf(stats.max_mp, mp + stats.max_mp * float(fx["kill_mana"]) / 100.0)
@@ -303,7 +303,7 @@ func _on_hit_fx(e, dmg: float, crit: bool) -> void:
 			z.fx("burst", p + Vector3.UP, 3.0, Color(0.7, 0.3, 0.9), 0.4)
 			for o in z.enemies.duplicate():
 				if is_instance_valid(o) and o.alive and U.flat_dist(o.global_position, p) <= 3.0 + o.radius:
-					o.take_damage(stats.damage * stats.dmg_mult * 0.8, false)
+					o.take_damage(stats.damage * stats.dmg_mult * 0.8, false, "shadow")
 			procs += 1
 	_proc_lock = false
 
@@ -425,13 +425,13 @@ func hit(e, mult: float, spell := false, force_crit := false, fb := {}) -> void:
 	var dir := U.flat(e.global_position - global_position).normalized()
 	var z = zone()
 	CombatFX.hit(z.fx_root, e.global_position + Vector3.UP * (2.2 if e.def.boss else 0.9), e.kind, crit, dir)
-	e.take_damage(dmg, crit)
+	var dealt: float = e.take_damage(dmg, crit, String(fb.get("elem", cur_elem)))
 	if is_instance_valid(e):
 		e.knockback(dir, float(fb.get("knock", 1.5)) * (1.4 if crit else 1.0))
 	z.hit_stop(float(fb.get("stop", 0.03)) * (1.6 if crit else 1.0))
 	var sh := float(fb.get("shake", 0.0)) + (0.12 if crit else 0.0)
 	if sh > 0: z.shake(sh)
-	if stats.leech > 0: heal(dmg * stats.leech)
+	if stats.leech > 0: heal(dealt * stats.leech)
 	_on_hit_fx(e, dmg, crit)
 
 func hit_area(center: Vector3, radius: float, mult: float, spell: bool, extra := Callable(), fb := {"knock": 4.0, "stop": 0.05, "shake": 0.15}) -> void:
@@ -450,7 +450,9 @@ func _dir_to(origin: Vector3, t) -> Vector3:
 	d.y = 0
 	return d.normalized()
 
+var cur_elem := "phys"   # стихия текущего умения (Combat.SKILL_ELEM)
 func _execute(s: Dictionary) -> void:
+	cur_elem = Combat.elem_of_skill(s, String(data["class"]))
 	var z = zone()
 	var target = find_target(maxf(s.range, cls.range) + 2)
 	if target != null and s.kind != "dash": face_towards(target.global_position)

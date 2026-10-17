@@ -16,7 +16,10 @@ static func drop_for(z, e) -> void:
 	if boss:
 		_boss_drop(z, e)
 		return
-	spawn(z, pos + _rand(), "gold", int(round(randi_range(2, 5) * (1 + lvl * 0.5))))
+	# враги намного ниже героя: меньше золота и предметов (Combat.reward_factor)
+	var rf := Combat.reward_factor(int(z.data["level"]), lvl)
+	spawn(z, pos + _rand(), "gold", maxi(1, int(round(randi_range(2, 5) * (1 + lvl * 0.5) * rf))))
+	if randf() > rf: return
 	if randf() < 0.1: spawn(z, pos + _rand(), "potion", 1)
 	# добыча для всех классов; элиты/редкие — больше и лучше, иногда комплекты
 	var rank: String = e.rank if "rank" in e else "normal"

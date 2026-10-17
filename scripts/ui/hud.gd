@@ -26,6 +26,7 @@ var boss_panel: Control
 var boss_bar: ProgressBar
 var boss_name: Label
 var boss_phase: Label
+var boss_res: RichTextLabel
 var minimap: Minimap
 var objective: Label
 var window: Control
@@ -94,6 +95,7 @@ func setup(z) -> void:
 	objective = UIK.label(root, "", 22, UIK.TEXT, HORIZONTAL_ALIGNMENT_RIGHT)
 	objective.anchor_left = 1; objective.anchor_right = 1
 	objective.offset_left = -640; objective.offset_right = -20; objective.offset_top = 278; objective.offset_bottom = 340
+	if zone.builder is WorldBuilder: objective.offset_top = 306; objective.offset_bottom = 368   # под названием зоны
 
 	# --- верхние кнопки (слева от карты) ---
 	var b_tal := _top_button("Таланты", _open.bind("talents"), Color(0.42, 0.28, 0.5), 0, 240, "book-cover")
@@ -152,7 +154,7 @@ func setup(z) -> void:
 	# --- полоса босса ---
 	boss_panel = UIK.panel(root, Color(0.1, 0.06, 0.05, 0.88))
 	boss_panel.anchor_left = 0.5; boss_panel.anchor_right = 0.5
-	boss_panel.offset_left = -400; boss_panel.offset_right = 400; boss_panel.offset_top = 116; boss_panel.offset_bottom = 236
+	boss_panel.offset_left = -400; boss_panel.offset_right = 400; boss_panel.offset_top = 116; boss_panel.offset_bottom = 268
 	boss_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sk := UIK.icon_rect(boss_panel, "skull-crossed-bones", 44, Color(1, 0.4, 0.3)); sk.position = Vector2(24, 12)
 	boss_name = UIK.label(boss_panel, "", 30, UIK.ACCENT)
@@ -169,6 +171,10 @@ func setup(z) -> void:
 		m.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		boss_bar.add_child(m); UIK.rect(m, Vector2(752 * f - 2, -4), Vector2(4, 54))
 		m.name = "Mark%d" % int(f * 100)
+	boss_res = RichTextLabel.new(); boss_res.bbcode_enabled = true; boss_res.scroll_active = false
+	boss_res.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	boss_res.add_theme_font_size_override("normal_font_size", 21)
+	boss_panel.add_child(boss_res); UIK.rect(boss_res, Vector2(24, 114), Vector2(752, 34))
 	boss_panel.visible = false
 	boss_bar.move_to_front()
 	refresh_skill_buttons()
@@ -654,6 +660,10 @@ func _update_enemy_bars() -> void:
 			UIK.rect(nm, Vector2(-85, -38), Vector2(300, 34))
 			nm.autowrap_mode = TextServer.AUTOWRAP_OFF
 			nm.name = "Name"
+			var rs := UIK.label(bar, "", 16, Color(0.85, 0.85, 0.85), HORIZONTAL_ALIGNMENT_CENTER)
+			UIK.rect(rs, Vector2(-85, 16), Vector2(300, 24))
+			rs.autowrap_mode = TextServer.AUTOWRAP_OFF
+			rs.name = "Res"
 			root.move_child(bar, 0)
 			bar_pool.append(bar)
 		var b: ProgressBar = bar_pool[used]
@@ -667,11 +677,17 @@ func _update_enemy_bars() -> void:
 		var nc := Color(1, 0.35, 0.3) if diff >= 3 else (Color(0.7, 0.7, 0.7) if diff <= -3 else Color.WHITE)
 		if e.rank in ["elite", "rare"]: nc = Enemy.RANK_COLORS[e.rank]
 		nl.add_theme_color_override("font_color", nc)
+		# сопротивления/уязвимости — у элит, редких, боссов и у ближних врагов
+		var rl: Label = b.get_node("Res")
+		rl.text = Combat.resist_text(e.kind, e.rank, e.def.boss) if (e.rank != "normal" or e.def.boss or dist < 9.0) else ""
 	for i in range(used, bar_pool.size()): bar_pool[i].visible = false
 	boss_panel.visible = boss != null
 	if boss != null:
 		_set_bar(boss_bar, boss.hp, boss.max_hp, "%d / %d" % [ceili(boss.hp), roundi(boss.max_hp)])
+		var rec := Combat.boss_rec(boss.kind, boss.level)
+		var rec_c := "ff6655" if int(zone.data["level"]) < rec else "bbffaa"
 		boss_name.text = str(boss.def.name) + "  ·  ур. %d" % boss.level
+		if boss_res: boss_res.text = "[center][color=#%s]Рекомендуемый уровень: %d+[/color]   %s[/center]" % [rec_c, rec, Combat.resist_text(boss.kind, boss.rank, true)]
 		var br = boss.brain
 		if br:
 			boss_phase.text = "Фаза %d · %s" % [br.phase, br.PHASE_NAMES[br.phase]] + ("  · ЯРОСТЬ" if br.enraged else "")
@@ -744,6 +760,13 @@ func _update_cast() -> void:
 		enrage_label.text = "Ярость через %d:%02d" % [int(left) / 60, int(left) % 60] if left > 0 else "ЯРОСТЬ!"
 
 func _objective() -> String:
+	if zone.builder is WorldBuilder:
+		var lv := int(zone.data["level"])
+		var best := 0
+		for i in WorldData.BIOMES.size():
+			if int(WorldData.BIOMES[i].lv[0]) <= lv + 1: best = i
+		var bz: Dictionary = WorldData.BIOMES[best]
+		return "Цель: %s (ур. %d–%d) — путевые камни на карте (M / касание мини-карты)" % [bz.name, bz.lv[0], bz.lv[1]]
 	if zone.is_dungeon():
 		var b = zone.builder
 		if b.boss_enemy() == null and b.return_portal != null:
@@ -761,5 +784,5 @@ func _objective() -> String:
 	var boss_alive := false
 	for e in zone.enemies:
 		if e.alive and e.def.boss: boss_alive = true
-	if boss_alive: return "Цель: победить Древнего тролля в руинах (череп на карте)"
-	return "Цель: портал в Глобальный мир (замок на карте)"
+	if boss_alive: return "Цель: победить Древнего тролля в руинах (рек. ур. %d+, череп на карте)" % Combat.boss_rec("troll", 9)
+	return "Цель: портал в Земли Эфира (замок на карте)"

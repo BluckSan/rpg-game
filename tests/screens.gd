@@ -472,5 +472,34 @@ func _v050_ui_shots(z) -> void:
 	get_tree().quit()
 
 func _v050_world_shots(z) -> void:
+	out = "/workspace/rpg-shots/v050"; DirAccess.make_dir_recursive_absolute(out)
+	Game.current["level"] = 22
+	Game.travel("global", "world"); await w(5.0)
+	z = get_tree().current_scene
+	var p: Player = z.player
+	p.god_mode = true; p.recalc(true)
+	var wb: WorldBuilder = z.builder
+	z.cam_rig.yaw = 160.0; z.cam_rig.distance = 15.0; await w(2.0)
+	await shot("w1_cross_town")
+	for t in WorldData.TOWNS:
+		if t.id == "cross": continue
+		wb.discover_waypoint(t.id); wb.travel_to(t.id); await w(3.0)
+		z.cam_rig.yaw = 200.0
+		await w(1.0)
+		await shot("w2_town_%s" % t.id)
+	var done_b := {}
+	for s in wb.spawners:
+		var key := "%d_%s" % [s.biome, s.rank]
+		if done_b.has(key) or (s.rank == "normal" and s.biome % 2 == 1): continue
+		done_b[key] = true
+		var q: Vector3 = s.global_position + Vector3(9, 0, 9)
+		q.y = WorldData.height(q.x, q.z) + 0.4
+		p.teleport(q); z.cam_rig.yaw = 45.0; z.cam_rig.distance = 13.0
+		await w(3.0)
+		await shot("w3_%s_%s" % [WorldData.BIOMES[s.biome].id, s.rank])
+	z.hud._open("map"); await w(0.8)
+	await shot("w6_world_map")
+	z.hud.close_window(); await w(0.3)
+	get_tree().paused = false
 	get_tree().quit()
 

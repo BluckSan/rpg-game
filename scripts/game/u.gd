@@ -100,10 +100,12 @@ static func telegraph(parent: Node, pos: Vector3, radius: float, dur: float) -> 
 
 static var _num_font: Font
 
-static func damage_number(parent: Node, pos: Vector3, amount: float, crit: bool, to_player: bool) -> void:
+## Цифры урона: по герою — красные, крит — золотые, иначе — цвет стихии (огонь, лёд, яд…)
+static func damage_number(parent: Node, pos: Vector3, amount: float, crit: bool, to_player: bool, elem := "") -> void:
 	var t := str(int(round(amount)))
 	if crit: t += "!"
-	var c := Color(1, 0.3, 0.25) if to_player else (Color(1, 0.78, 0.15) if crit else Color(1, 0.98, 0.92))
+	var ec: Color = Combat.ELEM_COLORS.get(elem, Color(1, 0.98, 0.92))
+	var c := Color(1, 0.3, 0.25) if to_player else (Color(1, 0.78, 0.15) if crit and elem in ["", "phys"] else (ec.lerp(Color(1, 0.85, 0.3), 0.35) if crit else ec))
 	_pop_label(parent, pos, t, c, 0.0016 if crit else 0.0011, crit)
 
 static func float_text(parent: Node, pos: Vector3, text: String, c: Color) -> void:

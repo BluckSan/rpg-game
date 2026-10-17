@@ -23,6 +23,7 @@ const STAT_NAMES := {
 	"ms%": "% к скорости бега", "crit": "% шанс крит. удара", "critdmg%": "% к силе крит. удара",
 	"armor": "к броне", "armor%": "% к броне", "regen": "здоровья в сек.", "mpregen": "маны в сек.",
 	"leech%": "% похищения жизни", "cdr%": "% сокращения перезарядки", "dr%": "% снижения получаемого урона",
+	"pen%": "% пробивания брони", "resred": "% снижения сопротивлений цели",
 }
 ## Пассивы и модификаторы умений из талантов (значение — за ранг; %s — число)
 const FX_NAMES := {
@@ -43,7 +44,7 @@ var CLASSES := {
 		"name": "Воин", "weapon": "Ржавый меч", "color": Color(0.85,0.3,0.2),
 		"desc": "Мастер ближнего боя. Много здоровья и брони.\nПути развития: Берсерк, Паладин, Друид.",
 		"hp": 140.0, "hp_lvl": 14.0, "mp": 40.0, "mp_lvl": 3.0, "dmg": 12.0, "dmg_lvl": 2.2,
-		"range": 2.6, "interval": 0.75, "ranged": false, "spell": false,
+		"range": 2.6, "interval": 0.75, "ranged": false, "spell": false, "pen": 15.0,
 		"skills": [
 			{"id": "w_attack", "name": "Удар", "kind": "melee", "mult": 1.0, "cd": 0.0, "mana": 0.0, "radius": 2.6, "range": 2.6, "color": Color.WHITE, "unlock": 1},
 			{"id": "w_spin", "name": "Вихрь", "desc": "Круговой удар по всем врагам рядом", "kind": "spin", "mult": 1.6, "cd": 6.0, "mana": 15.0, "radius": 4.2, "range": 4.0, "color": Color(1,0.6,0.3), "unlock": 1},
@@ -497,6 +498,8 @@ func compute_stats(c: Dictionary) -> Dictionary:
 	s.leech = g.call("leech%") / 100.0
 	s.cdr = clampf(g.call("cdr%"), 0, 50) / 100.0
 	s.dr = s.armor / (s.armor + 120.0) * 0.8 + g.call("dr%") / 100.0
+	s.pen = clampf(g.call("pen%") + float(cls.get("pen", 0.0)), 0, Combat.PEN_CAP)   # воин: врождённое пробивание брони
+	s.resred = maxf(0.0, g.call("resred"))
 	if fx.has("leech_x"): s.leech *= 2.0
 	if fx.has("no_regen"): s.regen = 0.0
 	s.fx = fx
@@ -509,7 +512,7 @@ const RING_BASES := ["Медное кольцо", "Серебряное коль
 const PREFIXES := ["Острый", "Крепкий", "Быстрый", "Древний", "Пылающий", "Ледяной", "Кровавый", "Святой", "Теневой"]
 const UNIQUES := ["Клык Тролля", "Сердце долины", "Пепельный венец", "Шёпот бури"]
 const AFFIXES := [["hp",10,40],["mp",10,35],["dmg%",4,15],["as%",3,10],["ms%",2,8],["crit",1,5],
-	["critdmg%",8,25],["armor",8,30],["regen",0.5,2.5],["spell%",5,16],["leech%",0.3,1.5],["cdr%",2,6]]
+	["critdmg%",8,25],["armor",8,30],["regen",0.5,2.5],["spell%",5,16],["leech%",0.3,1.5],["cdr%",2,6],["pen%",4,12],["resred",3,10]]
 
 func weapon_base(class_id: String, tier: int) -> String:
 	match class_id:
