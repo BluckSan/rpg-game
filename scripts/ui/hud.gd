@@ -740,8 +740,8 @@ func _update_cast() -> void:
 func _objective() -> String:
 	if zone.is_dungeon():
 		var b = zone.builder
-		if b.boss_enemy() == null and DB.zone_flag(zone.data, "dungeon", "boss_warden_killed"):
-			return "Склеп пройден! Портал у входа ведёт в долину"
+		if b.boss_enemy() == null and b.return_portal != null:
+			return "Хранитель повержен! Войдите в золотой портал на арене — он вернёт в долину"
 		if not b.gate_open():
 			if b.packs_left() > 0 and zone.player.global_position.z < 40: return "Цель: пройти коридор ловушек (шипы — по таймингу или прыжком)"
 			return "Цель: рычаги в порядке с таблички у решётки (Пламя → Лёд → Тень)"

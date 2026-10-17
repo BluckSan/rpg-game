@@ -328,9 +328,49 @@ func _process(_d: float) -> void:
 		zone.spawn_point = checkpoint()
 		Game.toast("Контрольная точка: вход на арену", 2.0)
 		zone.save()
+	_watch_boss()
 	var boss = boss_enemy()
 	var fighting: bool = boss != null and boss.brain and boss.brain.engaged and not p.dead
 	set_door(fighting and p.global_position.z > 88.0)
+
+# ---------- портал возврата после победы над Хранителем ----------
+var return_portal: Portal
+var _boss_seen := false
+var return_point := Vector3(0, 0, 112)
+func _watch_boss() -> void:
+	var boss = boss_enemy()
+	if boss != null: _boss_seen = true; return
+	if return_portal == null and (_boss_seen or flag("boss_warden_killed")):
+		spawn_return_portal()
+
+## Появляется на каждой победе (и в повторных забегах): арка, вспышка, свет, подсказка на экране
+func spawn_return_portal() -> void:
+	if return_portal != null: return
+	var c := return_point
+	var root := Node3D.new(); root.name = "ReturnPortal"; add_child(root)
+	root.position = c
+	for sx in [-1, 1]:
+		U.prim("box", root, Vector3(sx * 1.9, 2.1, 0), Vector3(0.7, 4.2, 0.7), WALL * 1.2, 0.6)
+	U.prim("box", root, Vector3(0, 4.4, 0), Vector3(4.6, 0.6, 0.8), WALL * 1.2, 0.6)
+	var plane := U.prim("box", root, Vector3(0, 2.0, 0), Vector3(3.0, 3.9, 0.08), Color(1.0, 0.85, 0.4))
+	plane.material_override = U.fx_mat(Color(1.0, 0.8, 0.35, 0.6))
+	var ring := U.prim("cylinder", root, Vector3(0, 0.03, 0), Vector3(4.2, 0.01, 4.2), Color(1, 0.8, 0.4))
+	ring.material_override = U.fx_mat(Color(1.0, 0.8, 0.35, 0.35))
+	_light(c + Vector3(0, 2.5, 1.2), Color(1.0, 0.8, 0.45), 2.5, 12.0)
+	return_portal = Portal.new()
+	return_portal.zone = zone
+	return_portal.target_zone = "starter"
+	return_portal.arrive = "dungeon"
+	return_portal.collect_loot = true
+	return_portal._cd = 1.5
+	add_child(return_portal)
+	return_portal.global_position = c
+	# появление: вырастает из пола + вспышки
+	root.scale = Vector3(1, 0.05, 1)
+	root.create_tween().tween_property(root, "scale", Vector3.ONE, 0.9).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	zone.fx("ring", c + Vector3.UP * 0.1, 4.0, Color(1, 0.8, 0.4), 0.6)
+	CombatFX.burst(zone.fx_root, c + Vector3.UP * 1.5, Color(1, 0.85, 0.45), 40, 6.0, 0.15, 1.0, Vector3.UP, 180, 0.0)
+	Game.toast("Открылся портал в долину — добыча будет собрана автоматически", 4.0)
 
 func boss_enemy():
 	for e in zone.enemies:
@@ -338,15 +378,16 @@ func boss_enemy():
 	return null
 
 ## Маршрут (для мини-карты) и следующая цель
-const ROUTE := [Vector3(0, 0, 3), Vector3(0, 0, 16), Vector3(0, 0, 40), Vector3(0, 0, 52), Vector3(0, 0, 64), Vector3(0, 0, 86), Vector3(0, 0, 104)]
+const ROUTE := [Vector3(0, 0, 3), Vector3(0, 0, 16), Vector3(0, 0, 40), Vector3(0, 0, 52), Vector3(0, 0, 64), Vector3(0, 0, 86), Vector3(0, 0, 104), Vector3(0, 0, 112)]
 func guide_target() -> Vector3:
 	var p: Vector3 = zone.player.global_position
 	if p.z < 40: return Vector3(0, 0, 41)
 	if not flag("lever_solved"):
 		var k := lever_input.size()
 		return levers[ORDER[clampi(k, 0, 2)]].global_position
+	if boss_enemy() != null: return arena_center if p.z >= 86 else Vector3(0, 0, 87)
+	if return_portal != null: return return_point
 	if p.z < 86: return Vector3(0, 0, 87)
-	if boss_enemy() != null: return arena_center
 	return exit_point
 
 ## Сколько групп осталось

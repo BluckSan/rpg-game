@@ -40,8 +40,8 @@
    "region": "",
    "classId": "warrior",
    "branch": "",
-   "x": 60.6,
-   "y": -35.0,
+   "x": 138.6,
+   "y": -80.0,
    "max_rank": 1,
    "mods": [],
    "fx": {},
@@ -58,8 +58,8 @@
    "region": "",
    "classId": "mage",
    "branch": "",
-   "x": -60.6,
-   "y": -35.0,
+   "x": -138.6,
+   "y": -80.0,
    "max_rank": 1,
    "mods": [],
    "fx": {},
@@ -77,7 +77,7 @@
    "classId": "archer",
    "branch": "",
    "x": -0.0,
-   "y": 70.0,
+   "y": 160.0,
    "max_rank": 1,
    "mods": [],
    "fx": {},
@@ -94,7 +94,7 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 140.0,
+   "x": 310.0,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -118,8 +118,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 121.2,
-   "y": -70.0,
+   "x": 268.5,
+   "y": -155.0,
    "max_rank": 3,
    "mods": [
     {
@@ -144,8 +144,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 70.0,
-   "y": -121.2,
+   "x": 155.0,
+   "y": -268.5,
    "max_rank": 3,
    "mods": [
     {
@@ -169,7 +169,7 @@
    "classId": "",
    "branch": "",
    "x": 0.0,
-   "y": -140.0,
+   "y": -310.0,
    "max_rank": 3,
    "mods": [
     {
@@ -190,8 +190,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -70.0,
-   "y": -121.2,
+   "x": -155.0,
+   "y": -268.5,
    "max_rank": 3,
    "mods": [
     {
@@ -214,8 +214,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -121.2,
-   "y": -70.0,
+   "x": -268.5,
+   "y": -155.0,
    "max_rank": 3,
    "mods": [
     {
@@ -240,7 +240,7 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -140.0,
+   "x": -310.0,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -264,8 +264,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -121.2,
-   "y": 70.0,
+   "x": -268.5,
+   "y": 155.0,
    "max_rank": 3,
    "mods": [
     {
@@ -286,8 +286,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -70.0,
-   "y": 121.2,
+   "x": -155.0,
+   "y": 268.5,
    "max_rank": 3,
    "mods": [
     {
@@ -311,7 +311,7 @@
    "classId": "",
    "branch": "",
    "x": -0.0,
-   "y": 140.0,
+   "y": 310.0,
    "max_rank": 3,
    "mods": [
     {
@@ -336,8 +336,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 70.0,
-   "y": 121.2,
+   "x": 155.0,
+   "y": 268.5,
    "max_rank": 3,
    "mods": [
     {
@@ -360,8 +360,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 121.2,
-   "y": 70.0,
+   "x": 268.5,
+   "y": 155.0,
    "max_rank": 3,
    "mods": [
     {
@@ -382,8 +382,8 @@
    "region": "",
    "classId": "warrior",
    "branch": "w_weapon",
-   "x": 198.0,
-   "y": -53.1,
+   "x": 431.9,
+   "y": -84.0,
    "max_rank": 3,
    "mods": [
     {
@@ -406,8 +406,8 @@
    "region": "",
    "classId": "",
    "branch": "w_weapon",
-   "x": 251.1,
-   "y": -67.3,
+   "x": 530.1,
+   "y": -103.0,
    "max_rank": 3,
    "mods": [
     {
@@ -428,8 +428,8 @@
    "region": "",
    "classId": "",
    "branch": "w_weapon",
-   "x": 304.3,
-   "y": -81.5,
+   "x": 628.2,
+   "y": -122.1,
    "max_rank": 2,
    "mods": [
     {
@@ -454,8 +454,8 @@
    "region": "",
    "classId": "",
    "branch": "w_weapon",
-   "x": 357.4,
-   "y": -95.8,
+   "x": 726.4,
+   "y": -141.2,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -474,8 +474,8 @@
    "region": "",
    "classId": "",
    "branch": "w_weapon",
-   "x": 410.5,
-   "y": -110.0,
+   "x": 824.6,
+   "y": -160.3,
    "max_rank": 3,
    "mods": [
     {
@@ -496,8 +496,8 @@
    "region": "",
    "classId": "",
    "branch": "w_weapon",
-   "x": 463.6,
-   "y": -124.2,
+   "x": 922.7,
+   "y": -179.4,
    "max_rank": 1,
    "mods": [
     {
@@ -521,8 +521,8 @@
    "region": "",
    "classId": "warrior",
    "branch": "w_guard",
-   "x": 177.5,
-   "y": -102.5,
+   "x": 381.1,
+   "y": -220.0,
    "max_rank": 3,
    "mods": [
     {
@@ -545,8 +545,8 @@
    "region": "",
    "classId": "",
    "branch": "w_guard",
-   "x": 225.2,
-   "y": -130.0,
+   "x": 467.7,
+   "y": -270.0,
    "max_rank": 3,
    "mods": [
     {
@@ -567,8 +567,8 @@
    "region": "",
    "classId": "",
    "branch": "w_guard",
-   "x": 272.8,
-   "y": -157.5,
+   "x": 554.3,
+   "y": -320.0,
    "max_rank": 2,
    "mods": [
     {
@@ -593,8 +593,8 @@
    "region": "",
    "classId": "",
    "branch": "w_guard",
-   "x": 320.4,
-   "y": -185.0,
+   "x": 640.9,
+   "y": -370.0,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -613,8 +613,8 @@
    "region": "",
    "classId": "",
    "branch": "w_guard",
-   "x": 368.1,
-   "y": -212.5,
+   "x": 727.5,
+   "y": -420.0,
    "max_rank": 3,
    "mods": [
     {
@@ -635,8 +635,8 @@
    "region": "",
    "classId": "",
    "branch": "w_guard",
-   "x": 415.7,
-   "y": -240.0,
+   "x": 814.1,
+   "y": -470.0,
    "max_rank": 1,
    "mods": [
     {
@@ -662,8 +662,8 @@
    "region": "",
    "classId": "warrior",
    "branch": "w_blood",
-   "x": 145.0,
-   "y": -145.0,
+   "x": 288.7,
+   "y": -332.1,
    "max_rank": 3,
    "mods": [
     {
@@ -686,8 +686,8 @@
    "region": "",
    "classId": "",
    "branch": "w_blood",
-   "x": 183.8,
-   "y": -183.8,
+   "x": 354.3,
+   "y": -407.5,
    "max_rank": 3,
    "mods": [
     {
@@ -708,8 +708,8 @@
    "region": "",
    "classId": "",
    "branch": "w_blood",
-   "x": 222.7,
-   "y": -222.7,
+   "x": 419.9,
+   "y": -483.0,
    "max_rank": 2,
    "mods": [
     {
@@ -734,8 +734,8 @@
    "region": "",
    "classId": "",
    "branch": "w_blood",
-   "x": 261.6,
-   "y": -261.6,
+   "x": 485.5,
+   "y": -558.5,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -754,8 +754,8 @@
    "region": "",
    "classId": "",
    "branch": "w_blood",
-   "x": 300.5,
-   "y": -300.5,
+   "x": 551.1,
+   "y": -634.0,
    "max_rank": 3,
    "mods": [
     {
@@ -776,8 +776,8 @@
    "region": "",
    "classId": "",
    "branch": "w_blood",
-   "x": 339.4,
-   "y": -339.4,
+   "x": 616.7,
+   "y": -709.4,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -798,8 +798,8 @@
    "region": "",
    "classId": "mage",
    "branch": "m_fire",
-   "x": -145.0,
-   "y": -145.0,
+   "x": -288.7,
+   "y": -332.1,
    "max_rank": 3,
    "mods": [
     {
@@ -822,8 +822,8 @@
    "region": "",
    "classId": "",
    "branch": "m_fire",
-   "x": -183.8,
-   "y": -183.8,
+   "x": -354.3,
+   "y": -407.5,
    "max_rank": 3,
    "mods": [
     {
@@ -844,8 +844,8 @@
    "region": "",
    "classId": "",
    "branch": "m_fire",
-   "x": -222.7,
-   "y": -222.7,
+   "x": -419.9,
+   "y": -483.0,
    "max_rank": 2,
    "mods": [
     {
@@ -870,8 +870,8 @@
    "region": "",
    "classId": "",
    "branch": "m_fire",
-   "x": -261.6,
-   "y": -261.6,
+   "x": -485.5,
+   "y": -558.5,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -890,8 +890,8 @@
    "region": "",
    "classId": "",
    "branch": "m_fire",
-   "x": -300.5,
-   "y": -300.5,
+   "x": -551.1,
+   "y": -634.0,
    "max_rank": 3,
    "mods": [
     {
@@ -912,8 +912,8 @@
    "region": "",
    "classId": "",
    "branch": "m_fire",
-   "x": -339.4,
-   "y": -339.4,
+   "x": -616.7,
+   "y": -709.4,
    "max_rank": 1,
    "mods": [
     {
@@ -937,8 +937,8 @@
    "region": "",
    "classId": "mage",
    "branch": "m_frost",
-   "x": -177.5,
-   "y": -102.5,
+   "x": -381.1,
+   "y": -220.0,
    "max_rank": 3,
    "mods": [
     {
@@ -961,8 +961,8 @@
    "region": "",
    "classId": "",
    "branch": "m_frost",
-   "x": -225.2,
-   "y": -130.0,
+   "x": -467.7,
+   "y": -270.0,
    "max_rank": 3,
    "mods": [
     {
@@ -983,8 +983,8 @@
    "region": "",
    "classId": "",
    "branch": "m_frost",
-   "x": -272.8,
-   "y": -157.5,
+   "x": -554.3,
+   "y": -320.0,
    "max_rank": 2,
    "mods": [
     {
@@ -1009,8 +1009,8 @@
    "region": "",
    "classId": "",
    "branch": "m_frost",
-   "x": -320.4,
-   "y": -185.0,
+   "x": -640.9,
+   "y": -370.0,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -1029,8 +1029,8 @@
    "region": "",
    "classId": "",
    "branch": "m_frost",
-   "x": -368.1,
-   "y": -212.5,
+   "x": -727.5,
+   "y": -420.0,
    "max_rank": 3,
    "mods": [
     {
@@ -1051,8 +1051,8 @@
    "region": "",
    "classId": "",
    "branch": "m_frost",
-   "x": -415.7,
-   "y": -240.0,
+   "x": -814.1,
+   "y": -470.0,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -1072,8 +1072,8 @@
    "region": "",
    "classId": "mage",
    "branch": "m_arcane",
-   "x": -198.0,
-   "y": -53.1,
+   "x": -431.9,
+   "y": -84.0,
    "max_rank": 3,
    "mods": [
     {
@@ -1096,8 +1096,8 @@
    "region": "",
    "classId": "",
    "branch": "m_arcane",
-   "x": -251.1,
-   "y": -67.3,
+   "x": -530.1,
+   "y": -103.0,
    "max_rank": 3,
    "mods": [
     {
@@ -1118,8 +1118,8 @@
    "region": "",
    "classId": "",
    "branch": "m_arcane",
-   "x": -304.3,
-   "y": -81.5,
+   "x": -628.2,
+   "y": -122.1,
    "max_rank": 2,
    "mods": [
     {
@@ -1144,8 +1144,8 @@
    "region": "",
    "classId": "",
    "branch": "m_arcane",
-   "x": -357.4,
-   "y": -95.8,
+   "x": -726.4,
+   "y": -141.2,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -1164,8 +1164,8 @@
    "region": "",
    "classId": "",
    "branch": "m_arcane",
-   "x": -410.5,
-   "y": -110.0,
+   "x": -824.6,
+   "y": -160.3,
    "max_rank": 3,
    "mods": [
     {
@@ -1186,8 +1186,8 @@
    "region": "",
    "classId": "",
    "branch": "m_arcane",
-   "x": -463.6,
-   "y": -124.2,
+   "x": -922.7,
+   "y": -179.4,
    "max_rank": 1,
    "mods": [
     {
@@ -1211,8 +1211,8 @@
    "region": "",
    "classId": "archer",
    "branch": "a_aim",
-   "x": -53.1,
-   "y": 198.0,
+   "x": -143.2,
+   "y": 416.0,
    "max_rank": 3,
    "mods": [
     {
@@ -1235,8 +1235,8 @@
    "region": "",
    "classId": "",
    "branch": "a_aim",
-   "x": -67.3,
-   "y": 251.1,
+   "x": -175.8,
+   "y": 510.6,
    "max_rank": 3,
    "mods": [
     {
@@ -1257,8 +1257,8 @@
    "region": "",
    "classId": "",
    "branch": "a_aim",
-   "x": -81.5,
-   "y": 304.3,
+   "x": -208.4,
+   "y": 605.1,
    "max_rank": 2,
    "mods": [
     {
@@ -1283,8 +1283,8 @@
    "region": "",
    "classId": "",
    "branch": "a_aim",
-   "x": -95.8,
-   "y": 357.4,
+   "x": -240.9,
+   "y": 699.7,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -1303,8 +1303,8 @@
    "region": "",
    "classId": "",
    "branch": "a_aim",
-   "x": -110.0,
-   "y": 410.5,
+   "x": -273.5,
+   "y": 794.2,
    "max_rank": 3,
    "mods": [
     {
@@ -1325,8 +1325,8 @@
    "region": "",
    "classId": "",
    "branch": "a_aim",
-   "x": -124.2,
-   "y": 463.6,
+   "x": -306.0,
+   "y": 888.8,
    "max_rank": 1,
    "mods": [
     {
@@ -1351,7 +1351,7 @@
    "classId": "archer",
    "branch": "a_volley",
    "x": -0.0,
-   "y": 205.0,
+   "y": 440.0,
    "max_rank": 3,
    "mods": [
     {
@@ -1375,7 +1375,7 @@
    "classId": "",
    "branch": "a_volley",
    "x": -0.0,
-   "y": 260.0,
+   "y": 540.0,
    "max_rank": 3,
    "mods": [
     {
@@ -1397,7 +1397,7 @@
    "classId": "",
    "branch": "a_volley",
    "x": -0.0,
-   "y": 315.0,
+   "y": 640.0,
    "max_rank": 2,
    "mods": [
     {
@@ -1419,7 +1419,7 @@
    "classId": "",
    "branch": "a_volley",
    "x": -0.0,
-   "y": 370.0,
+   "y": 740.0,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -1439,7 +1439,7 @@
    "classId": "",
    "branch": "a_volley",
    "x": -0.0,
-   "y": 425.0,
+   "y": 840.0,
    "max_rank": 3,
    "mods": [
     {
@@ -1461,7 +1461,7 @@
    "classId": "",
    "branch": "a_volley",
    "x": -0.0,
-   "y": 480.0,
+   "y": 940.0,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -1481,8 +1481,8 @@
    "region": "",
    "classId": "archer",
    "branch": "a_track",
-   "x": 53.1,
-   "y": 198.0,
+   "x": 143.2,
+   "y": 416.0,
    "max_rank": 3,
    "mods": [
     {
@@ -1505,8 +1505,8 @@
    "region": "",
    "classId": "",
    "branch": "a_track",
-   "x": 67.3,
-   "y": 251.1,
+   "x": 175.8,
+   "y": 510.6,
    "max_rank": 3,
    "mods": [
     {
@@ -1527,8 +1527,8 @@
    "region": "",
    "classId": "",
    "branch": "a_track",
-   "x": 81.5,
-   "y": 304.3,
+   "x": 208.4,
+   "y": 605.1,
    "max_rank": 2,
    "mods": [
     {
@@ -1553,8 +1553,8 @@
    "region": "",
    "classId": "",
    "branch": "a_track",
-   "x": 95.8,
-   "y": 357.4,
+   "x": 240.9,
+   "y": 699.7,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -1573,8 +1573,8 @@
    "region": "",
    "classId": "",
    "branch": "a_track",
-   "x": 110.0,
-   "y": 410.5,
+   "x": 273.5,
+   "y": 794.2,
    "max_rank": 3,
    "mods": [
     {
@@ -1595,8 +1595,8 @@
    "region": "",
    "classId": "",
    "branch": "a_track",
-   "x": 124.2,
-   "y": 463.6,
+   "x": 306.0,
+   "y": 888.8,
    "max_rank": 1,
    "mods": [
     {
@@ -1620,7 +1620,7 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 560.0,
+   "x": 1080.0,
    "y": -0.0,
    "max_rank": 2,
    "mods": [
@@ -1644,8 +1644,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 485.0,
-   "y": -280.0,
+   "x": 935.3,
+   "y": -540.0,
    "max_rank": 2,
    "mods": [
     {
@@ -1666,8 +1666,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 280.0,
-   "y": -485.0,
+   "x": 540.0,
+   "y": -935.3,
    "max_rank": 2,
    "mods": [
     {
@@ -1691,7 +1691,7 @@
    "classId": "",
    "branch": "",
    "x": 0.0,
-   "y": -560.0,
+   "y": -1080.0,
    "max_rank": 2,
    "mods": [
     {
@@ -1712,8 +1712,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -280.0,
-   "y": -485.0,
+   "x": -540.0,
+   "y": -935.3,
    "max_rank": 2,
    "mods": [
     {
@@ -1736,8 +1736,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -485.0,
-   "y": -280.0,
+   "x": -935.3,
+   "y": -540.0,
    "max_rank": 2,
    "mods": [
     {
@@ -1758,7 +1758,7 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -560.0,
+   "x": -1080.0,
    "y": -0.0,
    "max_rank": 2,
    "mods": [
@@ -1782,8 +1782,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -485.0,
-   "y": 280.0,
+   "x": -935.3,
+   "y": 540.0,
    "max_rank": 2,
    "mods": [
     {
@@ -1804,8 +1804,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -280.0,
-   "y": 485.0,
+   "x": -540.0,
+   "y": 935.3,
    "max_rank": 2,
    "mods": [
     {
@@ -1829,7 +1829,7 @@
    "classId": "",
    "branch": "",
    "x": -0.0,
-   "y": 560.0,
+   "y": 1080.0,
    "max_rank": 2,
    "mods": [
     {
@@ -1850,8 +1850,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 280.0,
-   "y": 485.0,
+   "x": 540.0,
+   "y": 935.3,
    "max_rank": 2,
    "mods": [
     {
@@ -1874,8 +1874,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 485.0,
-   "y": 280.0,
+   "x": 935.3,
+   "y": 540.0,
    "max_rank": 2,
    "mods": [
     {
@@ -1896,7 +1896,7 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 240.0,
+   "x": 470.0,
    "y": -0.0,
    "max_rank": 2,
    "mods": [
@@ -1918,7 +1918,7 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 340.0,
+   "x": 700.0,
    "y": -0.0,
    "max_rank": 2,
    "mods": [
@@ -1940,7 +1940,7 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 450.0,
+   "x": 920.0,
    "y": -0.0,
    "max_rank": 2,
    "mods": [
@@ -1962,8 +1962,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 120.0,
-   "y": -207.8,
+   "x": 235.0,
+   "y": -407.0,
    "max_rank": 2,
    "mods": [
     {
@@ -1984,8 +1984,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 170.0,
-   "y": -294.4,
+   "x": 350.0,
+   "y": -606.2,
    "max_rank": 2,
    "mods": [
     {
@@ -2006,8 +2006,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 225.0,
-   "y": -389.7,
+   "x": 460.0,
+   "y": -796.7,
    "max_rank": 2,
    "mods": [
     {
@@ -2028,8 +2028,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -120.0,
-   "y": -207.8,
+   "x": -235.0,
+   "y": -407.0,
    "max_rank": 2,
    "mods": [
     {
@@ -2050,8 +2050,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -170.0,
-   "y": -294.4,
+   "x": -350.0,
+   "y": -606.2,
    "max_rank": 2,
    "mods": [
     {
@@ -2072,8 +2072,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -225.0,
-   "y": -389.7,
+   "x": -460.0,
+   "y": -796.7,
    "max_rank": 2,
    "mods": [
     {
@@ -2094,7 +2094,7 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -240.0,
+   "x": -470.0,
    "y": -0.0,
    "max_rank": 2,
    "mods": [
@@ -2116,7 +2116,7 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -340.0,
+   "x": -700.0,
    "y": -0.0,
    "max_rank": 2,
    "mods": [
@@ -2138,7 +2138,7 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -450.0,
+   "x": -920.0,
    "y": -0.0,
    "max_rank": 2,
    "mods": [
@@ -2160,8 +2160,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -120.0,
-   "y": 207.8,
+   "x": -235.0,
+   "y": 407.0,
    "max_rank": 2,
    "mods": [
     {
@@ -2182,8 +2182,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -170.0,
-   "y": 294.4,
+   "x": -350.0,
+   "y": 606.2,
    "max_rank": 2,
    "mods": [
     {
@@ -2204,8 +2204,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -225.0,
-   "y": 389.7,
+   "x": -460.0,
+   "y": 796.7,
    "max_rank": 2,
    "mods": [
     {
@@ -2226,8 +2226,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 120.0,
-   "y": 207.8,
+   "x": 235.0,
+   "y": 407.0,
    "max_rank": 2,
    "mods": [
     {
@@ -2248,8 +2248,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 170.0,
-   "y": 294.4,
+   "x": 350.0,
+   "y": 606.2,
    "max_rank": 2,
    "mods": [
     {
@@ -2270,8 +2270,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 225.0,
-   "y": 389.7,
+   "x": 460.0,
+   "y": 796.7,
    "max_rank": 2,
    "mods": [
     {
@@ -2292,7 +2292,7 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 600.0,
+   "x": 1240.0,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -2314,7 +2314,7 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 655.0,
+   "x": 1333.5,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -2336,7 +2336,7 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 710.0,
+   "x": 1427.0,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -2360,7 +2360,7 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 765.0,
+   "x": 1520.5,
    "y": -0.0,
    "max_rank": 2,
    "mods": [
@@ -2386,7 +2386,7 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 820.0,
+   "x": 1614.0,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -2410,7 +2410,7 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 875.0,
+   "x": 1707.5,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -2434,7 +2434,7 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 930.0,
+   "x": 1801.0,
    "y": -0.0,
    "max_rank": 2,
    "mods": [
@@ -2460,7 +2460,7 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 985.0,
+   "x": 1894.5,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -2484,7 +2484,7 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 1040.0,
+   "x": 1988.0,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -2506,8 +2506,8 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 704.7,
-   "y": 86.5,
+   "x": 1419.2,
+   "y": 149.2,
    "max_rank": 3,
    "mods": [
     {
@@ -2528,8 +2528,8 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 688.9,
-   "y": 171.8,
+   "x": 1395.8,
+   "y": 296.7,
    "max_rank": 3,
    "mods": [
     {
@@ -2549,8 +2549,8 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 704.7,
-   "y": -86.5,
+   "x": 1419.2,
+   "y": -149.2,
    "max_rank": 3,
    "mods": [
     {
@@ -2571,8 +2571,8 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 688.9,
-   "y": -171.8,
+   "x": 1395.8,
+   "y": -296.7,
    "max_rank": 3,
    "mods": [
     {
@@ -2592,8 +2592,8 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 868.5,
-   "y": 106.6,
+   "x": 1698.1,
+   "y": 178.5,
    "max_rank": 3,
    "mods": [
     {
@@ -2614,8 +2614,8 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 849.0,
-   "y": 211.7,
+   "x": 1670.2,
+   "y": 355.0,
    "max_rank": 3,
    "mods": [
     {
@@ -2635,8 +2635,8 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 868.5,
-   "y": -106.6,
+   "x": 1698.1,
+   "y": -178.5,
    "max_rank": 3,
    "mods": [
     {
@@ -2657,8 +2657,8 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 849.0,
-   "y": -211.7,
+   "x": 1670.2,
+   "y": -355.0,
    "max_rank": 3,
    "mods": [
     {
@@ -2679,8 +2679,8 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 879.8,
-   "y": -269.0,
+   "x": 1726.6,
+   "y": -462.6,
    "max_rank": 2,
    "mods": [
     {
@@ -2704,7 +2704,7 @@
    "region": "berserker",
    "classId": "",
    "branch": "",
-   "x": 1100.0,
+   "x": 2090.0,
    "y": -0.0,
    "max_rank": 1,
    "mods": [
@@ -2738,8 +2738,8 @@
    "region": "berserker",
    "classId": "",
    "branch": "berserker_0",
-   "x": 1158.6,
-   "y": 162.8,
+   "x": 2203.5,
+   "y": 270.5,
    "max_rank": 3,
    "mods": [
     {
@@ -2762,8 +2762,8 @@
    "region": "berserker",
    "classId": "",
    "branch": "berserker_0",
-   "x": 1223.0,
-   "y": 171.9,
+   "x": 2322.6,
+   "y": 285.2,
    "max_rank": 2,
    "mods": [],
    "fx": {
@@ -2782,8 +2782,8 @@
    "region": "berserker",
    "classId": "",
    "branch": "berserker_0",
-   "x": 1292.3,
-   "y": 181.6,
+   "x": 2451.6,
+   "y": 301.0,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -2803,7 +2803,7 @@
    "region": "berserker",
    "classId": "",
    "branch": "berserker_1",
-   "x": 1170.0,
+   "x": 2220.0,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -2827,7 +2827,7 @@
    "region": "berserker",
    "classId": "",
    "branch": "berserker_1",
-   "x": 1235.0,
+   "x": 2340.0,
    "y": -0.0,
    "max_rank": 2,
    "mods": [
@@ -2850,7 +2850,7 @@
    "region": "berserker",
    "classId": "",
    "branch": "berserker_1",
-   "x": 1305.0,
+   "x": 2470.0,
    "y": -0.0,
    "max_rank": 1,
    "mods": [],
@@ -2871,8 +2871,8 @@
    "region": "berserker",
    "classId": "",
    "branch": "berserker_2",
-   "x": 1158.6,
-   "y": -162.8,
+   "x": 2203.5,
+   "y": -270.5,
    "max_rank": 3,
    "mods": [
     {
@@ -2895,8 +2895,8 @@
    "region": "berserker",
    "classId": "",
    "branch": "berserker_2",
-   "x": 1223.0,
-   "y": -171.9,
+   "x": 2322.6,
+   "y": -285.2,
    "max_rank": 2,
    "mods": [
     {
@@ -2918,8 +2918,8 @@
    "region": "berserker",
    "classId": "",
    "branch": "berserker_2",
-   "x": 1292.3,
-   "y": -181.6,
+   "x": 2451.6,
+   "y": -301.0,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -2939,8 +2939,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 300.0,
-   "y": -519.6,
+   "x": 620.0,
+   "y": -1073.9,
    "max_rank": 3,
    "mods": [
     {
@@ -2961,8 +2961,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 327.5,
-   "y": -567.2,
+   "x": 666.8,
+   "y": -1154.8,
    "max_rank": 3,
    "mods": [
     {
@@ -2983,8 +2983,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 355.0,
-   "y": -614.9,
+   "x": 713.5,
+   "y": -1235.8,
    "max_rank": 3,
    "mods": [
     {
@@ -3007,8 +3007,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 382.5,
-   "y": -662.5,
+   "x": 760.3,
+   "y": -1316.8,
    "max_rank": 2,
    "mods": [
     {
@@ -3033,8 +3033,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 410.0,
-   "y": -710.1,
+   "x": 807.0,
+   "y": -1397.8,
    "max_rank": 3,
    "mods": [
     {
@@ -3057,8 +3057,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 437.5,
-   "y": -757.8,
+   "x": 853.8,
+   "y": -1478.7,
    "max_rank": 3,
    "mods": [
     {
@@ -3081,8 +3081,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 465.0,
-   "y": -805.4,
+   "x": 900.5,
+   "y": -1559.7,
    "max_rank": 2,
    "mods": [
     {
@@ -3107,8 +3107,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 492.5,
-   "y": -853.0,
+   "x": 947.3,
+   "y": -1640.7,
    "max_rank": 3,
    "mods": [
     {
@@ -3131,8 +3131,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 520.0,
-   "y": -900.7,
+   "x": 994.0,
+   "y": -1721.7,
    "max_rank": 3,
    "mods": [
     {
@@ -3153,8 +3153,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 427.3,
-   "y": -567.0,
+   "x": 838.8,
+   "y": -1154.5,
    "max_rank": 3,
    "mods": [
     {
@@ -3175,8 +3175,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 493.2,
-   "y": -510.7,
+   "x": 954.8,
+   "y": -1060.5,
    "max_rank": 3,
    "mods": [
     {
@@ -3196,8 +3196,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 277.4,
-   "y": -653.6,
+   "x": 580.4,
+   "y": -1303.6,
    "max_rank": 3,
    "mods": [
     {
@@ -3218,8 +3218,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 195.7,
-   "y": -682.5,
+   "x": 441.0,
+   "y": -1357.2,
    "max_rank": 3,
    "mods": [
     {
@@ -3239,8 +3239,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 526.6,
-   "y": -698.8,
+   "x": 1003.6,
+   "y": -1381.4,
    "max_rank": 3,
    "mods": [
     {
@@ -3261,8 +3261,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 607.8,
-   "y": -629.4,
+   "x": 1142.5,
+   "y": -1268.9,
    "max_rank": 3,
    "mods": [
     {
@@ -3282,8 +3282,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 341.9,
-   "y": -805.4,
+   "x": 694.5,
+   "y": -1559.9,
    "max_rank": 3,
    "mods": [
     {
@@ -3304,8 +3304,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 241.2,
-   "y": -841.1,
+   "x": 527.6,
+   "y": -1623.9,
    "max_rank": 3,
    "mods": [
     {
@@ -3326,8 +3326,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 207.0,
-   "y": -896.4,
+   "x": 462.6,
+   "y": -1726.6,
    "max_rank": 2,
    "mods": [
     {
@@ -3351,8 +3351,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "",
-   "x": 550.0,
-   "y": -952.6,
+   "x": 1045.0,
+   "y": -1810.0,
    "max_rank": 1,
    "mods": [
     {
@@ -3385,8 +3385,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "paladin_0",
-   "x": 720.3,
-   "y": -922.0,
+   "x": 1336.0,
+   "y": -1773.0,
    "max_rank": 3,
    "mods": [
     {
@@ -3409,8 +3409,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "paladin_0",
-   "x": 760.3,
-   "y": -973.2,
+   "x": 1408.2,
+   "y": -1868.8,
    "max_rank": 2,
    "mods": [
     {
@@ -3434,8 +3434,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "paladin_0",
-   "x": 803.4,
-   "y": -1028.4,
+   "x": 1486.5,
+   "y": -1972.6,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -3455,8 +3455,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "paladin_1",
-   "x": 585.0,
-   "y": -1013.2,
+   "x": 1110.0,
+   "y": -1922.6,
    "max_rank": 3,
    "mods": [
     {
@@ -3479,8 +3479,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "paladin_1",
-   "x": 617.5,
-   "y": -1069.5,
+   "x": 1170.0,
+   "y": -2026.5,
    "max_rank": 2,
    "mods": [
     {
@@ -3502,8 +3502,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "paladin_1",
-   "x": 652.5,
-   "y": -1130.2,
+   "x": 1235.0,
+   "y": -2139.1,
    "max_rank": 1,
    "mods": [
     {
@@ -3526,8 +3526,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "paladin_2",
-   "x": 438.3,
-   "y": -1084.8,
+   "x": 867.4,
+   "y": -2043.5,
    "max_rank": 3,
    "mods": [
     {
@@ -3550,8 +3550,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "paladin_2",
-   "x": 462.6,
-   "y": -1145.1,
+   "x": 914.3,
+   "y": -2154.0,
    "max_rank": 2,
    "mods": [
     {
@@ -3573,8 +3573,8 @@
    "region": "paladin",
    "classId": "",
    "branch": "paladin_2",
-   "x": 488.9,
-   "y": -1210.0,
+   "x": 965.1,
+   "y": -2273.6,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -3594,8 +3594,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -300.0,
-   "y": -519.6,
+   "x": -620.0,
+   "y": -1073.9,
    "max_rank": 3,
    "mods": [
     {
@@ -3616,8 +3616,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -327.5,
-   "y": -567.2,
+   "x": -666.7,
+   "y": -1154.8,
    "max_rank": 3,
    "mods": [
     {
@@ -3638,8 +3638,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -355.0,
-   "y": -614.9,
+   "x": -713.5,
+   "y": -1235.8,
    "max_rank": 3,
    "mods": [
     {
@@ -3662,8 +3662,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -382.5,
-   "y": -662.5,
+   "x": -760.2,
+   "y": -1316.8,
    "max_rank": 2,
    "mods": [
     {
@@ -3688,8 +3688,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -410.0,
-   "y": -710.1,
+   "x": -807.0,
+   "y": -1397.8,
    "max_rank": 3,
    "mods": [
     {
@@ -3712,8 +3712,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -437.5,
-   "y": -757.8,
+   "x": -853.7,
+   "y": -1478.7,
    "max_rank": 3,
    "mods": [
     {
@@ -3736,8 +3736,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -465.0,
-   "y": -805.4,
+   "x": -900.5,
+   "y": -1559.7,
    "max_rank": 2,
    "mods": [
     {
@@ -3762,8 +3762,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -492.5,
-   "y": -853.0,
+   "x": -947.2,
+   "y": -1640.7,
    "max_rank": 3,
    "mods": [
     {
@@ -3786,8 +3786,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -520.0,
-   "y": -900.7,
+   "x": -994.0,
+   "y": -1721.7,
    "max_rank": 3,
    "mods": [
     {
@@ -3808,8 +3808,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -277.4,
-   "y": -653.6,
+   "x": -580.4,
+   "y": -1303.6,
    "max_rank": 3,
    "mods": [
     {
@@ -3830,8 +3830,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -195.7,
-   "y": -682.5,
+   "x": -441.0,
+   "y": -1357.2,
    "max_rank": 3,
    "mods": [
     {
@@ -3851,8 +3851,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -427.3,
-   "y": -567.0,
+   "x": -838.8,
+   "y": -1154.5,
    "max_rank": 3,
    "mods": [
     {
@@ -3873,8 +3873,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -493.2,
-   "y": -510.7,
+   "x": -954.8,
+   "y": -1060.5,
    "max_rank": 3,
    "mods": [
     {
@@ -3894,8 +3894,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -341.9,
-   "y": -805.4,
+   "x": -694.5,
+   "y": -1559.9,
    "max_rank": 3,
    "mods": [
     {
@@ -3916,8 +3916,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -241.2,
-   "y": -841.1,
+   "x": -527.6,
+   "y": -1623.9,
    "max_rank": 3,
    "mods": [
     {
@@ -3937,8 +3937,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -526.6,
-   "y": -698.8,
+   "x": -1003.6,
+   "y": -1381.4,
    "max_rank": 3,
    "mods": [
     {
@@ -3959,8 +3959,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -607.8,
-   "y": -629.4,
+   "x": -1142.5,
+   "y": -1268.9,
    "max_rank": 3,
    "mods": [
     {
@@ -3981,8 +3981,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -672.8,
-   "y": -627.4,
+   "x": -1264.0,
+   "y": -1264.0,
    "max_rank": 2,
    "mods": [
     {
@@ -4006,8 +4006,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "",
-   "x": -550.0,
-   "y": -952.6,
+   "x": -1045.0,
+   "y": -1810.0,
    "max_rank": 1,
    "mods": [
     {
@@ -4036,8 +4036,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "elementalist_0",
-   "x": -438.3,
-   "y": -1084.8,
+   "x": -867.4,
+   "y": -2043.5,
    "max_rank": 3,
    "mods": [
     {
@@ -4060,8 +4060,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "elementalist_0",
-   "x": -462.6,
-   "y": -1145.1,
+   "x": -914.3,
+   "y": -2154.0,
    "max_rank": 2,
    "mods": [
     {
@@ -4083,8 +4083,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "elementalist_0",
-   "x": -488.9,
-   "y": -1210.0,
+   "x": -965.1,
+   "y": -2273.6,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -4104,8 +4104,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "elementalist_1",
-   "x": -585.0,
-   "y": -1013.2,
+   "x": -1110.0,
+   "y": -1922.6,
    "max_rank": 3,
    "mods": [
     {
@@ -4128,8 +4128,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "elementalist_1",
-   "x": -617.5,
-   "y": -1069.5,
+   "x": -1170.0,
+   "y": -2026.5,
    "max_rank": 2,
    "mods": [
     {
@@ -4151,8 +4151,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "elementalist_1",
-   "x": -652.5,
-   "y": -1130.2,
+   "x": -1235.0,
+   "y": -2139.1,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -4173,8 +4173,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "elementalist_2",
-   "x": -720.3,
-   "y": -922.0,
+   "x": -1336.0,
+   "y": -1773.0,
    "max_rank": 3,
    "mods": [
     {
@@ -4197,8 +4197,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "elementalist_2",
-   "x": -760.3,
-   "y": -973.2,
+   "x": -1408.2,
+   "y": -1868.8,
    "max_rank": 2,
    "mods": [
     {
@@ -4220,8 +4220,8 @@
    "region": "elementalist",
    "classId": "",
    "branch": "elementalist_2",
-   "x": -803.4,
-   "y": -1028.4,
+   "x": -1486.5,
+   "y": -1972.6,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -4243,7 +4243,7 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -600.0,
+   "x": -1240.0,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -4265,7 +4265,7 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -655.0,
+   "x": -1333.5,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -4287,7 +4287,7 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -710.0,
+   "x": -1427.0,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -4311,7 +4311,7 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -765.0,
+   "x": -1520.5,
    "y": -0.0,
    "max_rank": 2,
    "mods": [
@@ -4337,7 +4337,7 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -820.0,
+   "x": -1614.0,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -4361,7 +4361,7 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -875.0,
+   "x": -1707.5,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -4385,7 +4385,7 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -930.0,
+   "x": -1801.0,
    "y": -0.0,
    "max_rank": 2,
    "mods": [
@@ -4411,7 +4411,7 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -985.0,
+   "x": -1894.5,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -4435,7 +4435,7 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -1040.0,
+   "x": -1988.0,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -4457,8 +4457,8 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -704.7,
-   "y": -86.5,
+   "x": -1419.2,
+   "y": -149.2,
    "max_rank": 3,
    "mods": [
     {
@@ -4479,8 +4479,8 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -688.9,
-   "y": -171.8,
+   "x": -1395.8,
+   "y": -296.7,
    "max_rank": 3,
    "mods": [
     {
@@ -4500,8 +4500,8 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -704.7,
-   "y": 86.5,
+   "x": -1419.2,
+   "y": 149.2,
    "max_rank": 3,
    "mods": [
     {
@@ -4522,8 +4522,8 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -688.9,
-   "y": 171.8,
+   "x": -1395.8,
+   "y": 296.7,
    "max_rank": 3,
    "mods": [
     {
@@ -4543,8 +4543,8 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -868.5,
-   "y": -106.6,
+   "x": -1698.1,
+   "y": -178.5,
    "max_rank": 3,
    "mods": [
     {
@@ -4565,8 +4565,8 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -849.0,
-   "y": -211.7,
+   "x": -1670.2,
+   "y": -355.0,
    "max_rank": 3,
    "mods": [
     {
@@ -4586,8 +4586,8 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -868.5,
-   "y": 106.6,
+   "x": -1698.1,
+   "y": 178.5,
    "max_rank": 3,
    "mods": [
     {
@@ -4608,8 +4608,8 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -849.0,
-   "y": 211.7,
+   "x": -1670.2,
+   "y": 355.0,
    "max_rank": 3,
    "mods": [
     {
@@ -4630,8 +4630,8 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -879.8,
-   "y": 269.0,
+   "x": -1726.6,
+   "y": 462.6,
    "max_rank": 2,
    "mods": [
     {
@@ -4655,7 +4655,7 @@
    "region": "necromancer",
    "classId": "",
    "branch": "",
-   "x": -1100.0,
+   "x": -2090.0,
    "y": -0.0,
    "max_rank": 1,
    "mods": [
@@ -4689,8 +4689,8 @@
    "region": "necromancer",
    "classId": "",
    "branch": "necromancer_0",
-   "x": -1158.6,
-   "y": -162.8,
+   "x": -2203.5,
+   "y": -270.5,
    "max_rank": 3,
    "mods": [
     {
@@ -4713,8 +4713,8 @@
    "region": "necromancer",
    "classId": "",
    "branch": "necromancer_0",
-   "x": -1223.0,
-   "y": -171.9,
+   "x": -2322.6,
+   "y": -285.2,
    "max_rank": 2,
    "mods": [
     {
@@ -4736,8 +4736,8 @@
    "region": "necromancer",
    "classId": "",
    "branch": "necromancer_0",
-   "x": -1292.3,
-   "y": -181.6,
+   "x": -2451.6,
+   "y": -301.0,
    "max_rank": 1,
    "mods": [
     {
@@ -4762,7 +4762,7 @@
    "region": "necromancer",
    "classId": "",
    "branch": "necromancer_1",
-   "x": -1170.0,
+   "x": -2220.0,
    "y": -0.0,
    "max_rank": 3,
    "mods": [
@@ -4786,7 +4786,7 @@
    "region": "necromancer",
    "classId": "",
    "branch": "necromancer_1",
-   "x": -1235.0,
+   "x": -2340.0,
    "y": -0.0,
    "max_rank": 2,
    "mods": [
@@ -4809,7 +4809,7 @@
    "region": "necromancer",
    "classId": "",
    "branch": "necromancer_1",
-   "x": -1305.0,
+   "x": -2470.0,
    "y": -0.0,
    "max_rank": 1,
    "mods": [],
@@ -4831,8 +4831,8 @@
    "region": "necromancer",
    "classId": "",
    "branch": "necromancer_2",
-   "x": -1158.6,
-   "y": 162.8,
+   "x": -2203.5,
+   "y": 270.5,
    "max_rank": 3,
    "mods": [
     {
@@ -4855,8 +4855,8 @@
    "region": "necromancer",
    "classId": "",
    "branch": "necromancer_2",
-   "x": -1223.0,
-   "y": 171.9,
+   "x": -2322.6,
+   "y": 285.2,
    "max_rank": 2,
    "mods": [
     {
@@ -4878,8 +4878,8 @@
    "region": "necromancer",
    "classId": "",
    "branch": "necromancer_2",
-   "x": -1292.3,
-   "y": 181.6,
+   "x": -2451.6,
+   "y": 301.0,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -4900,8 +4900,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -300.0,
-   "y": 519.6,
+   "x": -620.0,
+   "y": 1073.9,
    "max_rank": 3,
    "mods": [
     {
@@ -4922,8 +4922,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -327.5,
-   "y": 567.2,
+   "x": -666.8,
+   "y": 1154.8,
    "max_rank": 3,
    "mods": [
     {
@@ -4944,8 +4944,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -355.0,
-   "y": 614.9,
+   "x": -713.5,
+   "y": 1235.8,
    "max_rank": 3,
    "mods": [
     {
@@ -4968,8 +4968,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -382.5,
-   "y": 662.5,
+   "x": -760.3,
+   "y": 1316.8,
    "max_rank": 2,
    "mods": [
     {
@@ -4994,8 +4994,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -410.0,
-   "y": 710.1,
+   "x": -807.0,
+   "y": 1397.8,
    "max_rank": 3,
    "mods": [
     {
@@ -5018,8 +5018,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -437.5,
-   "y": 757.8,
+   "x": -853.8,
+   "y": 1478.7,
    "max_rank": 3,
    "mods": [
     {
@@ -5042,8 +5042,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -465.0,
-   "y": 805.4,
+   "x": -900.5,
+   "y": 1559.7,
    "max_rank": 2,
    "mods": [
     {
@@ -5068,8 +5068,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -492.5,
-   "y": 853.0,
+   "x": -947.3,
+   "y": 1640.7,
    "max_rank": 3,
    "mods": [
     {
@@ -5092,8 +5092,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -520.0,
-   "y": 900.7,
+   "x": -994.0,
+   "y": 1721.7,
    "max_rank": 3,
    "mods": [
     {
@@ -5114,8 +5114,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -427.3,
-   "y": 567.0,
+   "x": -838.8,
+   "y": 1154.5,
    "max_rank": 3,
    "mods": [
     {
@@ -5136,8 +5136,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -493.2,
-   "y": 510.7,
+   "x": -954.8,
+   "y": 1060.5,
    "max_rank": 3,
    "mods": [
     {
@@ -5157,8 +5157,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -277.4,
-   "y": 653.6,
+   "x": -580.4,
+   "y": 1303.6,
    "max_rank": 3,
    "mods": [
     {
@@ -5179,8 +5179,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -195.7,
-   "y": 682.5,
+   "x": -441.0,
+   "y": 1357.2,
    "max_rank": 3,
    "mods": [
     {
@@ -5200,8 +5200,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -526.6,
-   "y": 698.8,
+   "x": -1003.6,
+   "y": 1381.4,
    "max_rank": 3,
    "mods": [
     {
@@ -5222,8 +5222,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -607.8,
-   "y": 629.4,
+   "x": -1142.5,
+   "y": 1268.9,
    "max_rank": 3,
    "mods": [
     {
@@ -5243,8 +5243,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -341.9,
-   "y": 805.4,
+   "x": -694.5,
+   "y": 1559.9,
    "max_rank": 3,
    "mods": [
     {
@@ -5265,8 +5265,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -241.2,
-   "y": 841.1,
+   "x": -527.6,
+   "y": 1623.9,
    "max_rank": 3,
    "mods": [
     {
@@ -5287,8 +5287,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -207.0,
-   "y": 896.4,
+   "x": -462.6,
+   "y": 1726.6,
    "max_rank": 2,
    "mods": [
     {
@@ -5312,8 +5312,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "",
-   "x": -550.0,
-   "y": 952.6,
+   "x": -1045.0,
+   "y": 1810.0,
    "max_rank": 1,
    "mods": [
     {
@@ -5346,8 +5346,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "shadow_0",
-   "x": -720.3,
-   "y": 922.0,
+   "x": -1336.0,
+   "y": 1773.0,
    "max_rank": 3,
    "mods": [
     {
@@ -5370,8 +5370,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "shadow_0",
-   "x": -760.3,
-   "y": 973.2,
+   "x": -1408.2,
+   "y": 1868.8,
    "max_rank": 2,
    "mods": [
     {
@@ -5393,8 +5393,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "shadow_0",
-   "x": -803.4,
-   "y": 1028.4,
+   "x": -1486.5,
+   "y": 1972.6,
    "max_rank": 1,
    "mods": [
     {
@@ -5419,8 +5419,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "shadow_1",
-   "x": -585.0,
-   "y": 1013.2,
+   "x": -1110.0,
+   "y": 1922.6,
    "max_rank": 3,
    "mods": [
     {
@@ -5443,8 +5443,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "shadow_1",
-   "x": -617.5,
-   "y": 1069.5,
+   "x": -1170.0,
+   "y": 2026.5,
    "max_rank": 2,
    "mods": [
     {
@@ -5466,8 +5466,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "shadow_1",
-   "x": -652.5,
-   "y": 1130.2,
+   "x": -1235.0,
+   "y": 2139.1,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -5487,8 +5487,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "shadow_2",
-   "x": -438.3,
-   "y": 1084.8,
+   "x": -867.4,
+   "y": 2043.5,
    "max_rank": 3,
    "mods": [
     {
@@ -5511,8 +5511,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "shadow_2",
-   "x": -462.6,
-   "y": 1145.1,
+   "x": -914.3,
+   "y": 2154.0,
    "max_rank": 2,
    "mods": [
     {
@@ -5534,8 +5534,8 @@
    "region": "shadow",
    "classId": "",
    "branch": "shadow_2",
-   "x": -488.9,
-   "y": 1210.0,
+   "x": -965.1,
+   "y": 2273.6,
    "max_rank": 1,
    "mods": [],
    "fx": {
@@ -5555,8 +5555,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 300.0,
-   "y": 519.6,
+   "x": 620.0,
+   "y": 1073.9,
    "max_rank": 3,
    "mods": [
     {
@@ -5577,8 +5577,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 327.5,
-   "y": 567.2,
+   "x": 666.8,
+   "y": 1154.8,
    "max_rank": 3,
    "mods": [
     {
@@ -5599,8 +5599,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 355.0,
-   "y": 614.9,
+   "x": 713.5,
+   "y": 1235.8,
    "max_rank": 3,
    "mods": [
     {
@@ -5623,8 +5623,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 382.5,
-   "y": 662.5,
+   "x": 760.3,
+   "y": 1316.8,
    "max_rank": 2,
    "mods": [
     {
@@ -5649,8 +5649,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 410.0,
-   "y": 710.1,
+   "x": 807.0,
+   "y": 1397.8,
    "max_rank": 3,
    "mods": [
     {
@@ -5673,8 +5673,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 437.5,
-   "y": 757.8,
+   "x": 853.8,
+   "y": 1478.7,
    "max_rank": 3,
    "mods": [
     {
@@ -5697,8 +5697,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 465.0,
-   "y": 805.4,
+   "x": 900.5,
+   "y": 1559.7,
    "max_rank": 2,
    "mods": [
     {
@@ -5723,8 +5723,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 492.5,
-   "y": 853.0,
+   "x": 947.3,
+   "y": 1640.7,
    "max_rank": 3,
    "mods": [
     {
@@ -5747,8 +5747,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 520.0,
-   "y": 900.7,
+   "x": 994.0,
+   "y": 1721.7,
    "max_rank": 3,
    "mods": [
     {
@@ -5769,8 +5769,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 277.4,
-   "y": 653.6,
+   "x": 580.4,
+   "y": 1303.6,
    "max_rank": 3,
    "mods": [
     {
@@ -5791,8 +5791,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 195.7,
-   "y": 682.5,
+   "x": 441.0,
+   "y": 1357.2,
    "max_rank": 3,
    "mods": [
     {
@@ -5812,8 +5812,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 427.3,
-   "y": 567.0,
+   "x": 838.8,
+   "y": 1154.5,
    "max_rank": 3,
    "mods": [
     {
@@ -5834,8 +5834,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 493.2,
-   "y": 510.7,
+   "x": 954.8,
+   "y": 1060.5,
    "max_rank": 3,
    "mods": [
     {
@@ -5855,8 +5855,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 341.9,
-   "y": 805.4,
+   "x": 694.5,
+   "y": 1559.9,
    "max_rank": 3,
    "mods": [
     {
@@ -5877,8 +5877,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 241.2,
-   "y": 841.1,
+   "x": 527.6,
+   "y": 1623.9,
    "max_rank": 3,
    "mods": [
     {
@@ -5898,8 +5898,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 526.6,
-   "y": 698.8,
+   "x": 1003.6,
+   "y": 1381.4,
    "max_rank": 3,
    "mods": [
     {
@@ -5920,8 +5920,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 607.8,
-   "y": 629.4,
+   "x": 1142.5,
+   "y": 1268.9,
    "max_rank": 3,
    "mods": [
     {
@@ -5942,8 +5942,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 672.8,
-   "y": 627.4,
+   "x": 1264.0,
+   "y": 1264.0,
    "max_rank": 2,
    "mods": [
     {
@@ -5967,8 +5967,8 @@
    "region": "druid",
    "classId": "",
    "branch": "",
-   "x": 550.0,
-   "y": 952.6,
+   "x": 1045.0,
+   "y": 1810.0,
    "max_rank": 1,
    "mods": [
     {
@@ -6001,8 +6001,8 @@
    "region": "druid",
    "classId": "",
    "branch": "druid_0",
-   "x": 438.3,
-   "y": 1084.8,
+   "x": 867.4,
+   "y": 2043.5,
    "max_rank": 3,
    "mods": [
     {
@@ -6025,8 +6025,8 @@
    "region": "druid",
    "classId": "",
    "branch": "druid_0",
-   "x": 462.6,
-   "y": 1145.1,
+   "x": 914.3,
+   "y": 2154.0,
    "max_rank": 2,
    "mods": [
     {
@@ -6048,8 +6048,8 @@
    "region": "druid",
    "classId": "",
    "branch": "druid_0",
-   "x": 488.9,
-   "y": 1210.0,
+   "x": 965.1,
+   "y": 2273.6,
    "max_rank": 1,
    "mods": [
     {
@@ -6076,8 +6076,8 @@
    "region": "druid",
    "classId": "",
    "branch": "druid_1",
-   "x": 585.0,
-   "y": 1013.2,
+   "x": 1110.0,
+   "y": 1922.6,
    "max_rank": 3,
    "mods": [
     {
@@ -6100,8 +6100,8 @@
    "region": "druid",
    "classId": "",
    "branch": "druid_1",
-   "x": 617.5,
-   "y": 1069.5,
+   "x": 1170.0,
+   "y": 2026.5,
    "max_rank": 2,
    "mods": [
     {
@@ -6123,8 +6123,8 @@
    "region": "druid",
    "classId": "",
    "branch": "druid_1",
-   "x": 652.5,
-   "y": 1130.2,
+   "x": 1235.0,
+   "y": 2139.1,
    "max_rank": 1,
    "mods": [
     {
@@ -6149,8 +6149,8 @@
    "region": "druid",
    "classId": "",
    "branch": "druid_2",
-   "x": 720.3,
-   "y": 922.0,
+   "x": 1336.0,
+   "y": 1773.0,
    "max_rank": 3,
    "mods": [
     {
@@ -6173,8 +6173,8 @@
    "region": "druid",
    "classId": "",
    "branch": "druid_2",
-   "x": 760.3,
-   "y": 973.2,
+   "x": 1408.2,
+   "y": 1868.8,
    "max_rank": 2,
    "mods": [
     {
@@ -6196,8 +6196,8 @@
    "region": "druid",
    "classId": "",
    "branch": "druid_2",
-   "x": 803.4,
-   "y": 1028.4,
+   "x": 1486.5,
+   "y": 1972.6,
    "max_rank": 1,
    "mods": [
     {
@@ -6222,8 +6222,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 680.4,
-   "y": -392.8,
+   "x": 1341.6,
+   "y": -774.5,
    "max_rank": 2,
    "mods": [
     {
@@ -6244,8 +6244,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 831.6,
-   "y": -480.1,
+   "x": 1598.6,
+   "y": -923.0,
    "max_rank": 2,
    "mods": [
     {
@@ -6267,7 +6267,7 @@
    "classId": "",
    "branch": "",
    "x": 0.0,
-   "y": -785.7,
+   "y": -1549.1,
    "max_rank": 2,
    "mods": [
     {
@@ -6289,7 +6289,7 @@
    "classId": "",
    "branch": "",
    "x": 0.0,
-   "y": -960.3,
+   "y": -1845.9,
    "max_rank": 2,
    "mods": [
     {
@@ -6310,8 +6310,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -680.4,
-   "y": -392.8,
+   "x": -1341.6,
+   "y": -774.5,
    "max_rank": 2,
    "mods": [
     {
@@ -6332,8 +6332,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -831.6,
-   "y": -480.1,
+   "x": -1598.6,
+   "y": -923.0,
    "max_rank": 2,
    "mods": [
     {
@@ -6354,8 +6354,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -680.4,
-   "y": 392.9,
+   "x": -1341.6,
+   "y": 774.5,
    "max_rank": 2,
    "mods": [
     {
@@ -6376,8 +6376,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": -831.6,
-   "y": 480.2,
+   "x": -1598.6,
+   "y": 923.0,
    "max_rank": 2,
    "mods": [
     {
@@ -6399,7 +6399,7 @@
    "classId": "",
    "branch": "",
    "x": -0.0,
-   "y": 785.7,
+   "y": 1549.1,
    "max_rank": 2,
    "mods": [
     {
@@ -6421,7 +6421,7 @@
    "classId": "",
    "branch": "",
    "x": -0.0,
-   "y": 960.3,
+   "y": 1845.9,
    "max_rank": 2,
    "mods": [
     {
@@ -6442,8 +6442,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 680.4,
-   "y": 392.9,
+   "x": 1341.6,
+   "y": 774.5,
    "max_rank": 2,
    "mods": [
     {
@@ -6464,8 +6464,8 @@
    "region": "",
    "classId": "",
    "branch": "",
-   "x": 831.6,
-   "y": 480.2,
+   "x": 1598.6,
+   "y": 923.0,
    "max_rank": 2,
    "mods": [
     {

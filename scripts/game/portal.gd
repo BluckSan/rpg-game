@@ -5,6 +5,8 @@ class_name Portal
 var zone
 var target_zone := "global"
 var arrive := ""
+var collect_loot := false   # портал возврата: подобрать всю добычу перед переходом
+var used := 0
 var _cd := 0.0
 
 func _process(delta: float) -> void:
@@ -23,5 +25,9 @@ func _process(delta: float) -> void:
 	if why != "":
 		Game.toast(why, 3.0)
 		return
+	used += 1
+	if collect_loot:
+		var n := Loot.collect_all(zone)
+		if n > 0: Game.toast("Добыча собрана: %d" % n, 2.0)
 	zone.save()
 	Game.travel(target_zone, arrive)

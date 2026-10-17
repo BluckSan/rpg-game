@@ -135,6 +135,43 @@ func _wall_fight(d) -> void:
 		check(best < 3.5, "враг из зала рычагов обошёл стену через проём и догнал героя (мин. %.1f м)" % best)
 		for e in d.enemies: if is_instance_valid(e): e.set_process(true)
 
+## Убить Хранителя → портал возврата появляется → дойти до него по навмешу → долина у входа в склеп, добыча собрана
+func _boss_return(d, cls: String, run: int) -> void:
+	var b = d.builder
+	var p: Player = d.player
+	var boss = b.boss_enemy()
+	check(boss != null and b.return_portal == null, "[%s] забег %d: Хранитель жив, портала возврата ещё нет" % [cls, run])
+	if boss == null: return
+	var inv0: int = p.data["inventory"].size()
+	var gold0: int = int(p.data["gold"])
+	p.teleport(b.arena_center + Vector3(0, 0.1, -10)); await w(0.3)
+	var g := 0
+	while is_instance_valid(boss) and boss.alive and g < 60:
+		if boss.brain: boss.brain.invulnerable = false
+		boss.take_damage(boss.max_hp * 2.0, false)
+		await get_tree().physics_frame; g += 1
+	await w(1.2)
+	check(b.return_portal != null and is_instance_valid(b.return_portal), "[%s] забег %d: после победы на арене появился портал возврата" % [cls, run])
+	if b.return_portal == null: return
+	check("портал" in d.hud.objective.text.to_lower(), "[%s] подсказка на экране: %s" % [cls, d.hud.objective.text])
+	var map: RID = b.nav_map()
+	check(reachable(map, p.global_position, b.return_point, 1.0), "[%s] портал возврата достижим по навмешу" % cls)
+	await walk(d, map, b.return_point, 0.3, "портал возврата")
+	g = 0
+	while get_tree().current_scene == d and g < 300:
+		await get_tree().physics_frame; g += 1
+	await w(1.5)
+	var s = get_tree().current_scene
+	var ok: bool = s != d and s.has_method("is_dungeon") and not s.is_dungeon()
+	check(ok, "[%s] забег %d: портал вернул в долину" % [cls, run])
+	if not ok: return
+	var pl: Player = s.player
+	check(U.flat_dist(pl.global_position, s.builder.dungeon_gate_point) < 8.0, "[%s] герой у входа в склеп: %s" % [cls, str(pl.global_position)])
+	var saved = Game.load_file(Game.SAVE_DIR + "/char_%s.json" % pl.data["id"])
+	var inv_ok: bool = pl.data["inventory"].size() > inv0 or int(pl.data["gold"]) > gold0
+	check(inv_ok and saved != null and (saved["inventory"] as Array).size() == pl.data["inventory"].size(), "[%s] добыча собрана и сохранена (предметы %d → %d, золото %d → %d)" % [cls, inv0, pl.data["inventory"].size(), gold0, int(pl.data["gold"])])
+	check(DB.zone_flag(pl.data, "dungeon", "boss_warden_killed"), "[%s] победа над Хранителем сохранена" % cls)
+
 func _class_run(cls: String) -> void:
 	for f in Game.list_characters(): if str(f.get("name", "")) == "Навигатор": Game.delete_character(f["id"])
 	var rng := RandomNumberGenerator.new(); rng.seed = 11
@@ -151,8 +188,8 @@ func _class_run(cls: String) -> void:
 	var p: Player = d.player
 	p.god_mode = true
 	if cls == "warrior": await _wall_fight(d)
-	for e in d.enemies.duplicate(): if is_instance_valid(e): e.queue_free()
-	d.enemies.clear()
+	for e in d.enemies.duplicate():
+		if is_instance_valid(e) and e.kind != "warden": e.queue_free(); d.enemies.erase(e)
 	await w(0.2)
 	var b = d.builder
 	var map := await bake(d)
@@ -181,14 +218,30 @@ func _class_run(cls: String) -> void:
 	check(reachable(map, p.global_position, b.arena_center), "[%s] навмеш: после рычагов путь до арены" % cls)
 	check(await walk(d, map, Vector3(0, 0, 88), 0.8, "огненный коридор"), "[%s] агент прошёл огненный коридор" % cls)
 	check(await walk(d, map, b.arena_center + Vector3(0, 0, -5), 1.0, "арена"), "[%s] агент дошёл до центра арены" % cls)
-	check(await walk(d, map, Vector3(0, 0, 3), 1.0, "обратно ко входу"), "[%s] агент вернулся ко входу" % cls)
-	await walk(d, map, b.exit_point, 0.2, "портал выхода")
-	var g := 0
-	while get_tree().current_scene == d and g < 200:
-		p.force_move = Vector3(0, 0, -1)
-		await get_tree().physics_frame; g += 1
-	await w(1.5)
-	var s = get_tree().current_scene
-	check(s != d and s.has_method("is_dungeon") and not s.is_dungeon(), "[%s] выход через портал → лагерь" % cls)
+	if cls == "archer":
+		# выход через портал у входа (босс жив) — проверка обратного пути
+		var boss0 = b.boss_enemy()
+		if boss0: boss0.set_process(false)
+		check(await walk(d, map, Vector3(0, 0, 3), 1.0, "обратно ко входу"), "[%s] агент вернулся ко входу" % cls)
+		await walk(d, map, b.exit_point, 0.2, "портал выхода")
+		var g := 0
+		while get_tree().current_scene == d and g < 200:
+			p.force_move = Vector3(0, 0, -1)
+			await get_tree().physics_frame; g += 1
+		await w(1.5)
+		var s0 = get_tree().current_scene
+		check(s0 != d and s0.has_method("is_dungeon") and not s0.is_dungeon(), "[%s] выход через портал → лагерь" % cls)
+	else:
+		await _boss_return(d, cls, 1)
+		if cls == "warrior":
+			# повторный забег: снова в склеп, босс снова жив, снова портал
+			Game.travel("dungeon"); await w(2.0)
+			var d2 = get_tree().current_scene
+			check(d2.is_dungeon() and d2.builder.boss_enemy() != null and d2.builder.return_portal == null, "[%s] повторный забег: Хранитель снова на месте, портала нет" % cls)
+			if d2.is_dungeon():
+				d2.player.god_mode = true
+				await bake(d2)
+				d2.player.teleport(Vector3(0, 0.1, 88)); await w(0.5)
+				await _boss_return(d2, cls, 2)
 	Game.to_menu(); await w(1.0)
 	Game.delete_character(c["id"])

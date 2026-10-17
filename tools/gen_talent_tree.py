@@ -128,12 +128,12 @@ REGIONS = [
 # --- центр ---
 starts = {}
 for cid, ang, nm in CLASSES:
-    x, y = pol(70, ang)
+    x, y = pol(160, ang)
     starts[cid] = add(f"Начало: {nm}", "start", x, y, "", [], cid)
 ring = {}
 for i in range(12):
     ang = i * 30
-    x, y = pol(140, ang)
+    x, y = pol(310, ang)
     ring[ang] = add("Основы", "minor", x, y, "", [random.choice([("hp", 6), ("mp", 6), ("dmg%", 2), ("armor", 4)])], max_rank=3)
 for i in range(12):
     link(ring[i * 30], ring[((i + 1) % 12) * 30])
@@ -143,7 +143,7 @@ for cid, ang, nm in CLASSES:
 # --- ветви классов ---
 for cid, ang, nm in CLASSES:
     for bi, (bid, bname, pool, notable, mod, key) in enumerate(SPECS[cid]):
-        a = ang + (bi - 1) * 15
+        a = ang + (bi - 1) * 19
         prev = ring[ang]
         chain_def = [
             ("minor", pool[0][2], [(pool[0][0], pool[0][1])], {}, 3, ""),
@@ -154,7 +154,7 @@ for cid, ang, nm in CLASSES:
             ("keystone", key[0], key[1], key[2], 1, key[3]),
         ]
         for k, (typ, name, mods, fx, mr, desc) in enumerate(chain_def):
-            x, y = pol(205 + k * 55, a)
+            x, y = pol(440 + k * 100, a)
             nid = add(name, typ, x, y, "", mods, cid if k == 0 else "", bid, mr, fx, "", 6 if typ == "keystone" else 0, False, desc)
             link(prev, nid); prev = nid
         # подпись ветви хранится на первом узле
@@ -162,7 +162,7 @@ for cid, ang, nm in CLASSES:
         nodes[prev - 5]["branch_class"] = cid
 
 # --- спицы и внешнее кольцо ---
-OUT_R = 560
+OUT_R = 1080
 outer = {}
 for i in range(12):
     ang = i * 30
@@ -172,20 +172,21 @@ for i in range(12):
     link(outer[i * 30], outer[((i + 1) % 12) * 30])
 for ang in range(0, 360, 60):
     prev = ring[ang]
-    for r in (240, 340, 450):
+    for r in (470, 700, 920):
         x, y = pol(r, ang)
         nid = add("Тропа", "minor", x, y, "", [random.choice([("hp", 6), ("dmg%", 2), ("mp", 6), ("armor", 5)])], max_rank=2)
         link(prev, nid); prev = nid
     link(prev, outer[ang])
 
 # --- регионы превращения ---
-OFF = 400
+OFF = 900
+RS = 1.7   # шаг колец регионов
 chains = {}
 for rid, ang, rname, color, pool, notables, key, asc_branches in REGIONS:
     chain = []
     radii = [200, 255, 310, 365, 420, 475, 530, 585, 640]
     for i, r in enumerate(radii):
-        x, y = pol(r + OFF, ang)
+        x, y = pol(r * RS + OFF, ang)
         if i in (3, 6):
             nm, mods = notables[0 if i == 3 else 1]
             nid = add(nm, "notable", x, y, rid, mods, max_rank=2)
@@ -199,32 +200,32 @@ for rid, ang, rname, color, pool, notables, key, asc_branches in REGIONS:
         for side in (-1, 1):
             prev = chain[base_i]
             for k in range(1, 3):
-                x, y = pol(side_r + OFF, ang + side * k * 7)
+                x, y = pol(side_r * RS + OFF, ang + side * k * 6)
                 s, v, nm = pool[(k + base_i + side) % len(pool)]
                 nid = add(nm, "minor", x, y, rid, [(s, v)], max_rank=3)
                 link(prev, nid); prev = nid
             if base_i == 5 and side == 1:
-                x, y = pol(side_r + OFF + 45, ang + side * 17)
+                x, y = pol(side_r * RS + OFF + 80, ang + side * 15)
                 nm, mods = notables[2]
                 nid = add(nm, "notable", x, y, rid, mods, max_rank=2); link(prev, nid)
-    x, y = pol(700 + OFF, ang)
+    x, y = pol(700 * RS + OFF, ang)
     gate = add(key[0], "keystone", x, y, rid, key[1], gate=True, desc="Ворота превращения: открывает путь «%s»" % rname)
     link(chain[-1], gate)
     chains[rid] = chain
     # ветви пути (только для выбравших это превращение)
     for bi, (bname, minor, notable, keyst) in enumerate(asc_branches):
-        a = ang + (bi - 1) * 8
+        a = ang + (bi - 1) * 7
         prev = gate
         bid = f"{rid}_{bi}"
-        x, y = pol(1170, a)
+        x, y = pol(700 * RS + OFF + 130, a)
         n1 = add(bname, "minor", x, y, rid, [minor], "", bid, 3, {}, rid)
         nodes[n1]["branch_name"] = bname
-        x, y = pol(1235, a)
+        x, y = pol(700 * RS + OFF + 250, a)
         nm_mods = [m for m in notable[1] if m[1] != 0]
         n2 = add(notable[0], "notable", x, y, rid, nm_mods, "", bid, 2, notable[2], rid, desc="")
         stat_mods = [(k, v) for k, v in keyst[1].items() if k in ("critdmg%", "hp%", "ms%", "regen", "dr%")]
         fx = {k: v for k, v in keyst[1].items() if k not in ("critdmg%", "hp%", "ms%", "regen", "dr%")}
-        x, y = pol(1305, a)
+        x, y = pol(700 * RS + OFF + 380, a)
         n3 = add(keyst[0], "keystone", x, y, rid, stat_mods, "", bid, 1, fx, rid, 4, desc=keyst[2])
         link(gate, n1); link(n1, n2); link(n2, n3)
 
@@ -234,7 +235,7 @@ for i, rid in enumerate(names):
     nxt = names[(i + 1) % len(names)]
     a = REGIONS[i][1]; mid = a + 30
     for idx, r in ((4, 410), (7, 590)):
-        x, y = pol((r + OFF) * 0.97, mid)
+        x, y = pol((r * RS + OFF) * 0.97, mid)
         nid = add("Перекрёсток", "minor", x, y, "", [random.choice([("hp", 8), ("dmg%", 3), ("mp", 8), ("ms%", 2), ("armor", 6)])], max_rank=2)
         link(chains[rid][idx], nid); link(chains[nxt][idx], nid)
 

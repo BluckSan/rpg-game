@@ -93,6 +93,12 @@ func _process(delta: float) -> void:
 		global_position += to.normalized() * minf(dist, delta * (4.0 + (4.5 - dist) * 3.0))
 		global_position.y = lerpf(global_position.y, p.global_position.y, minf(1.0, delta * 6.0))
 		return
+	collect()
+
+## Подобрать (в инвентарь/золото/зелья). false — инвентарь полон
+func collect() -> bool:
+	var p = zone.player
+	if p == null: return false
 	var d: Dictionary = p.data
 	match type:
 		"gold":
@@ -105,8 +111,16 @@ func _process(delta: float) -> void:
 			if d["inventory"].size() >= DB.INVENTORY_SIZE:
 				Game.toast("Инвентарь полон!", 1.5)
 				age = -2.0
-				return
+				return false
 			d["inventory"].append(item)
 			zone.hud.pickup(item.name, DB.RARITY_COLORS[int(item.rarity)], UIK.item_icon(item, d["class"]))
 	Game.sfx("pickup")
 	queue_free()
+	return true
+
+## Собрать всю лежащую добычу зоны (портал возврата — ничего не теряется). Возвращает число подобранного
+static func collect_all(z) -> int:
+	var n := 0
+	for c in z.fx_root.get_children():
+		if c is Loot and not c.is_queued_for_deletion() and c.collect(): n += 1
+	return n

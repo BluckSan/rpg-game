@@ -12,7 +12,7 @@ var info_body: RichTextLabel
 var learn_btn: Button
 var asc_list: VBoxContainer
 var selected := -1
-var zoom := 0.6
+var zoom := 0.5
 var offset := Vector2.ZERO   # смещение центра дерева относительно центра области
 var font: Font
 var _touches := {}
@@ -27,6 +27,8 @@ var filter_btns := {}
 var matches: Array = []
 var _match_i := -1
 var _reset_armed := 0.0
+const ZOOM_MIN := 0.12
+const ZOOM_MAX := 1.8
 const FILTERS := [["all", "Все"], ["avail", "Можно"], ["key", "Ключевые"], ["fx", "Пассивы"], ["has", "Изучено"]]
 
 func setup(z) -> void:
@@ -179,9 +181,7 @@ func _draw_tree() -> void:
 			var rc := _region_color(n["region"] if n["region"] != "" else m["region"])
 			var col := rc.lerp(Color.WHITE, 0.3) if (ha and hb) else (rc.darkened(0.5) if (ha or hb) else Color(0.2, 0.2, 0.24))
 			canvas.draw_line(_to_screen(n["pos"]), _to_screen(m["pos"]), col, maxf(2.0, 6.0 * zoom), true)
-	var labels := []
 	var filt := _filtering()
-	var fs_r := maxi(13, int(18 * zoom / 0.6))
 	for id in DB.tree_order:
 		var n: Dictionary = DB.tree_nodes[id]
 		var p := _to_screen(n["pos"])
@@ -209,44 +209,139 @@ func _draw_tree() -> void:
 			canvas.draw_circle(p, r, fill)
 		if has and avail and mr > 1:   # можно поднять ранг
 			canvas.draw_arc(p, r + 9 * zoom, 0, TAU, 24, Color(0.5, 1, 0.5, 0.8), 2.0)
-		if mr > 1 and zoom >= 0.45 and (not filt or matches.has(id)):
+		if mr > 1:
+			# ранг: дуга-прогресс вокруг узла всегда; число — только если помещается внутри узла
+			var dim := filt and not matches.has(id)
+			canvas.draw_arc(p, r + 2.0 * zoom + 1.5, -PI / 2, -PI / 2 + TAU, 28, Color(0, 0, 0, 0.5), maxf(2.0, 3.0 * zoom))
+			if rk > 0: canvas.draw_arc(p, r + 2.0 * zoom + 1.5, -PI / 2, -PI / 2 + TAU * float(rk) / mr, 28, Color(1, 0.9, 0.45, 0.25 if dim else 1.0), maxf(2.0, 3.0 * zoom))
 			var rt := "%d/%d" % [rk, mr]
-			var rw := font.get_string_size(rt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs_r).x
-			var rp := p + Vector2(-rw / 2, fs_r * 0.36)
-			canvas.draw_string_outline(font, rp, rt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs_r, 4, Color.BLACK)
-			canvas.draw_string(font, rp, rt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs_r, Color(1, 1, 0.85) if rk > 0 else Color(0.75, 0.75, 0.75))
-		if n["branch_name"] != "" and zoom >= 0.35:
-			var bt: String = n["branch_name"]
-			var bfs := maxi(14, int(19 * zoom / 0.6))
-			var bw := font.get_string_size(bt, HORIZONTAL_ALIGNMENT_LEFT, -1, bfs).x
-			var dirv: Vector2 = (n["pos"] as Vector2).normalized()
-			labels.append([p - dirv * (r + bfs * 1.2) + Vector2(-bw / 2, bfs * 0.35), bt, bfs])
-		if n["type"] == "keystone" or n["type"] == "start":
-			var t: String = DB.CLASSES[n["class"]].name if n["type"] == "start" else n["name"]
-			var fs := maxi(14, int(22 * zoom / 0.6))
-			var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-			var off := Vector2(0, r + 10 + fs)
-			if n["type"] == "start":
-				# стартовые узлы стоят тесно в центре — подпись выносим наружу от центра дерева
-				var nd: Vector2 = (n["pos"] as Vector2).normalized()
-				off = nd * (r + fs * 1.6) + Vector2(0, fs * 0.35)
-			var tp := p + Vector2(-w / 2, 0) + off
-			labels.append([tp, t, fs])
-	# подписи рисуем поверх всех узлов
-	for lb in labels:
-		canvas.draw_string_outline(font, lb[0], lb[1], HORIZONTAL_ALIGNMENT_LEFT, -1, lb[2], 6, Color.BLACK)
-		canvas.draw_string(font, lb[0], lb[1], HORIZONTAL_ALIGNMENT_LEFT, -1, lb[2], Color.WHITE)
+			var rfs := clampi(int(r * 0.78), 8, 24)
+			var rw := font.get_string_size(rt, HORIZONTAL_ALIGNMENT_LEFT, -1, rfs).x
+			if rw <= r * 1.8 - 2 and rfs >= 10 and not dim:
+				var rp := p + Vector2(-rw / 2, rfs * 0.36)
+				canvas.draw_string_outline(font, rp, rt, HORIZONTAL_ALIGNMENT_LEFT, -1, rfs, 3, Color.BLACK)
+				canvas.draw_string(font, rp, rt, HORIZONTAL_ALIGNMENT_LEFT, -1, rfs, Color(1, 1, 0.85) if rk > 0 else Color(0.75, 0.75, 0.75))
+	# подписи: масштабируются с зумом, раскладываются без наложений (смещение / выноска)
+	for lb in layout_labels():
+		if lb.leader:
+			canvas.draw_line(lb.anchor, lb.rect.get_center(), Color(1, 1, 1, 0.35), 1.5, true)
+		var c: Color = lb.color
+		if lb.kind != "region":
+			canvas.draw_string_outline(font, lb.pos, lb.text, HORIZONTAL_ALIGNMENT_LEFT, -1, lb.fs, maxi(3, lb.fs / 4), Color.BLACK)
+		canvas.draw_string(font, lb.pos, lb.text, HORIZONTAL_ALIGNMENT_LEFT, -1, lb.fs, c)
+
+## Размер шрифта подписи: растёт с зумом, но в читаемых пределах
+func label_fs(base: float) -> int:
+	return clampi(int(base * zoom), 13, 34)
+
+## Какие подписи видны на этом зуме: далеко — регионы и классы, ближе — ключевые и ветви, ещё ближе — особые и модификаторы, вплотную — все
+func _label_tier(n: Dictionary) -> int:
+	match n["type"]:
+		"start": return 0
+		"keystone": return 1
+		"notable", "mod": return 2
+	return 3
+
+func _tier_visible(t: int) -> bool:
+	match t:
+		0: return true
+		1: return zoom >= 0.32
+		2: return zoom >= 0.62
+	return zoom >= 1.15
+
+## Раскладка подписей: кандидаты по приоритету; для каждой — позиции вокруг узла (снизу, сверху, справа, слева,
+## наружу по радиусу, затем дальше с выноской). Подпись не ставится поверх уже поставленной; если места нет — скрыта.
+func layout_labels() -> Array:
+	var out: Array = []
+	var placed: Array[Rect2] = []
+	var view := Rect2(Vector2.ZERO, canvas.size).grow(40)
+	var filt := _filtering()
+	# 1) названия регионов — крупно, на своих местах
 	for rid in DB.tree_regions:
 		var key := DB.keystone_of(rid)
 		if key.is_empty(): continue
 		var kp: Vector2 = key["pos"]
 		var dir := kp.normalized()
-		var lp := _to_screen(kp * 0.62 + Vector2(-dir.y, dir.x) * 120)
 		var t: String = DB.tree_regions[rid]["name"].to_upper()
-		var fs := maxi(16, int(34 * zoom / 0.6))
+		var fs := clampi(int(54 * zoom), 16, 40)
 		var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		var c: Color = DB.tree_regions[rid]["color"].lightened(0.3); c.a = 0.6
-		canvas.draw_string(font, lp - Vector2(w / 2, 0), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, c)
+		var ctr := _to_screen(kp * 0.6 + Vector2(-dir.y, dir.x) * 230)
+		var rect := Rect2(ctr - Vector2(w / 2, fs * 0.8), Vector2(w, fs))
+		if not view.intersects(rect): continue
+		if _free(rect, placed):
+			placed.append(rect.grow(4))
+			out.append({"text": t, "fs": fs, "pos": Vector2(rect.position.x, rect.position.y + fs * 0.8), "rect": rect, "color": c, "kind": "region", "leader": false, "anchor": ctr, "id": -1})
+	# 2) узлы
+	var cands: Array = []
+	for id in DB.tree_order:
+		var n: Dictionary = DB.tree_nodes[id]
+		var t := _label_tier(n)
+		var bname: String = n["branch_name"]
+		var show_node: bool = _tier_visible(t) or id == selected or (filt and matches.has(id) and zoom >= 0.32)
+		var show_branch: bool = bname != "" and zoom >= 0.32
+		if not show_node and not show_branch: continue
+		var p := _to_screen(n["pos"])
+		if not view.has_point(p): continue
+		if show_branch: cands.append([0.5, id, bname, label_fs(24), Color(0.95, 0.85, 0.55), "branch"])
+		if show_node:
+			var nm: String = DB.CLASSES[n["class"]].name if n["type"] == "start" else n["name"]
+			if n["type"] == "start" or bname != nm:
+				var pr := float(t)
+				if id == selected: pr = -1.0
+				cands.append([pr, id, nm, label_fs([32, 28, 24, 21][t]), Color.WHITE, "node"])
+	cands.sort_custom(func(a, b): return a[0] < b[0] or (a[0] == b[0] and a[1] < b[1]))
+	# занятые узлами круги (чтобы подпись не закрывала узлы)
+	var discs: Array = []
+	for id in DB.tree_order:
+		var n: Dictionary = DB.tree_nodes[id]
+		var p := _to_screen(n["pos"])
+		if view.has_point(p): discs.append([p, _node_radius(n) * zoom + 5 * zoom + 2])
+	for c in cands:
+		var id: int = c[1]
+		var n: Dictionary = DB.tree_nodes[id]
+		var p := _to_screen(n["pos"])
+		var r := _node_radius(n) * zoom + 6 * zoom + 3
+		var fs: int = c[3]
+		var w := font.get_string_size(c[2], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var h := float(fs)
+		var radial: Vector2 = (n["pos"] as Vector2).normalized() if (n["pos"] as Vector2).length() > 1 else Vector2.DOWN
+		var opts: Array = []
+		if c[5] == "branch":
+			# подпись ветви — по направлению к центру дерева (внутрь), чтобы не спорить с именем узла
+			for k in [1.0, 1.8, 2.8]: opts.append([p - radial * (r + h * k) - Vector2(0, -h * 0.1), k > 1.0])
+		else:
+			opts.append([p + Vector2(0, r + h * 0.55), false])          # снизу
+			opts.append([p - Vector2(0, r + h * 0.55), false])          # сверху
+			opts.append([p + Vector2(r + w / 2 + 4, 0), false])         # справа
+			opts.append([p - Vector2(r + w / 2 + 4, 0), false])         # слева
+			for k in [1.0, 2.0, 3.2]: opts.append([p + radial * (r + h * 0.6 + w * 0.3 + k * h), k > 1.0])
+		var best = null; var best_pen := INF
+		for o in opts:
+			var ctr: Vector2 = o[0]
+			var rect := Rect2(ctr - Vector2(w / 2, h / 2), Vector2(w, h))
+			if not _free(rect, placed): continue
+			var pen := 0.0
+			for d in discs:
+				if d[0].distance_to(p) < 0.5: continue
+				if _rect_hits_circle(rect, d[0], d[1]): pen += 1.0
+			if o[1]: pen += 0.6
+			if pen < best_pen: best_pen = pen; best = [rect, o[1]]
+			if pen == 0.0: break
+		if best == null: continue
+		var rect: Rect2 = best[0]
+		placed.append(rect.grow(2))
+		out.append({"text": c[2], "fs": fs, "pos": Vector2(rect.position.x, rect.position.y + h * 0.8), "rect": rect, "color": c[4], "kind": c[5], "leader": best[1], "anchor": p, "id": id})
+	return out
+
+func _free(rect: Rect2, placed: Array[Rect2]) -> bool:
+	for q in placed:
+		if q.intersects(rect): return false
+	return true
+
+static func _rect_hits_circle(rect: Rect2, c: Vector2, rad: float) -> bool:
+	var q := Vector2(clampf(c.x, rect.position.x, rect.end.x), clampf(c.y, rect.position.y, rect.end.y))
+	return q.distance_to(c) < rad
 
 func _canvas_input(ev: InputEvent) -> void:
 	if ev is InputEventScreenTouch:
@@ -283,7 +378,7 @@ func _canvas_input(ev: InputEvent) -> void:
 		_clamp(); canvas.queue_redraw()
 
 func _zoom_at(k: float, at: Vector2) -> void:
-	var nz := clampf(zoom * k, 0.2, 1.8)
+	var nz := clampf(zoom * k, ZOOM_MIN, ZOOM_MAX)
 	var tree_pt := (at - canvas.size / 2 - offset) / zoom
 	zoom = nz
 	offset = at - canvas.size / 2 - tree_pt * zoom
@@ -291,7 +386,7 @@ func _zoom_at(k: float, at: Vector2) -> void:
 	canvas.queue_redraw()
 
 func _clamp() -> void:
-	var lim := 1400 * zoom
+	var lim := 2600 * zoom
 	offset = offset.clamp(Vector2(-lim, -lim), Vector2(lim, lim))
 
 func _tap(p: Vector2) -> void:

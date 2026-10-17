@@ -471,6 +471,28 @@ func _talent_v2_tests(z, p: Player) -> void:
 	tw.search.text = "снаряд"
 	tw._update_matches()
 	check(tw.matches.size() >= 2, "поиск по эффекту: %d" % tw.matches.size())
+	# подписи: без наложений на разных зумах (по умолчанию, макс., средние), видимость по зуму
+	for zz in [tw.zoom, tw.ZOOM_MAX, 0.32, 0.8, tw.ZOOM_MIN]:
+		tw.zoom = zz; tw.center_on_start()
+		var lbs: Array = tw.layout_labels()
+		var ov := 0
+		for i in lbs.size():
+			for j in range(i + 1, lbs.size()):
+				if (lbs[i].rect as Rect2).intersects(lbs[j].rect): ov += 1
+		var fsz := []
+		for lb in lbs: fsz.append(lb.fs)
+		check(ov == 0 and lbs.size() >= 3, "подписи дерева при зуме %.2f: %d шт., наложений %d" % [zz, lbs.size(), ov])
+		check(fsz.is_empty() or (fsz.min() >= 13 and fsz.max() <= 40), "размер подписей в пределах 13–40 (%s)" % str([fsz.min() if fsz.size() else 0, fsz.max() if fsz.size() else 0]))
+	tw.zoom = 0.5; tw.center_on_start()
+	var minor_far := 0
+	for lb in tw.layout_labels():
+		if lb.kind == "node" and lb.id >= 0 and DB.tree_nodes[lb.id]["type"] == "minor": minor_far += 1
+	tw.zoom = tw.ZOOM_MAX; tw.center_on_start()
+	var minor_near := 0
+	for lb in tw.layout_labels():
+		if lb.kind == "node" and lb.id >= 0 and DB.tree_nodes[lb.id]["type"] == "minor": minor_near += 1
+	check(minor_far == 0 and minor_near >= 3, "малые узлы подписаны только вблизи (далеко %d, близко %d)" % [minor_far, minor_near])
+	tw.zoom = 0.5; tw.center_on_start()
 	tw.search.text = "ГНЕВ"; tw.matches.clear(); tw._match_i = -1
 	tw.find_next()
 	check(tw.selected >= 0 and "гнев" in str(DB.tree_nodes[tw.selected]["name"]).to_lower(), "«Найти» без пересчёта и без учёта регистра")
