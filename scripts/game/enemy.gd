@@ -1,4 +1,4 @@
-extends Node3D
+extends CharacterBody3D
 class_name Enemy
 ## Враг: блуждание, погоня, атака, возврат домой (поводок), смерть с наградой. Босс — удар по области с предупреждением.
 
@@ -34,6 +34,16 @@ var speed_mult := 1.0
 var hits_taken := 0
 var curse_timer := 0.0   # проклятие: +30% получаемого урона
 
+## Физика: тело на слое 4 (враги), сталкивается только со статикой уровня (слой 1) — стены не проходит.
+## Друг друга и героя не толкают (раздвигание — мягкое, в _move_towards). В подземелье путь — по навмешу.
+const LAYER_ENEMY := 4
+const LIFT := 0.3          # капсула приподнята — мелкие ступеньки/пандусы не цепляют
+var _path: PackedVector3Array = PackedVector3Array()
+var _path_i := 0
+var _path_t := 0.0
+var _path_goal := Vector3(INF, 0, INF)
+var wall_hits := 0
+
 var _dots: Array = []     # [урон за тик, тиков осталось, таймер, цвет] — яд/кровотечение/поджог
 
 ## Урон со временем: total за dur секунд (тик 0.5 с)
@@ -58,6 +68,16 @@ static func spawn(z, k: String, lvl: int, pos: Vector3, parent: Node) -> Enemy:
 	e.hp = e.max_hp
 	e.home = pos
 	e._wander_target = pos
+	e.collision_layer = LAYER_ENEMY
+	e.collision_mask = 1
+	e.motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
+	e.safe_margin = 0.02
+	var cs := CollisionShape3D.new(); cs.name = "Body"
+	var cap := CapsuleShape3D.new()
+	cap.radius = clampf(e.radius * 0.8, 0.3, 1.6)
+	cap.height = maxf(cap.radius * 2.0 + 0.2, 1.4 if not e.def.boss else 2.6)
+	cs.shape = cap; cs.position = Vector3(0, LIFT + cap.height / 2.0, 0)
+	e.add_child(cs)
 	parent.add_child(e)
 	e.global_position = Vector3(pos.x, z.ground_y(pos), pos.z)
 	e.rotation.y = randf() * TAU
@@ -197,9 +217,7 @@ func _process(delta: float) -> void:
 		if _slow_timer <= 0: _slow_factor = 1.0
 	_animate(delta)
 	if _kb.length_squared() > 0.01:
-		var np := global_position + _kb * delta
-		np.y = zone.ground_y(np)
-		global_position = np
+		slide_move(_kb * delta)
 		_kb = _kb * exp(-delta * 9.0)
 	if brain:
 		brain.update(delta)
@@ -255,9 +273,40 @@ func _deal_to(t: Node3D, dmg: float) -> void:
 	if t is Player: t.take_damage(dmg, global_position)
 	elif t.has_method("take_damage"): t.take_damage(dmg)
 
+## Движение со столкновениями: скольжение вдоль стен (две итерации), высота — по рельефу зоны
+func slide_move(motion: Vector3) -> void:
+	motion.y = 0
+	for i in 3:
+		if motion.length_squared() < 0.000001: break
+		var col := move_and_collide(motion)
+		if col == null: break
+		wall_hits += 1
+		var n := col.get_normal(); n.y = 0
+		if n.length_squared() < 0.0001: break
+		motion = col.get_remainder().slide(n.normalized())
+		motion.y = 0
+	global_position.y = zone.ground_y(global_position)
+
+## Следующая точка пути: в подземелье — по навмешу (обход стен), иначе — напрямую
+func _steer_point(p: Vector3, delta: float) -> Vector3:
+	var b = zone.builder if zone else null
+	if b == null or not b.has_method("nav_ready") or not b.nav_ready(): return p
+	_path_t -= delta
+	if _path_t <= 0.0 or U.flat_dist(p, _path_goal) > 1.0 or _path_i >= _path.size():
+		_path_t = 0.45
+		_path_goal = p
+		_path = NavigationServer3D.map_get_path(b.nav_map(), global_position, p, true)
+		_path_i = 1
+	while _path_i < _path.size() - 1 and U.flat_dist(global_position, _path[_path_i]) < 0.5: _path_i += 1
+	if _path.size() < 2: return p
+	return _path[mini(_path_i, _path.size() - 1)]
+
 func _move_towards(p: Vector3, speed: float, delta: float) -> void:
 	var d := U.flat(p - global_position)
 	if d.length_squared() < 0.01: return
+	var face := d
+	d = U.flat(_steer_point(p, delta) - global_position)
+	if d.length_squared() < 0.0001: d = face
 	var step := d.normalized() * speed * delta
 	for o in zone.enemies:
 		if o == self: continue
@@ -265,10 +314,8 @@ func _move_towards(p: Vector3, speed: float, delta: float) -> void:
 		var mn: float = radius + o.radius
 		if away.length_squared() < mn * mn and away.length_squared() > 0.0001:
 			step += away.normalized() * delta * 2.0
-	var np := global_position + step
-	np.y = zone.ground_y(np)
-	global_position = np
-	_face(d, delta)
+	slide_move(step)
+	_face(d if d.length_squared() > 0.01 else face, delta)
 
 func _face(d: Vector3, delta: float) -> void:
 	if d.length_squared() < 0.001: return

@@ -20,27 +20,16 @@ func _ready() -> void:
 		get_tree().root.add_child.call_deferred(r); return
 	_run.call_deferred()
 
-var nav_region: NavigationRegion3D
+## Навмеш самой игры (тот же, по которому ходят враги): ждём готовности
 func bake(d) -> RID:
-	if nav_region and is_instance_valid(nav_region): nav_region.queue_free()
-	var nm := NavigationMesh.new()
-	nm.agent_radius = 0.5; nm.agent_height = 2.0; nm.agent_max_climb = 0.25; nm.agent_max_slope = 40.0
-	nm.cell_size = 0.25; nm.cell_height = 0.25
-	nm.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
-	nm.geometry_collision_mask = 1
-	var src := NavigationMeshSourceGeometryData3D.new()
-	NavigationServer3D.parse_source_geometry_data(nm, src, d.builder)
-	NavigationServer3D.bake_from_source_geometry_data(nm, src)
-	print("    навмеш: полигонов ", nm.get_polygon_count(), ", вершин ", nm.get_vertices().size(), ", вершин источника ", src.get_vertices().size())
-	nav_region = NavigationRegion3D.new(); nav_region.navigation_mesh = nm
-	d.add_child(nav_region)
-	var map: RID = d.get_world_3d().navigation_map
-	var it0 := NavigationServer3D.map_get_iteration_id(map)
-	for i in 120:
-		await get_tree().physics_frame
-		if NavigationServer3D.map_get_iteration_id(map) != it0 and NavigationServer3D.map_get_closest_point(map, Vector3(0, 0, 3)) != Vector3.ZERO: break
-	print("    карта: регионов ", NavigationServer3D.map_get_regions(map).size(), ", ближайшая точка к (0,0,3): ", NavigationServer3D.map_get_closest_point(map, Vector3(0, 0, 3)))
-	return map
+	var b = d.builder
+	var g := 0
+	while b._nav_baking and g < 600: await get_tree().physics_frame; g += 1
+	g = 0
+	while not b.nav_ready() and g < 600: await get_tree().physics_frame; g += 1
+	for i in 3: await get_tree().physics_frame
+	print("    навмеш: готов=%s, полигонов %d" % [str(b.nav_ready()), b._nav_region.navigation_mesh.get_polygon_count() if b._nav_region else 0])
+	return b.nav_map()
 
 func path_to(map: RID, from: Vector3, to: Vector3) -> PackedVector3Array:
 	return NavigationServer3D.map_get_path(map, from, to, true)
@@ -85,6 +74,67 @@ func _run() -> void:
 	print("=== NAV RESULT: %s (%d errors, %d checks) ===" % ["PASS" if errors == 0 else "FAIL", errors, checks])
 	get_tree().quit(1 if errors > 0 else 0)
 
+## Враг внутри стены? Геометрия уровня + физический запрос капсулой поменьше
+func _in_wall(d, e) -> bool:
+	if d.builder.point_blocked(e.global_position, -0.15): return true
+	var q := PhysicsShapeQueryParameters3D.new()
+	var sp := SphereShape3D.new(); sp.radius = 0.12
+	q.shape = sp; q.collision_mask = 1
+	q.transform = Transform3D(Basis.IDENTITY, e.global_position + Vector3.UP * 1.0)
+	return not d.get_world_3d().direct_space_state.intersect_shape(q, 1).is_empty()
+
+## Симуляция боя: герой за стенами/углами от групп, враги гонятся, получают отбрасывание в стены.
+## Ни один враг не должен оказаться внутри стены; точки появления — не в стенах.
+func _wall_fight(d) -> void:
+	var p: Player = d.player
+	var b = d.builder
+	await bake(d)
+	var bad_spawn := 0
+	for e in d.enemies: if is_instance_valid(e) and _in_wall(d, e): bad_spawn += 1
+	check(bad_spawn == 0 and d.enemies.size() >= 10, "враги: %d, появились внутри стен: %d" % [d.enemies.size(), bad_spawn])
+	var spots := [Vector3(-7, 0.1, 14), Vector3(0, 0.1, 30), Vector3(10.5, 0.1, 62), Vector3(-10.5, 0.1, 42), Vector3(0, 0.1, 9)]
+	var inside := 0; var samples := 0; var moved := 0; var max_hits := 0
+	var start := {}
+	for e in d.enemies: start[e] = e.global_position
+	for sp in spots:
+		p.teleport(sp)
+		var t_end := Time.get_ticks_msec() + int(5000 / Engine.time_scale)
+		var k := 0
+		while Time.get_ticks_msec() < t_end:
+			await get_tree().physics_frame
+			k += 1
+			for e in d.enemies:
+				if not is_instance_valid(e) or not e.alive: continue
+				if k % 20 == 0 and U.flat_dist(e.global_position, p.global_position) < 6.0:
+					e.knockback(U.flat(e.global_position - p.global_position).normalized(), 14.0)
+				samples += 1
+				if _in_wall(d, e):
+					inside += 1
+					if inside <= 3: print("    в стене: ", e.kind, " ", e.global_position)
+	for e in d.enemies:
+		if is_instance_valid(e) and start.has(e) and U.flat_dist(e.global_position, start[e]) > 3.0: moved += 1
+		if is_instance_valid(e): max_hits = maxi(max_hits, e.wall_hits)
+	check(inside == 0, "бой у стен: враг внутри стены %d раз из %d проверок" % [inside, samples])
+	check(moved >= 3 and max_hits > 0, "враги двигались (%d) и упирались в стены (до %d касаний), а не проходили сквозь" % [moved, max_hits])
+	# враг за стеной идёт в обход по навмешу, а не упирается напрямую
+	var e0 = null
+	for e in d.enemies:
+		if is_instance_valid(e) and e.alive and not e.def.ranged and not e.def.boss: e0 = e; break
+	if e0:
+		for e in d.enemies: if e != e0 and is_instance_valid(e): e.set_process(false)
+		e0.global_position = Vector3(-9, 0, 50)
+		e0.home = e0.global_position
+		p.teleport(Vector3(-2, 0.1, 30))   # коридор шипов: путь только через проём z=40
+		e0.def = e0.def.duplicate(); e0.def.aggro = 40.0
+		var t_end := Time.get_ticks_msec() + int(9000 / Engine.time_scale)
+		var best := 999.0
+		while Time.get_ticks_msec() < t_end:
+			await get_tree().physics_frame
+			best = minf(best, U.flat_dist(e0.global_position, p.global_position))
+			if best < 3.0: break
+		check(best < 3.5, "враг из зала рычагов обошёл стену через проём и догнал героя (мин. %.1f м)" % best)
+		for e in d.enemies: if is_instance_valid(e): e.set_process(true)
+
 func _class_run(cls: String) -> void:
 	for f in Game.list_characters(): if str(f.get("name", "")) == "Навигатор": Game.delete_character(f["id"])
 	var rng := RandomNumberGenerator.new(); rng.seed = 11
@@ -100,6 +150,7 @@ func _class_run(cls: String) -> void:
 	if not d.is_dungeon(): return
 	var p: Player = d.player
 	p.god_mode = true
+	if cls == "warrior": await _wall_fight(d)
 	for e in d.enemies.duplicate(): if is_instance_valid(e): e.queue_free()
 	d.enemies.clear()
 	await w(0.2)
@@ -125,7 +176,7 @@ func _class_run(cls: String) -> void:
 		d.hud.interact(); await w(0.4)
 		check(ok and b.levers[id].on, "[%s] агент дошёл и повернул рычаг «%s»" % [cls, b.ORDER_NAMES[id]])
 	check(b.gate_open(), "[%s] рычаги решены — решётка открыта" % cls)
-	await w(0.8)
+	await w(1.0)
 	map = await bake(d)
 	check(reachable(map, p.global_position, b.arena_center), "[%s] навмеш: после рычагов путь до арены" % cls)
 	check(await walk(d, map, Vector3(0, 0, 88), 0.8, "огненный коридор"), "[%s] агент прошёл огненный коридор" % cls)

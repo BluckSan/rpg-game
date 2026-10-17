@@ -71,6 +71,7 @@ func build(z) -> void:
 	merchant_point = Vector3.ZERO
 	spawn_point = checkpoint()
 	if flag("lever_solved"): _open_gate(true)
+	bake_nav.call_deferred()
 
 func _pack(pos: Vector3, k: String, lo: int, hi: int, n: int, r: float, f: String) -> Spawner:
 	var s := Spawner.create(zone, enemies_root, pos, k, lo, hi, n, r, -1.0)
@@ -278,10 +279,43 @@ func pull_lever(id: String) -> void:
 func _open_gate(instant: bool) -> void:
 	gate_body.get_child(0).set_deferred("disabled", true)
 	for x in levers.values(): x.set_on(true)
+	if not instant: get_tree().create_timer(0.3).timeout.connect(bake_nav)
 	if instant: gate_bars.position.y = -5.2
 	else:
 		var tw := gate_bars.create_tween()
 		tw.tween_property(gate_bars, "position:y", -5.2, 1.2)
+
+# ---------- навигация врагов ----------
+## Навмеш по статике уровня (в фоне, async): враги обходят стены, а не идут напрямую. Перестраивается при открытии решётки.
+var _nav_region: NavigationRegion3D
+var _nav_ok := false
+var _nav_iter := -1
+var _nav_baking := false
+func bake_nav() -> void:
+	if _nav_baking or not is_inside_tree(): return
+	_nav_baking = true
+	var nm := NavigationMesh.new()
+	nm.agent_radius = 0.5; nm.agent_height = 2.0; nm.agent_max_climb = 0.25; nm.agent_max_slope = 40.0
+	nm.cell_size = 0.25; nm.cell_height = 0.25
+	nm.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
+	nm.geometry_collision_mask = 1
+	nm.filter_baking_aabb = AABB(Vector3(-30, -1, -8), Vector3(60, 8, 136))
+	var src := NavigationMeshSourceGeometryData3D.new()
+	NavigationServer3D.parse_source_geometry_data(nm, src, self)
+	NavigationServer3D.bake_from_source_geometry_data_async(nm, src, func(): _nav_done.call_deferred(nm))
+
+func _nav_done(nm: NavigationMesh) -> void:
+	_nav_baking = false
+	if not is_inside_tree(): return
+	if _nav_region == null:
+		_nav_region = NavigationRegion3D.new(); _nav_region.name = "Nav"; add_child(_nav_region)
+	_nav_iter = NavigationServer3D.map_get_iteration_id(nav_map())
+	_nav_region.navigation_mesh = nm
+	_nav_ok = nm.get_polygon_count() > 0
+
+func nav_map() -> RID: return get_world_3d().navigation_map
+func nav_ready() -> bool:
+	return _nav_ok and NavigationServer3D.map_get_iteration_id(nav_map()) != _nav_iter
 
 func gate_open() -> bool:
 	return flag("lever_solved")

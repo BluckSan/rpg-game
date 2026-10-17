@@ -282,6 +282,28 @@ func _add_collider(kind: String, pos: Vector3, scale: Vector3, rot: Vector3) -> 
 	cs.rotation_degrees = rot
 	_colliders.add_child(cs)
 
+## Точка занята статикой уровня (стены, колонны, деревья, камни)? r — радиус тела. Пол/плоские плиты не считаются.
+func point_blocked(p: Vector3, r: float) -> bool:
+	if _colliders == null: return false
+	for cs in _colliders.get_children():
+		if not (cs is CollisionShape3D) or cs.disabled or cs.shape == null: continue
+		var t: Transform3D = (cs as CollisionShape3D).transform
+		var sh: Shape3D = cs.shape
+		var top := 0.0
+		if sh is BoxShape3D: top = t.origin.y + (sh as BoxShape3D).size.y * 0.5
+		elif sh is CylinderShape3D: top = t.origin.y + (sh as CylinderShape3D).height * 0.5
+		elif sh is SphereShape3D: top = t.origin.y + (sh as SphereShape3D).radius
+		if top < 0.35: continue
+		var l := t.affine_inverse() * Vector3(p.x, minf(top - 0.1, 0.9), p.z)
+		if sh is BoxShape3D:
+			var hs: Vector3 = (sh as BoxShape3D).size * 0.5
+			if absf(l.x) <= hs.x + r and absf(l.z) <= hs.z + r and absf(l.y) <= hs.y + 1.0: return true
+		elif sh is CylinderShape3D:
+			if Vector2(l.x, l.z).length() <= (sh as CylinderShape3D).radius + r and absf(l.y) <= (sh as CylinderShape3D).height * 0.5 + 1.0: return true
+		elif sh is SphereShape3D:
+			if Vector2(l.x, l.z).length() <= (sh as SphereShape3D).radius + r: return true
+	return false
+
 ## Статика по типу примитива и ячейке 24×24 м: каждая ячейка — свой MultiMesh, поэтому
 ## работает отсечение по камере и по дальности (visibility_range) — меньше вершин и вызовов.
 const CELL := 24.0

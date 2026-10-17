@@ -25,9 +25,18 @@ func _ready() -> void:
 	if clear_flag != "" and DB.zone_flag(zone.data, zone.data["zone"], clear_flag): return
 	for i in count: _spawn_one()
 
+## Точка появления не внутри стен/препятствий (до 16 попыток, затем — центр точки)
+func free_point() -> Vector3:
+	var b = zone.builder if zone else null
+	var er: float = float(DB.ENEMIES[kind].radius)
+	for i in 16:
+		var r := Vector2.from_angle(randf() * TAU) * randf() * radius
+		var p := global_position + Vector3(r.x, 0, r.y)
+		if b == null or not b.has_method("point_blocked") or not b.point_blocked(p, er): return p
+	return global_position
+
 func _spawn_one() -> void:
-	var r := Vector2.from_angle(randf() * TAU) * randf() * radius
-	var e := Enemy.spawn(zone, kind, randi_range(min_level, max_level), global_position + Vector3(r.x, 0, r.y), self)
+	var e := Enemy.spawn(zone, kind, randi_range(min_level, max_level), free_point(), self)
 	e.on_death = _on_death
 	alive += 1
 

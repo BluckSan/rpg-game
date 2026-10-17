@@ -181,9 +181,8 @@ func _charge(t) -> void:
 		if not is_instance_valid(e) or not e.alive: return
 		var step := speed * dt
 		traveled += step
-		var np: Vector3 = e.global_position + dir * step
-		np.y = z.ground_y(np)
-		e.global_position = np
+		e.slide_move(dir * step)
+		var np: Vector3 = e.global_position
 		if fmod(traveled, 1.5) < step: CombatFX.burst(z.fx_root, np + Vector3.UP * 0.2, Color(0.6, 0.5, 0.4, 0.7), 6, 2.0, 0.2, 0.5, Vector3.UP, 60, -2)
 		var p = z.player
 		if not hit and p and not p.dead and U.flat_dist(p.global_position, np) < 1.7:
