@@ -19,6 +19,8 @@ func _input(ev: InputEvent) -> void:
 	if not sc.is_visible_in_tree(): return
 	if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT:
 		if ev.pressed:
+			var hv := sc.get_viewport().gui_get_hovered_control()
+			if hv is Slider: return   # ползунок тянут вбок — это не прокрутка
 			if sc.get_global_rect().has_point(ev.position):
 				_down = true; _moved = false; _start = ev.position; _vel = 0.0
 		elif _down:

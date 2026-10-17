@@ -32,8 +32,8 @@ func _ready() -> void:
 	yaw = PI  # камера за спиной персонажа (персонаж смотрит в +Z)
 
 func rotate_by(dx: float, dy: float) -> void:
-	yaw -= dx * 0.006
-	pitch = clampf(pitch + dy * 0.004 * 57.0, 10, 70)
+	yaw -= dx * 0.006 * Game.sensitivity
+	pitch = clampf(pitch + dy * 0.004 * 57.0 * Game.sensitivity, 10, 70)
 
 func zoom_by(k: float) -> void:
 	distance = clampf(distance * k, MIN_DIST, MAX_DIST)

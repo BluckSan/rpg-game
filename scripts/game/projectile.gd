@@ -42,7 +42,7 @@ func add_trail(c: Color, is_glow: bool) -> Projectile:
 		hm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 		add_child(h)
 	var p := CPUParticles3D.new()
-	p.amount = 16 if glow else 10
+	p.amount = maxi(3, int((16 if glow else 10) * Game.particle_mul))
 	p.lifetime = 0.35 if glow else 0.2
 	p.local_coords = false
 	p.direction = Vector3.ZERO; p.spread = 180

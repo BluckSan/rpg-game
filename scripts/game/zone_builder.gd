@@ -59,8 +59,8 @@ func _lighting() -> void:
 	sun.shadow_blur = 1.5
 	sun.shadow_bias = 0.04
 	sun.shadow_normal_bias = 1.2
-	sun.shadow_enabled = Game.shadows_enabled
-	sun.directional_shadow_max_distance = 45
+	sun.shadow_enabled = Game.shadows_enabled and Game.shadow_distance > 0
+	sun.directional_shadow_max_distance = maxf(Game.shadow_distance, 10.0)
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	add_child(sun)
 	sun.rotation_degrees = Vector3(-48, -35, 0)
@@ -103,7 +103,27 @@ func _lighting() -> void:
 	e.adjustment_saturation = 1.08
 	e.adjustment_contrast = 1.04
 	we.environment = e
+	we.name = "Env"
 	add_child(we)
+	add_to_group("graphics_listeners")
+	apply_graphics()
+
+## Пресет графики → тени, дальность, свечение, туман
+func apply_graphics() -> void:
+	var sun: DirectionalLight3D = get_node_or_null("Sun")
+	var we: WorldEnvironment = get_node_or_null("Env")
+	if sun:
+		sun.shadow_enabled = Game.shadows_enabled and Game.shadow_distance > 0
+		sun.directional_shadow_max_distance = maxf(Game.shadow_distance, 10.0)
+		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if Game.quality >= 3 else DirectionalLight3D.SHADOW_ORTHOGONAL
+	if we and we.environment:
+		var e := we.environment
+		e.glow_enabled = Game.glow
+		e.fog_depth_end = Game.view_distance
+		e.fog_depth_begin = Game.view_distance * 0.35
+		e.adjustment_enabled = Game.quality >= 2
+	for n in get_tree().get_nodes_in_group("view_range"):
+		(n as GeometryInstance3D).visibility_range_end = Game.view_distance + CELL
 
 # ---------- статика ----------
 func _add(kind: String, pos: Vector3, scale: Vector3, c: Color, rot := Vector3.ZERO, collide := true) -> void:
@@ -125,25 +145,40 @@ func _add_collider(kind: String, pos: Vector3, scale: Vector3, rot: Vector3) -> 
 	cs.rotation_degrees = rot
 	_colliders.add_child(cs)
 
+## Статика по типу примитива и ячейке 24×24 м: каждая ячейка — свой MultiMesh, поэтому
+## работает отсечение по камере и по дальности (visibility_range) — меньше вершин и вызовов.
+const CELL := 24.0
 func _flush_batches() -> void:
 	var m := StandardMaterial3D.new()
 	m.vertex_color_use_as_albedo = true
 	m.roughness = 0.85
 	for kind in _batches:
-		var list: Array = _batches[kind]
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = true
-		mm.mesh = U.mesh(kind)
-		mm.instance_count = list.size()
-		for i in list.size():
-			mm.set_instance_transform(i, list[i][0])
-			mm.set_instance_color(i, list[i][1])
-		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = mm
-		mmi.material_override = m
-		mmi.name = "Batch_" + kind
-		add_child(mmi)
+		var cells := {}
+		for it in _batches[kind]:
+			var o: Vector3 = it[0].origin
+			# крупное (земля, границы) — отдельно, без дальности
+			var big: bool = it[0].basis.get_scale().length() > 40.0
+			var key: Vector2i = Vector2i(9999, 9999) if big else Vector2i(floori(o.x / CELL), floori(o.z / CELL))
+			if not cells.has(key): cells[key] = []
+			cells[key].append(it)
+		for key in cells:
+			var list: Array = cells[key]
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.use_colors = true
+			mm.mesh = U.mesh(kind)
+			mm.instance_count = list.size()
+			for i in list.size():
+				mm.set_instance_transform(i, list[i][0])
+				mm.set_instance_color(i, list[i][1])
+			var mmi := MultiMeshInstance3D.new()
+			mmi.multimesh = mm
+			mmi.material_override = m
+			mmi.name = "Batch_%s_%d_%d" % [kind, key.x, key.y]
+			if key.x != 9999:
+				mmi.visibility_range_end = Game.view_distance + CELL
+				mmi.add_to_group("view_range")
+			add_child(mmi)
 
 func _glow(kind: String, pos: Vector3, scale: Vector3, c: Color, emission: float, scr: Script = null) -> Node3D:
 	var w := Node3D.new()

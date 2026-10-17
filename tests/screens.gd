@@ -3,7 +3,7 @@ extends Node
 ## godot --path . --rendering-driver opengl3 --resolution 1920x1080 res://tests/screens.tscn
 ## Сохраняет в /workspace/rpg-shots/ (или в user://shots, если папки нет).
 var is_runner := false
-var out := "/workspace/rpg-shots/v031"
+var out := "/workspace/rpg-shots/v032"
 var only := ""
 
 func shot(n: String) -> void:
@@ -36,7 +36,15 @@ func _ready() -> void:
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 	await w(1.2)
 	var menu = get_tree().current_scene
+	if want("menu"): await shot("00_title")
+	if want("menu"):
+		menu.show_settings(); await w(0.5); await shot("00b_settings")
+		for ch in menu.ui.get_children():
+			if ch is SettingsPanel: ch.queue_free()
+	menu.show_select(); await w(1.0)
 	if want("menu"): await shot("01_menu")
+	if want("menu"):
+		menu._on_delete(); await w(0.4); await shot("01b_delete_confirm"); menu.cancel_delete(); await w(0.2)
 	menu.open_creator(); await w(0.3)
 	var cr = null
 	for ch in menu.screen.get_children():

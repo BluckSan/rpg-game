@@ -48,6 +48,7 @@ static func spawn(z, k: String, lvl: int, pos: Vector3, parent: Node) -> Enemy:
 	e.global_position = Vector3(pos.x, z.ground_y(pos), pos.z)
 	e.rotation.y = randf() * TAU
 	e._build_model()
+	if not e.def.boss: U.set_view_range(e, Game.view_distance * 0.85)
 	if e.def.boss:
 		e.brain = BossBrain.new()
 		e.brain.setup(e)

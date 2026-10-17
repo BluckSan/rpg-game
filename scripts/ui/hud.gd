@@ -306,6 +306,7 @@ func pickup(t: String, c: Color, ic := "") -> void:
 var level_banners := 0
 func level_up(level: int, points: int) -> void:
 	level_banners += 1
+	Game.sfx("level")
 	var b := Control.new(); b.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.anchor_left = 0.5; b.anchor_right = 0.5
 	b.offset_left = -450; b.offset_right = 450; b.offset_top = 150; b.offset_bottom = 330

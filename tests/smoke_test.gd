@@ -51,6 +51,7 @@ func _ready() -> void:
 	await frames(10)
 	var menu = get_tree().current_scene
 	check(menu != null and menu.name == "MainMenu", "сцена меню загружена")
+	await _title_tests(menu)
 	menu.open_creator()
 	await frames(5)
 	var cr = null
@@ -219,7 +220,7 @@ func _combo_tests(z, p: Player, cls: String) -> void:
 	dummy.max_hp = 99999; dummy.hp = 99999
 	dummy.def = dummy.def.duplicate(); dummy.def.aggro = 0.0
 	await frames(2)
-	_grip_tests(p, cls)
+	await _grip_tests(p, cls)
 	p.face_towards(dummy.global_position)
 	p.combo_step = 0; p.combo_timer = 0
 	var n0 := p.combo_count
@@ -243,6 +244,8 @@ func _desktop_tests(z, p: Player) -> void:
 	check(Game.desktop == Game.is_pc_platform() or "--touch" in OS.get_cmdline_user_args(), "режим ПК определён: %s" % str(Game.desktop))
 	if not Game.desktop:
 		check(h.jump_btn.visible and h.joy_base.visible, "сенсорные кнопки на телефоне видны")
+		check(Game.fps_options() == [30, 45, 60, 90, 120], "телефон: варианты FPS 30–120")
+		await _settings_tests(z)
 		return
 	check(not h.jump_btn.visible and not h.roll_btn.visible and not h.joy_base.visible, "на ПК сенсорный джойстик и кнопки скрыты")
 	check(h.skill_btns[1].key_hint == "1" and h.skill_btns[0].key_hint == "ЛКМ", "подсказки клавиш на умениях")
@@ -261,16 +264,22 @@ func _desktop_tests(z, p: Player) -> void:
 	check(not h.minimap.big, "M — карта свёрнута")
 	h._hotkey(KEY_ESCAPE); await frames(2)
 	check(h.window != null and h.window.name == "Window_pause", "Esc открывает меню")
-	var q = h.window.find_child("Quality", true, false)
-	check(q != null and h.window.find_child("Fullscreen", true, false) != null and h.window.find_child("Resolution", true, false) != null, "настройки графики/экрана в меню")
-	var q0: int = Game.quality
-	Game.quality = 0; Game.apply_settings()
-	check(get_viewport().msaa_3d == Viewport.MSAA_DISABLED and is_equal_approx(get_tree().root.scaling_3d_scale, 0.75), "качество «Низкое» применено")
-	Game.quality = 2; Game.apply_settings()
-	check(get_tree().root.msaa_3d == Viewport.MSAA_4X, "качество «Высокое» применено")
+	check(h.window.find_child("Quality", true, false) == null, "настройки вынесены в отдельную панель")
+	h.close_window(); await frames(2)
+	await _settings_tests(z)
+	h._hotkey(KEY_ESCAPE); await frames(2)
+	h.window.open_settings(); await frames(2)
+	var sp2: Node = h.window.find_child("SettingsPanel", true, false)
+	check(sp2 != null and sp2.find_child("Fullscreen", true, false) != null and sp2.find_child("Resolution", true, false) != null and sp2.find_child("Vsync", true, false) != null, "ПК: полный экран/разрешение/VSync в настройках")
+	var fo: Array = Game.fps_options()
+	check(fo == [30, 60, 90, 120, 144, 165, 240, 300], "ПК: варианты FPS %s" % str(fo))
 	Game.ui_scale = 1.1; Game.apply_settings()
 	check(is_equal_approx(get_tree().root.content_scale_factor, 1.1), "масштаб интерфейса")
-	Game.ui_scale = 1.0; Game.quality = q0; Game.apply_settings()
+	Game.ui_scale = 1.0; Game.apply_settings()
+	check(get_tree().root.scaling_3d_mode == Viewport.SCALING_3D_MODE_BILINEAR or Game.render_scale < 0.99, "ПК: FSR только при уменьшенном 3D")
+	Game.render_scale = 0.75; Game.apply_settings()
+	check(get_tree().root.scaling_3d_mode == Viewport.SCALING_3D_MODE_FSR, "ПК: масштаб 3D 75%% через FSR")
+	Game.apply_preset(3)
 	h.close_window(); await frames(2)
 	# ЛКМ по миру — атака
 	var c: Vector2 = h._screen() * Vector2(0.5, 0.45)
@@ -282,14 +291,126 @@ func _desktop_tests(z, p: Player) -> void:
 	h._hotkey(KEY_1)
 	await secs(0.6)
 
+## Титульный экран: кнопки, настройки, выбор героя, удаление с подтверждением
+func _title_tests(menu) -> void:
+	check(menu.screen != null and menu.screen.name == "TitleScreen" and menu.title_mode, "при запуске — титульный экран")
+	for b in ["PlayButton", "SettingsButton", "QuitButton"]:
+		check(menu.screen.find_child(b, true, false) is Button, "кнопка «%s» на титульном экране" % b)
+	var qb: Button = menu.screen.find_child("QuitButton", true, false)
+	check(qb != null and qb.pressed.get_connections().size() > 0 and menu.has_method("quit_game"), "«Выход» подключён к выходу из игры")
+	check(menu.title_root.visible and not menu.stage_pivot.visible, "3D-сцена титульного экрана показана")
+	check(menu.sun.shadow_enabled == (Game.desktop and Game.shadows_enabled), "тени титульной сцены: только на ПК")
+	await frames(2)
+	check(Engine.max_fps == mini(Game.fps_cap, 120 if Game.desktop else 60), "в меню FPS ограничен: %d" % Engine.max_fps)
+	(menu.screen.find_child("SettingsButton", true, false) as Button).pressed.emit()
+	await frames(2)
+	var sp: Node = menu.ui.find_child("SettingsPanel", true, false)
+	check(sp != null and sp.find_child("Quality", true, false) != null and sp.find_child("Music", true, false) != null, "настройки открываются из главного меню")
+	if sp: sp.close()
+	await frames(2)
+	(menu.screen.find_child("PlayButton", true, false) as Button).pressed.emit()
+	await frames(3)
+	check(menu.screen.name == "SelectScreen" and not menu.title_mode and menu.stage_pivot.visible, "«Играть» → выбор персонажа")
+	check(menu.title_root.process_mode == Node.PROCESS_MODE_DISABLED and not menu.title_root.visible, "3D титульного экрана скрыт и не обновляется")
+	var n0: int = Game.list_characters().size()
+	check(menu.list_box.get_child_count() == DB.MAX_SLOTS, "слотов в списке: %d" % menu.list_box.get_child_count())
+	# удаление: отмена сохраняет, подтверждение удаляет
+	var victim := DB.new_character("Удаляемый", "archer", CharAssets.random_look(0))
+	Game.save_character(victim)
+	menu.refresh_list(); await frames(2)
+	for c in menu.chars:
+		if c["id"] == victim["id"]: menu.selected = c
+	menu._on_delete(); await frames(2)
+	var cb: Node = menu.ui.find_child("ConfirmDelete", true, false)
+	check(cb != null and cb.find_child("ConfirmYes", true, false) != null and cb.find_child("ConfirmNo", true, false) != null, "окно подтверждения удаления")
+	(cb.find_child("ConfirmNo", true, false) as Button).pressed.emit(); await frames(2)
+	check(Game.list_characters().size() == n0 + 1 and menu.ui.find_child("ConfirmDelete", true, false) == null, "«Отмена» — герой не удалён")
+	for c in menu.chars:
+		if c["id"] == victim["id"]: menu.selected = c
+	menu._on_delete(); await frames(2)
+	(menu.ui.find_child("ConfirmDelete", true, false).find_child("ConfirmYes", true, false) as Button).pressed.emit(); await frames(2)
+	var still := false
+	for c in Game.list_characters():
+		if c["id"] == victim["id"]: still = true
+	check(not still and Game.list_characters().size() == n0, "«Удалить» — герой удалён")
+	(menu.screen.find_child("BackButton", true, false) as Button).pressed.emit(); await frames(2)
+	check(menu.screen.name == "TitleScreen" and menu.title_mode, "«Назад» → титульный экран")
+
+## Настройки из меню паузы: пресеты, масштаб 3D, FPS (в игре и в меню), звук, чувствительность
+func _settings_tests(z) -> void:
+	var h = z.hud
+	var q0: int = Game.quality
+	var rs0: float = Game.render_scale
+	var fc0: int = Game.fps_cap
+	h._open("pause"); await frames(2)
+	check(get_tree().paused, "пауза открыта")
+	h.window.open_settings(); await frames(2)
+	var sp: Node = h.window.find_child("SettingsPanel", true, false)
+	check(sp != null, "настройки открываются из меню паузы")
+	if sp == null: return
+	for id in ["Quality", "RenderScale", "FpsCap", "Shadows", "UiScale", "Music", "Sfx", "Sensitivity"]:
+		check(sp.find_child(id, true, false) != null, "строка настроек «%s»" % id)
+	var qb: Button = sp.find_child("Quality", true, false)
+	var before: String = qb.text
+	qb.pressed.emit(); await frames(1)
+	check(qb.text != before and Game.quality == (q0 + 1) % 4, "пресет переключается кнопкой (%s → %s)" % [before, qb.text])
+	Game.apply_preset(0)
+	check(Game.fps_cap == 30 and not Game.shadows_enabled and is_equal_approx(get_tree().root.scaling_3d_scale, 0.6) and Game.particle_mul < 0.5, "пресет «Экономия батареи»: 30 к/с, без теней, 3D 60%")
+	check(get_viewport().msaa_3d == Viewport.MSAA_DISABLED and not Game.glow, "экономия: MSAA и свечение выключены")
+	var z_env: WorldEnvironment = z.find_child("Env", true, false)
+	if z_env:
+		check(not z_env.environment.glow_enabled, "экономия: свечение в зоне выключено")
+	Game.apply_preset(3)
+	check(Game.shadows_enabled and Game.particle_mul >= 1.0 and Game.view_distance > 100.0, "пресет «Высокое» применён")
+	var fb: Button = sp.find_child("FpsCap", true, false)
+	var opts: Array = Game.fps_options()
+	Game.fps_cap = opts[opts.size() - 1]; Game.apply_settings()
+	await frames(2)
+	var menu_cap := 120 if Game.desktop else 60
+	check(Engine.max_fps == mini(Game.fps_cap, menu_cap), "на паузе FPS ограничен: %d" % Engine.max_fps)
+	fb.pressed.emit(); await frames(1)
+	check(Game.fps_cap == opts[0] and fb.text.begins_with(str(opts[0])), "FPS переключается по кругу: %s" % fb.text)
+	var rb: Button = sp.find_child("RenderScale", true, false)
+	Game.render_scale = 0.75; Game.apply_settings()
+	rb.pressed.emit(); await frames(1)
+	check(is_equal_approx(Game.render_scale, 0.85) and is_equal_approx(get_tree().root.scaling_3d_scale, 0.85), "масштаб 3D переключён на 85%")
+	var ms: HSlider = sp.find_child("Music", true, false) as HSlider
+	if ms == null:
+		for c in sp.find_child("Music", true, false).find_children("*", "HSlider", true, false): ms = c
+	ms.value = 0.25; await frames(1)
+	check(absf(db_to_linear(AudioServer.get_bus_volume_db(AudioServer.get_bus_index("Music"))) - 0.25) < 0.05, "громкость музыки → шина Music")
+	ms.value = 0.0; await frames(1)
+	check(AudioServer.is_bus_mute(AudioServer.get_bus_index("Music")) or AudioServer.get_bus_volume_db(AudioServer.get_bus_index("Music")) < -60, "музыка 0 — без звука")
+	ms.value = 0.7
+	var ss: HSlider = sp.find_child("Sfx", true, false) as HSlider
+	if ss == null:
+		for c in sp.find_child("Sfx", true, false).find_children("*", "HSlider", true, false): ss = c
+	ss.value = 0.5; await frames(1)
+	check(absf(db_to_linear(AudioServer.get_bus_volume_db(AudioServer.get_bus_index("SFX"))) - 0.5) < 0.05, "громкость эффектов → шина SFX")
+	var sens: HSlider = sp.find_child("Sensitivity", true, false) as HSlider
+	if sens == null:
+		for c in sp.find_child("Sensitivity", true, false).find_children("*", "HSlider", true, false): sens = c
+	sens.value = 1.5; await frames(1)
+	check(is_equal_approx(Game.sensitivity, 1.5), "чувствительность камеры")
+	sens.value = 1.0
+	sp.close(); await frames(2)
+	check(h.window.find_child("SettingsPanel", true, false) == null, "панель настроек закрыта")
+	h.close_window(); await frames(2)
+	check(not get_tree().paused, "пауза снята")
+	await frames(2)
+	check(Engine.max_fps == Game.fps_cap, "в игре FPS = настройке: %d" % Engine.max_fps)
+	Game.quality = q0; Game.render_scale = rs0; Game.fps_cap = fc0; Game.apply_settings()
+	await frames(1)
+
 ## Хват: оружие в кулаке (точка хвата у центра кулака), посох/лук в стойке вертикально
 func _grip_tests(p: Player, cls: String) -> void:
 	var v: CharVisual = p.visual
 	if v.weapon == null or v.skel == null: return
+	await secs(0.6)   # выравнивание хвата плавно набирает вес (blend_speed)
 	var side := -1.0 if cls == "archer" else 1.0
 	var hb := v.skel.find_bone("hand_l" if cls == "archer" else "hand_r")
 	var ht: Transform3D = v.skel.global_transform * v.skel.get_bone_global_pose(hb)
-	var fist: Vector3 = ht * CharVisual.grip_center(side)
+	var fist: Vector3 = ht * (CharVisual.grip_center(side) if cls == "warrior" else v.fist_center("hand_l" if cls == "archer" else "hand_r"))
 	var pn: String = {"warrior": "props/sword1", "archer": "props/bow", "mage": "props/staff"}[cls]
 	var gp: Vector3 = v.weapon.global_transform * Vector3(0, float(CharVisual.GRIP[pn][0]), 0)
 	check(gp.distance_to(fist) < 0.03, "[%s] оружие в кулаке (%.3f м)" % [cls, gp.distance_to(fist)])

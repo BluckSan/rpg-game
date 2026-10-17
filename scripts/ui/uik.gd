@@ -137,7 +137,9 @@ static func button(parent: Node, text: String, cb: Callable, c := BUTTON, size :
 
 ## Нажатие не срабатывает, если палец прокручивал список
 static func _guard(cb: Callable) -> void:
-	if not DragScroll.dragging: cb.call()
+	if not DragScroll.dragging:
+		Game.sfx("click")
+		cb.call()
 
 static func _btn_style(c: Color) -> StyleBoxTexture:
 	var s := StyleBoxTexture.new()

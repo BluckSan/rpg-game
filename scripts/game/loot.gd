@@ -96,4 +96,5 @@ func _process(delta: float) -> void:
 				return
 			d["inventory"].append(item)
 			zone.hud.pickup(item.name, DB.RARITY_COLORS[int(item.rarity)], UIK.item_icon(item, d["class"]))
+	Game.sfx("pickup")
 	queue_free()

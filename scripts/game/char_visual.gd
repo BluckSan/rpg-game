@@ -18,6 +18,8 @@ const WEAPONS := {
 	"troll": [["hand_r", "props/axe", "grip", Vector3.ZERO, 0.8]],
 }
 ## Хват: точка на оси модели (y в единицах модели), где смыкается кулак, и поворот вокруг оси (°)
+## Толщина древка относительно длины (посох модели слишком толстый для кулака — сужаем по X/Z)
+const GRIP_THIN := {"props/staff": 0.62}
 const GRIP := {"props/staff": [-0.134, 0.0], "props/sword1": [-0.07, 0.0], "props/axe": [-0.12, 0.0], "props/bow": [0.0, 0.0]}
 ## Центр кулака в системе кости кисти (измерено по костям пальцев скелета UAL: ладонь — x≈0,
 ## согнутые пальцы — x≈-0.05, костяшки — y≈0.11; ось кулака — Z, большой палец — +Z)
@@ -26,13 +28,23 @@ static func grip_center(side: float) -> Vector3:
 	return Vector3(GRIP_CENTER_R.x * side, GRIP_CENTER_R.y, GRIP_CENTER_R.z)
 
 ## Трансформ оружия в кости кисти: ось модели Y идёт по оси кулака (+Z кости), кулак — на точке хвата
-static func grip_transform(side: float, prop_name: String, sc: float, roll := 0.0) -> Transform3D:
+static func grip_transform(side: float, prop_name: String, sc: float, roll := 0.0, center = null) -> Transform3D:
 	var g: Array = GRIP.get(prop_name, [0.0, 0.0])
 	var b := Basis(Vector3(0, 1, 0), Vector3(0, 0, 1), Vector3(1, 0, 0))  # X→Y, Y→Z, Z→X
 	b = b * Basis(Vector3.UP, deg_to_rad(float(g[1]) + roll))
-	b = b * Basis.from_scale(Vector3.ONE * sc)
-	var c := grip_center(side)
+	var th: float = GRIP_THIN.get(prop_name, 1.0)
+	b = b * Basis.from_scale(Vector3(sc * th, sc, sc * th))
+	var c: Vector3 = grip_center(side) if center == null else center
 	return Transform3D(b, c - b * Vector3(0, float(g[0]), 0))
+
+## Центр кулака для этого скелета (мужская и женская кисти разного размера). Значения сняты с
+## костей пальцев в позе анимаций (кулак сжат во всех клипах UAL): середина между костяшками (*_01)
+## и согнутыми фалангами (*_03), ближе к ладони. В позе покоя (rest) пальцы разжаты — её не используем.
+const FIST_CENTER := {0: Vector3(-0.028, 0.082, 0.0), 1: Vector3(-0.025, 0.057, 0.002)}
+func fist_center(bone_name: String) -> Vector3:
+	var c: Vector3 = FIST_CENTER.get(_gender if _gender >= 0 else 0, FIST_CENTER[0])
+	if bone_name.ends_with("_l"): c.x = -c.x
+	return c
 
 ## Внешность монстров-гуманоидов
 const MONSTERS := {
@@ -222,7 +234,8 @@ func _build_weapons() -> void:
 		ba.add_child(inst)
 		if w[2] is String:
 			var side := 1.0 if w[0].ends_with("_r") else -1.0
-			inst.transform = grip_transform(side, w[1], float(w[4]))
+			# меч — проверенный хват (не трогаем); посох и лук — по реальному кулаку этого скелета
+			inst.transform = grip_transform(side, w[1], float(w[4]), 0.0, null if w[1] == "props/sword1" else fist_center(w[0]))
 			_add_grip(w[0], w[1])
 		else:
 			inst.position = w[2]; inst.rotation_degrees = w[3]; inst.scale = Vector3.ONE * float(w[4])
@@ -249,10 +262,12 @@ var grips := {}   # кость -> GripAlign
 func _add_grip(bone_name: String, prop_name: String) -> void:
 	if not prop_name in ["props/staff", "props/bow", "props/sword1"]: return
 	var m := GripAlign.new()
-	m.name = "Grip_" + bone_name
-	skel.add_child(m)
 	m.side = 1.0 if bone_name.ends_with("_r") else -1.0
-	m.setup(bone_name)
+	m.center = fist_center(bone_name)
+	m.bone = skel.find_bone(bone_name)
+	if "--nogrip" in OS.get_cmdline_user_args(): m.target_weight = 0.0
+	# анимация вручную: после неё сразу доворачиваем кисть (до отрисовки меша и оружия)
+	tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
 	grips[bone_name] = m
 
 ## Вес доводки в зависимости от действия
@@ -273,6 +288,7 @@ func _update_grips() -> void:
 		else:
 			w = 0.0 if _bow_aiming or (acting and _cur_action in ["roll", "dash"]) else 0.85
 		if dead: w = 0.0
+		if "--nogrip" in OS.get_cmdline_user_args(): w = 0.0
 		g.target_weight = w
 
 ## Светящийся кристалл на навершии посоха
@@ -287,6 +303,8 @@ func _staff_orb(inst: Node3D, tip: Vector3) -> void:
 	orb.material_override = m
 	orb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	inst.add_child(orb); orb.position = tip - Vector3(0, 0.12, 0)
+	var th: float = GRIP_THIN.get("props/staff", 1.0)
+	orb.scale = Vector3(1.0 / th, 1.0, 1.0 / th)   # шар остаётся круглым на суженном посохе
 	var halo := MeshInstance3D.new()
 	var q := QuadMesh.new(); q.size = Vector2(0.55, 0.55)
 	halo.mesh = q
@@ -338,7 +356,7 @@ func _build_fx(kind: String, c: Color, parent: Node3D) -> void:
 
 func _particles(parent: Node3D, c: Color, n: int, life: float, size: float, at: Vector3, spread: float) -> void:
 	var p := CPUParticles3D.new()
-	p.amount = n; p.lifetime = life; p.position = at
+	p.amount = maxi(2, int(n * Game.particle_mul)); p.lifetime = life; p.position = at
 	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE; p.emission_sphere_radius = spread
 	p.direction = Vector3.UP; p.spread = 25; p.gravity = Vector3(0, 0.6, 0)
 	p.initial_velocity_min = 0.2; p.initial_velocity_max = 0.6
@@ -488,6 +506,8 @@ func play_anim(anim: String, speed := 1.0, upper := true, trail_time := 0.0) -> 
 ## След оружия на время взмаха
 func swing(t: float) -> void:
 	if trail: trail.emit(t)
+	if is_inside_tree() and get_viewport().get_camera_3d() and global_position.distance_to(get_viewport().get_camera_3d().global_position) < 25.0:
+		Game.sfx("swing")
 
 ## Мировая позиция кончика оружия (точка каста)
 func tip_position() -> Vector3:
@@ -531,7 +551,7 @@ func _update_bow() -> void:
 	var w: Node3D = _bow_ba.get_child(0)
 	if aim:
 		_bow_ba.bone_name = "hand_r"
-		w.transform = grip_transform(1.0, "props/bow", _bow_rest[2], 180.0)
+		w.transform = grip_transform(1.0, "props/bow", _bow_rest[2], 180.0, fist_center("hand_r"))
 	else:
 		_bow_ba.bone_name = _bow_rest[0]
 		w.transform = _bow_rest[1]
@@ -554,3 +574,6 @@ func _process(delta: float) -> void:
 	tree.set("parameters/loco_ts/scale", 1.0 if s < 5.5 else clampf(s / 5.5, 1.0, 1.4))
 	var air_now: float = tree.get("parameters/air/blend_amount")
 	tree.set("parameters/air/blend_amount", move_toward(air_now, 1.0 if in_air else 0.0, delta * 6))
+	if not grips.is_empty():
+		tree.advance(delta)
+		for bn in grips: grips[bn].apply(skel, delta)

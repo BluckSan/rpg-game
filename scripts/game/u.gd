@@ -36,11 +36,11 @@ static func mesh(kind: String) -> Mesh:
 	match kind:
 		"box": m = BoxMesh.new()
 		"sphere":
-			var s := SphereMesh.new(); s.radius = 0.5; s.height = 1.0; s.radial_segments = 16; s.rings = 8; m = s
+			var s := SphereMesh.new(); s.radius = 0.5; s.height = 1.0; s.radial_segments = 12; s.rings = 6; m = s
 		"capsule":
 			var c := CapsuleMesh.new(); c.radius = 0.5; c.height = 2.0; c.radial_segments = 12; c.rings = 4; m = c
 		"cylinder":
-			var y := CylinderMesh.new(); y.top_radius = 0.5; y.bottom_radius = 0.5; y.height = 2.0; y.radial_segments = 14; y.rings = 1; m = y
+			var y := CylinderMesh.new(); y.top_radius = 0.5; y.bottom_radius = 0.5; y.height = 2.0; y.radial_segments = 10; y.rings = 1; m = y
 		"cone":
 			var k := CylinderMesh.new(); k.top_radius = 0.0; k.bottom_radius = 0.5; k.height = 1.0; k.radial_segments = 10; k.rings = 1; m = k
 		_: m = BoxMesh.new()
@@ -130,3 +130,10 @@ static func _pop_label(parent: Node, pos: Vector3, text: String, c: Color, px: f
 	tw.tween_property(l, "global_position", l.global_position + Vector3(side * 0.6, 1.4, 0), 0.9).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
 	tw.tween_property(l, "modulate:a", 0.0, 0.45).set_delay(0.5)
 	tw.chain().tween_callback(l.queue_free)
+
+
+## Дальность видимости для всех мешей узла (дальние объекты не рисуются; тени — только вблизи)
+static func set_view_range(n: Node, d: float) -> void:
+	for g in n.find_children("*", "GeometryInstance3D", true, false):
+		(g as GeometryInstance3D).visibility_range_end = d
+		g.add_to_group("view_range_mobs")

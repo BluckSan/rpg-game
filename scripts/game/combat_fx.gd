@@ -37,7 +37,7 @@ static func _mat(c: Color, add := true) -> StandardMaterial3D:
 static func burst(parent: Node, pos: Vector3, c: Color, n := 14, speed := 5.0, size := 0.06, life := 0.45, dir := Vector3.UP, spread := 70.0, gravity := -9.0) -> void:
 	var p := CPUParticles3D.new()
 	p.one_shot = true; p.emitting = false
-	p.amount = n; p.lifetime = life; p.explosiveness = 0.95
+	p.amount = maxi(2, int(n * Game.particle_mul)); p.lifetime = life; p.explosiveness = 0.95
 	p.direction = dir; p.spread = spread
 	p.initial_velocity_min = speed * 0.5; p.initial_velocity_max = speed
 	p.gravity = Vector3(0, gravity, 0)
@@ -56,6 +56,7 @@ static func burst(parent: Node, pos: Vector3, c: Color, n := 14, speed := 5.0, s
 ## Попадание по врагу
 static func hit(parent: Node, pos: Vector3, kind: String, crit: bool, from_dir: Vector3) -> void:
 	var d := (from_dir.normalized() + Vector3.UP * 0.6).normalized()
+	Game.sfx("hit", 0.85 if crit else 1.0)
 	match kind:
 		"skeleton", "skeleton_archer":
 			burst(parent, pos, Color(1, 0.9, 0.6), 16 if crit else 10, 6.0, 0.05, 0.35, d, 55)
