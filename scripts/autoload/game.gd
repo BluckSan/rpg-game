@@ -35,6 +35,7 @@ var sensitivity := 1.0     # чувствительность камеры (0.4�
 var _music: AudioStreamPlayer
 var _sfx_pool: Array[AudioStreamPlayer] = []
 var _sfx_streams := {}
+var _sfx_players := {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -101,7 +102,9 @@ func apply_settings() -> void:
 	vp.content_scale_factor = ui_scale
 	vp.scaling_3d_scale = render_scale
 	# на ПК при уменьшенном 3D — FSR (чётче), на телефоне — дешёвый билинейный
-	vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR if desktop and render_scale < 0.99 else Viewport.SCALING_3D_MODE_BILINEAR
+	# FSR — только на ПК-платформах; на Android всегда билинейное масштабирование (Mali/Vulkan Mobile)
+	var fsr_ok := desktop and is_pc_platform() and OS.get_name() != "Android"
+	vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR if fsr_ok and render_scale < 0.99 else Viewport.SCALING_3D_MODE_BILINEAR
 	match quality:
 		0:
 			vp.msaa_3d = Viewport.MSAA_DISABLED
@@ -148,9 +151,13 @@ func _setup_audio() -> void:
 	_music.stream = _make_music()
 	add_child(_music)
 	_music.play()
-	for i in 6:
-		var p := AudioStreamPlayer.new(); p.bus = "SFX"; add_child(p); _sfx_pool.append(p)
-	for n in ["click", "hit", "swing", "pickup", "level"]: _sfx_streams[n] = _make_sfx(n)
+	# у каждого звука свой проигрыватель с полифонией: поток никогда не подменяется на лету
+	# (подмена потока во время микширования на Android — риск гонки с аудиопотоком)
+	for n in ["click", "hit", "swing", "pickup", "level"]:
+		_sfx_streams[n] = _make_sfx(n)
+		var p := AudioStreamPlayer.new(); p.bus = "SFX"; p.stream = _sfx_streams[n]
+		p.max_polyphony = 3; p.name = "Sfx_" + n
+		add_child(p); _sfx_players[n] = p
 
 func apply_audio() -> void:
 	var mi := AudioServer.get_bus_index("Music"); var si := AudioServer.get_bus_index("SFX")
@@ -163,20 +170,25 @@ func apply_audio() -> void:
 
 ## Короткий звук: click, hit, swing, pickup, level
 func sfx(n: String, pitch := 1.0) -> void:
-	if not _sfx_streams.has(n) or sfx_volume <= 0.001: return
-	for p in _sfx_pool:
-		if not p.playing:
-			p.stream = _sfx_streams[n]; p.pitch_scale = pitch * randf_range(0.95, 1.05); p.play()
-			return
+	if not _sfx_players.has(n) or sfx_volume <= 0.001: return
+	var p: AudioStreamPlayer = _sfx_players[n]
+	p.pitch_scale = pitch * randf_range(0.95, 1.05)
+	p.play()
 
 const RATE := 22050
+## WAV из сэмплов. В конце — запас тишины, а конец петли — последний кадр включительно (frames-1):
+## микшер WAV в Godot при loop_end == frames читает кадр за концом буфера, на Android 16 с проверкой
+## тегов памяти (MTE) это приводило к падению SIGSEGV в libgodot_android.so (v0.3.2).
+const WAV_PAD := 512
 static func _wav(data: PackedFloat32Array, loop := false) -> AudioStreamWAV:
-	var b := PackedByteArray(); b.resize(data.size() * 2)
-	for i in data.size(): b.encode_s16(i * 2, int(clampf(data[i], -1.0, 1.0) * 32000.0))
+	var frames := data.size()
+	var b := PackedByteArray(); b.resize((frames + WAV_PAD) * 2)
+	b.fill(0)
+	for i in frames: b.encode_s16(i * 2, int(clampf(data[i], -1.0, 1.0) * 32000.0))
 	var w := AudioStreamWAV.new()
 	w.format = AudioStreamWAV.FORMAT_16_BITS; w.mix_rate = RATE; w.stereo = false; w.data = b
 	if loop:
-		w.loop_mode = AudioStreamWAV.LOOP_FORWARD; w.loop_begin = 0; w.loop_end = data.size()
+		w.loop_mode = AudioStreamWAV.LOOP_FORWARD; w.loop_begin = 0; w.loop_end = frames - 1
 	return w
 
 func _make_sfx(n: String) -> AudioStreamWAV:

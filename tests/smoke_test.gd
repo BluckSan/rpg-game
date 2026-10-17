@@ -51,6 +51,7 @@ func _ready() -> void:
 	await frames(10)
 	var menu = get_tree().current_scene
 	check(menu != null and menu.name == "MainMenu", "сцена меню загружена")
+	await _audio_tests()
 	await _title_tests(menu)
 	menu.open_creator()
 	await frames(5)
@@ -291,6 +292,24 @@ func _desktop_tests(z, p: Player) -> void:
 	h._hotkey(KEY_1)
 	await secs(0.6)
 
+## Звук: у каждого эффекта свой проигрыватель (без подмены потока), у WAV запас в конце буфера
+func _audio_tests() -> void:
+	var ok := true
+	for n in ["click", "hit", "swing", "pickup", "level"]:
+		var p: AudioStreamPlayer = Game._sfx_players.get(n)
+		if p == null or p.stream != Game._sfx_streams[n]: ok = false
+	check(ok, "звуки: отдельный проигрыватель на каждый эффект")
+	var m: AudioStreamWAV = Game._music.stream
+	var frames: int = m.data.size() / 2 - Game.WAV_PAD
+	check(m.loop_end == frames - 1 and m.data.size() / 2 > m.loop_end + 64, "музыка: конец петли внутри буфера (%d < %d)" % [m.loop_end, m.data.size() / 2])
+	for i in 200:
+		Game.sfx(["click", "hit", "swing", "pickup", "level"][i % 5])
+		if i % 20 == 0: await frames(1)
+	ok = true
+	for n in Game._sfx_players:
+		if Game._sfx_players[n].stream != Game._sfx_streams[n]: ok = false
+	check(ok, "200 звуков подряд — потоки не подменялись")
+
 ## Титульный экран: кнопки, настройки, выбор героя, удаление с подтверждением
 func _title_tests(menu) -> void:
 	check(menu.screen != null and menu.screen.name == "TitleScreen" and menu.title_mode, "при запуске — титульный экран")
@@ -415,6 +434,10 @@ func _grip_tests(p: Player, cls: String) -> void:
 	var gp: Vector3 = v.weapon.global_transform * Vector3(0, float(CharVisual.GRIP[pn][0]), 0)
 	check(gp.distance_to(fist) < 0.03, "[%s] оружие в кулаке (%.3f м)" % [cls, gp.distance_to(fist)])
 	var ax := (v.weapon.global_basis * Vector3.UP).normalized()
+	if cls == "archer":
+		var fwd: Vector3 = v.global_basis.z.normalized()
+		var rel: Vector3 = ht.origin - v.global_position
+		check(rel.dot(fwd) > 0.15 and v.arm_pose != null and v.arm_pose.cur > 0.5, "[archer] в стойке кисть с луком вынесена вперёд (%.2f м)" % rel.dot(fwd))
 	if cls != "warrior":
 		check(rad_to_deg(ax.angle_to(Vector3.UP)) < 20.0, "[%s] в стойке оружие вертикально (%d°)" % [cls, rad_to_deg(ax.angle_to(Vector3.UP))])
 

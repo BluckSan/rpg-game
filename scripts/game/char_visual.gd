@@ -106,7 +106,7 @@ func build(l: Dictionary, cls: String, asc: String, monster_kind := "") -> void:
 	else:
 		look = CharAssets.normalize_look(l)
 	for c in get_children(): c.queue_free()
-	model = null; beast = null; fx = null; skel = null; tree = null; meshes = {}; weapon = null; trail = null; _bow_ba = null; grips = {}; _bow_aiming = false
+	model = null; beast = null; fx = null; skel = null; tree = null; meshes = {}; weapon = null; trail = null; _bow_ba = null; grips = {}; arm_pose = null; _bow_aiming = false
 	dead = false
 	if asc == "druid":
 		beast = MobModel.new(); add_child(beast)
@@ -235,7 +235,7 @@ func _build_weapons() -> void:
 		if w[2] is String:
 			var side := 1.0 if w[0].ends_with("_r") else -1.0
 			# меч — проверенный хват (не трогаем); посох и лук — по реальному кулаку этого скелета
-			inst.transform = grip_transform(side, w[1], float(w[4]), 0.0, null if w[1] == "props/sword1" else fist_center(w[0]))
+			inst.transform = grip_transform(side, w[1], float(w[4]), 180.0 if w[1] == "props/bow" else 0.0, null if w[1] == "props/sword1" else fist_center(w[0]))
 			_add_grip(w[0], w[1])
 		else:
 			inst.position = w[2]; inst.rotation_degrees = w[3]; inst.scale = Vector3.ONE * float(w[4])
@@ -259,6 +259,7 @@ func _build_weapons() -> void:
 
 ## Доводка кисти: посох и лук в покое/на бегу стоят вертикально
 var grips := {}   # кость -> GripAlign
+var arm_pose: ArmPose   # лучник: рука с луком вынесена вперёд-влево в стойке
 func _add_grip(bone_name: String, prop_name: String) -> void:
 	if not prop_name in ["props/staff", "props/bow", "props/sword1"]: return
 	var m := GripAlign.new()
@@ -269,6 +270,9 @@ func _add_grip(bone_name: String, prop_name: String) -> void:
 	# анимация вручную: после неё сразу доворачиваем кисть (до отрисовки меша и оружия)
 	tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
 	grips[bone_name] = m
+	if prop_name == "props/bow":
+		arm_pose = ArmPose.new()
+		arm_pose.setup(skel, "upperarm_l", "lowerarm_l", "hand_l")
 
 ## Вес доводки в зависимости от действия
 func _update_grips() -> void:
@@ -290,6 +294,10 @@ func _update_grips() -> void:
 		if dead: w = 0.0
 		if "--nogrip" in OS.get_cmdline_user_args(): w = 0.0
 		g.target_weight = w
+	if arm_pose:
+		var aw := clampf(1.0 - _speed / 1.4, 0.0, 1.0)
+		if acting or _bow_aiming or dead or "--nogrip" in OS.get_cmdline_user_args(): aw = 0.0
+		arm_pose.target_weight = aw
 
 ## Светящийся кристалл на навершии посоха
 func _staff_orb(inst: Node3D, tip: Vector3) -> void:
@@ -576,4 +584,6 @@ func _process(delta: float) -> void:
 	tree.set("parameters/air/blend_amount", move_toward(air_now, 1.0 if in_air else 0.0, delta * 6))
 	if not grips.is_empty():
 		tree.advance(delta)
+		if skel == null or not is_instance_valid(skel): return
+		if arm_pose: arm_pose.apply(skel, global_basis, delta)
 		for bn in grips: grips[bn].apply(skel, delta)

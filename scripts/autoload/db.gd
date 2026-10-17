@@ -92,12 +92,15 @@ var ENEMIES := {
 	"skeleton_archer": {"name": "Скелет-лучник", "hp": 50.0, "dmg": 11.0, "speed": 2.6, "range": 11.0, "interval": 1.8, "aggro": 13.0, "radius": 0.5, "xp": 28.0, "ranged": true, "boss": false, "color": Color(0.9,0.88,0.8)},
 	"skeleton": {"name": "Скелет-воин", "hp": 70.0, "dmg": 12.0, "speed": 3.4, "range": 1.9, "interval": 1.2, "aggro": 11.0, "radius": 0.5, "xp": 30.0, "ranged": false, "boss": false, "color": Color(0.85,0.83,0.75)},
 	"goblin": {"name": "Гоблин-громила", "hp": 120.0, "dmg": 18.0, "speed": 3.0, "range": 2.2, "interval": 1.6, "aggro": 10.0, "radius": 0.8, "xp": 45.0, "ranged": false, "boss": false, "color": Color(0.35,0.55,0.2)},
+	"ether_guard": {"name": "Страж Эфира", "hp": 160.0, "dmg": 16.0, "speed": 3.4, "range": 2.0, "interval": 1.3, "aggro": 30.0, "radius": 0.6, "xp": 60.0, "ranged": false, "boss": false, "color": Color(0.6,0.4,1.0)},
+	"warden": {"name": "Хранитель Эфира", "hp": 5200.0, "dmg": 30.0, "speed": 3.6, "range": 3.4, "interval": 2.0, "aggro": 17.0, "radius": 1.6, "xp": 1500.0, "ranged": false, "boss": true, "color": Color(0.45,0.35,0.7)},
 	"troll": {"name": "Древний тролль", "hp": 2200.0, "dmg": 28.0, "speed": 3.2, "range": 3.2, "interval": 1.8, "aggro": 16.0, "radius": 1.6, "xp": 500.0, "ranged": false, "boss": true, "color": Color(0.4,0.5,0.45)},
 }
 
 ## Зоны. Чтобы добавить глобальную карту: сделать сборщик мира в zone.gd для "global" и поставить available = true.
 var ZONES := {
 	"starter": {"name": "Пепельная долина", "scene": "res://scenes/zone.tscn", "available": true, "min_level": 1},
+	"dungeon": {"name": "Склеп Эфира", "scene": "res://scenes/zone.tscn", "available": true, "min_level": 1, "requires": ["starter", "boss_troll_killed"]},
 	"global": {"name": "Земли Эфира", "scene": "res://scenes/zone.tscn", "available": false, "min_level": 10},
 }
 
@@ -317,6 +320,41 @@ func roll_item(ilvl: int, class_id: String, rarity_bonus := 0.0) -> Dictionary:
 	else:
 		it.name = base_name
 	return it
+
+## Уникальные предметы Хранителя Эфира (подземелье): у каждого класса свой, плюс общий перстень
+const WARDEN_UNIQUES := {
+	"warrior": {"name": "Клинок Хранителя", "slot": 0, "mods": [["dmg%", 22], ["hp%", 10], ["leech%", 1.5], ["armor", 30]]},
+	"archer": {"name": "Лук Пустоты", "slot": 0, "mods": [["dmg%", 20], ["as%", 12], ["crit", 6], ["critdmg%", 25]]},
+	"mage": {"name": "Посох Сжатого Эфира", "slot": 0, "mods": [["spell%", 26], ["mp", 40], ["cdr%", 8], ["mpregen", 2]]},
+	"ring": {"name": "Печать Хранителя", "slot": 3, "mods": [["hp", 60], ["dmg%", 10], ["ms%", 6], ["regen", 3]]},
+}
+func warden_unique(key: String, ilvl: int) -> Dictionary:
+	var u: Dictionary = WARDEN_UNIQUES[key]
+	var it := {"uid": str(randi()), "name": u.name, "slot": u.slot, "rarity": 3, "ilvl": ilvl, "unique": "warden_" + key, "mods": []}
+	var k := 1.0 + ilvl * 0.05
+	for m in u.mods: it.mods.append([m[0], round(float(m[1]) * k * 10.0) / 10.0])
+	it.base = round((3 + ilvl * 1.6) * 1.5) if u.slot == 0 else 0.0
+	return it
+
+## Флаг зоны (например, «босс повержен»)
+func zone_flag(c: Dictionary, zone_id: String, flag: String) -> bool:
+	return c.get("zones", {}).get(zone_id, {}).get("flags", []).has(flag)
+
+func set_zone_flag(c: Dictionary, zone_id: String, flag: String) -> void:
+	if not c.has("zones"): c["zones"] = {}
+	var zs: Dictionary = c["zones"].get(zone_id, {"flags": []})
+	if not zs.has("flags"): zs["flags"] = []
+	if not zs["flags"].has(flag): zs["flags"].append(flag)
+	c["zones"][zone_id] = zs
+
+## Открыта ли зона для персонажа: "" — да, иначе причина
+func zone_lock_reason(c: Dictionary, zone_id: String) -> String:
+	var z: Dictionary = ZONES.get(zone_id, {})
+	if z.is_empty() or not z["available"]: return "Путь откроется в следующих версиях"
+	if int(c["level"]) < int(z["min_level"]): return "Нужен %d уровень" % z["min_level"]
+	var req: Array = z.get("requires", [])
+	if req.size() == 2 and not zone_flag(c, req[0], req[1]): return "Печать держится. Победите Древнего тролля"
+	return ""
 
 func describe_item(it: Dictionary) -> String:
 	var s := "%s · %s · ур. %d\n" % [SLOT_NAMES[int(it.slot)], RARITY_NAMES[int(it.rarity)], int(it.ilvl)]
