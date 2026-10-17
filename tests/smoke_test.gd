@@ -471,6 +471,9 @@ func _talent_v2_tests(z, p: Player) -> void:
 	tw.search.text = "снаряд"
 	tw._update_matches()
 	check(tw.matches.size() >= 2, "поиск по эффекту: %d" % tw.matches.size())
+	tw.search.text = "ГНЕВ"; tw.matches.clear(); tw._match_i = -1
+	tw.find_next()
+	check(tw.selected >= 0 and "гнев" in str(DB.tree_nodes[tw.selected]["name"]).to_lower(), "«Найти» без пересчёта и без учёта регистра")
 	tw.search.text = ""
 	tw.set_filter("key")
 	var all_keys := true

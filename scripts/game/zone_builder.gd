@@ -153,8 +153,8 @@ func _heavy_env(e: Environment, sun: DirectionalLight3D) -> void:
 		e.sdfgi_energy = 0.9
 		e.ssao_radius = 1.4; e.ssao_intensity = 1.8; e.ssao_power = 1.4
 		e.ssr_max_steps = 48; e.ssr_fade_in = 0.15; e.ssr_fade_out = 2.0
-		e.volumetric_fog_density = 0.008 if not is_dungeon_env() else 0.03
-		e.volumetric_fog_albedo = Color(0.85, 0.85, 0.9) if not is_dungeon_env() else Color(0.6, 0.5, 0.9)
+		e.volumetric_fog_density = 0.008 if not is_dungeon_env() else 0.014
+		e.volumetric_fog_albedo = Color(0.85, 0.85, 0.9) if not is_dungeon_env() else Color(0.55, 0.5, 0.7)
 		e.volumetric_fog_anisotropy = 0.55
 		e.volumetric_fog_length = 70.0
 		e.volumetric_fog_sky_affect = 0.2
@@ -195,7 +195,7 @@ func _hi_world() -> void:
 		var zz := -SIZE + CH / 2
 		while zz < SIZE:
 			var xf: Array = []
-			for i in 420:
+			for i in 900:
 				var p := Vector3(x + grng.randf_range(-CH / 2, CH / 2), 0, zz + grng.randf_range(-CH / 2, CH / 2))
 				if p.length() < 13 or _dist_to_path(p) < 2.0 or p.distance_to(Vector3(-4, 0, 64)) < 17 or p.distance_to(Vector3(52, 0, -14)) < 12 \
 						or (absf(p.x - 6) < 12 and absf(p.z + 46) < 10) or p.distance_to(POND) < POND_R + 0.5 or p.distance_to(dungeon_gate_point) < 6 or p.length() > SIZE - 4:
@@ -241,7 +241,7 @@ func _blade_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new(); st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for k in 3:
 		var b := Basis(Vector3.UP, k * PI / 3.0)
-		var w := 0.07; var h := 0.5
+		var w := 0.045; var h := 0.36
 		var p0 := b * Vector3(-w, 0, 0); var p1 := b * Vector3(w, 0, 0); var p2 := b * Vector3(0.02, h, 0.03)
 		var nrm := b * Vector3(0, 0, 1)
 		for v in [[p0, 0.0], [p1, 0.0], [p2, 1.0]]:

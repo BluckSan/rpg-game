@@ -341,7 +341,7 @@ func _v040_shots(z) -> void:
 	z.hud.close_window(); await w(0.3)
 	z.hud._open("talents"); await w(0.6)
 	var tw = z.hud.window
-	tw.search.text = "огонь"; tw.find_next(); await w(0.5)
+	tw.search.text = "огн"; tw.find_next(); await w(0.5)
 	await shot("45_talents_search")
 	tw.set_filter("key"); await w(0.4)
 	await shot("46_talents_keystones")

@@ -132,7 +132,7 @@ func _filtering() -> bool:
 
 ## Следующее совпадение поиска: выбрать и показать по центру
 func find_next() -> void:
-	if not _filtering(): _update_matches()
+	if matches.is_empty() or _match_i < 0: _update_matches()
 	if matches.is_empty():
 		Game.toast("Ничего не найдено", 1.2); return
 	_match_i = (_match_i + 1) % matches.size()
