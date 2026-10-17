@@ -10,13 +10,20 @@ const DIRT := Color(0.45, 0.36, 0.25)
 const STONE := Color(0.5, 0.5, 0.52)
 const WOOD := Color(0.4, 0.27, 0.15)
 const PATHS := [[Vector3(0,0,0), Vector3(28,0,22)], [Vector3(0,0,0), Vector3(-42,0,8)], [Vector3(0,0,0), Vector3(6,0,-46)],
-	[Vector3(0,0,0), Vector3(52,0,-14)], [Vector3(0,0,0), Vector3(-4,0,60)], [Vector3(28,0,22), Vector3(66,0,56)]]
+	[Vector3(0,0,0), Vector3(52,0,-14)], [Vector3(0,0,0), Vector3(-4,0,60)], [Vector3(28,0,22), Vector3(66,0,56)],
+	[Vector3(-4,0,44), Vector3(-25,0,54)]]
 
 var zone
 var spawn_point := Vector3(0, 0.1, -3.5)
 var merchant_point := Vector3(-3.4, 0, -5.6)
 var arena_point := Vector3(-4, 0.8, 64)
 var portal_point := Vector3(66, 0, 56)
+var dungeon_gate_point := Vector3(-27, 0, 55)
+var dungeon_seal: Node3D
+const POND := Vector3(-22, 0, -28)
+const POND_R := 8.0
+var hi_nodes: Array = []      # ПК-детализация (трава, вода, земля) — видна только при heavy/pc_detail
+var detail_nodes: Array = []
 var rng := RandomNumberGenerator.new()
 var _batches := {}   # mesh kind -> [[Transform3D, Color], ...]
 var _colliders: StaticBody3D
@@ -37,9 +44,12 @@ func build(z) -> void:
 	_goblin_camp(Vector3(52, 0, -14))
 	_ruins(Vector3(-4, 0, 60))
 	_portal(portal_point)
+	_dungeon_gate(dungeon_gate_point)
 	_scatter()
 	_boundary()
 	_flush_batches()
+	if Game.desktop and Game.is_pc_platform(): _hi_world()
+	apply_graphics()
 	# спавны
 	Spawner.create(z, enemies_root, Vector3(28, 0, 22), "slime", 1, 2, 6, 9, 15)
 	Spawner.create(z, enemies_root, Vector3(16, 0, -14), "slime", 1, 3, 4, 6, 18)
@@ -122,8 +132,121 @@ func apply_graphics() -> void:
 		e.fog_depth_end = Game.view_distance
 		e.fog_depth_begin = Game.view_distance * 0.35
 		e.adjustment_enabled = Game.quality >= 2
+		_heavy_env(e, sun)
+	for n in hi_nodes: if is_instance_valid(n): n.visible = Game.heavy_fx()
+	for n in detail_nodes: if is_instance_valid(n): n.visible = Game.pc_detail()
 	for n in get_tree().get_nodes_in_group("view_range"):
 		(n as GeometryInstance3D).visibility_range_end = Game.view_distance + CELL
+
+## ПК «Высокое» (Forward+): глобальное освещение SDFGI (половинное разрешение), SSAO, объёмный туман,
+## отражения SSR, мягкие тени (PCSS), сильнее свечение. Иначе всё выключено — телефон не нагружается.
+func _heavy_env(e: Environment, sun: DirectionalLight3D) -> void:
+	var on := Game.heavy_fx()
+	e.sdfgi_enabled = on
+	e.ssao_enabled = on
+	e.ssr_enabled = on
+	e.volumetric_fog_enabled = on
+	if on:
+		e.sdfgi_cascades = 4
+		e.sdfgi_min_cell_size = 0.4
+		e.sdfgi_use_occlusion = true
+		e.sdfgi_energy = 0.9
+		e.ssao_radius = 1.4; e.ssao_intensity = 1.8; e.ssao_power = 1.4
+		e.ssr_max_steps = 48; e.ssr_fade_in = 0.15; e.ssr_fade_out = 2.0
+		e.volumetric_fog_density = 0.008 if not is_dungeon_env() else 0.03
+		e.volumetric_fog_albedo = Color(0.85, 0.85, 0.9) if not is_dungeon_env() else Color(0.6, 0.5, 0.9)
+		e.volumetric_fog_anisotropy = 0.55
+		e.volumetric_fog_length = 70.0
+		e.volumetric_fog_sky_affect = 0.2
+		e.glow_intensity = 0.55; e.glow_bloom = 0.07
+		e.set_glow_level(1, 1.0); e.set_glow_level(3, 0.8); e.set_glow_level(5, 0.6)
+	else:
+		e.glow_intensity = 0.35; e.glow_bloom = 0.04
+	if sun:
+		sun.light_angular_distance = 0.6 if on else 0.0
+		sun.shadow_blur = 1.0 if on else 1.5
+		if on: sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+		sun.light_volumetric_fog_energy = 1.0
+	RenderingServer.directional_soft_shadow_filter_set_quality(RenderingServer.SHADOW_QUALITY_SOFT_HIGH if on else RenderingServer.SHADOW_QUALITY_SOFT_LOW)
+	RenderingServer.positional_soft_shadow_filter_set_quality(RenderingServer.SHADOW_QUALITY_SOFT_MEDIUM if on else RenderingServer.SHADOW_QUALITY_SOFT_LOW)
+
+func is_dungeon_env() -> bool: return false
+
+## ПК: шейдерная земля, трава с ветром (чанки 16 м, дальность 38 м), пруд с водой
+func _hi_world() -> void:
+	var nb := NoiseTexture2D.new(); nb.width = 512; nb.height = 512; nb.seamless = true
+	var fn := FastNoiseLite.new(); fn.frequency = 0.008; fn.fractal_octaves = 4; nb.noise = fn
+	var ns := NoiseTexture2D.new(); ns.width = 256; ns.height = 256; ns.seamless = true
+	var fs := FastNoiseLite.new(); fs.frequency = 0.05; fs.fractal_octaves = 2; ns.noise = fs
+	var tm := ShaderMaterial.new(); tm.shader = load("res://assets/shaders/terrain.gdshader")
+	tm.set_shader_parameter("noise_big", nb); tm.set_shader_parameter("noise_small", ns)
+	var ground := MeshInstance3D.new(); ground.name = "TerrainHi"
+	var pm := PlaneMesh.new(); pm.size = Vector2(SIZE * 2 + 40, SIZE * 2 + 40)
+	ground.mesh = pm; ground.material_override = tm
+	ground.position = Vector3(0, 0.003, 0)
+	add_child(ground); detail_nodes.append(ground)
+	# трава
+	var blade := _blade_mesh()
+	var gm := ShaderMaterial.new(); gm.shader = load("res://assets/shaders/grass.gdshader")
+	var CH := 16.0
+	var grng := RandomNumberGenerator.new(); grng.seed = 777
+	var x := -SIZE + CH / 2
+	while x < SIZE:
+		var zz := -SIZE + CH / 2
+		while zz < SIZE:
+			var xf: Array = []
+			for i in 420:
+				var p := Vector3(x + grng.randf_range(-CH / 2, CH / 2), 0, zz + grng.randf_range(-CH / 2, CH / 2))
+				if p.length() < 13 or _dist_to_path(p) < 2.0 or p.distance_to(Vector3(-4, 0, 64)) < 17 or p.distance_to(Vector3(52, 0, -14)) < 12 \
+						or (absf(p.x - 6) < 12 and absf(p.z + 46) < 10) or p.distance_to(POND) < POND_R + 0.5 or p.distance_to(dungeon_gate_point) < 6 or p.length() > SIZE - 4:
+					continue
+				var s := grng.randf_range(0.7, 1.3)
+				xf.append(Transform3D(Basis(Vector3.UP, grng.randf() * TAU).scaled(Vector3(s, s * grng.randf_range(0.8, 1.4), s)), p))
+			if xf.size() > 0:
+				var mm := MultiMesh.new(); mm.transform_format = MultiMesh.TRANSFORM_3D; mm.use_colors = true
+				mm.mesh = blade; mm.instance_count = xf.size()
+				for i in xf.size():
+					mm.set_instance_transform(i, xf[i])
+					mm.set_instance_color(i, Color(grng.randf(), 0, 0))
+				var mi := MultiMeshInstance3D.new(); mi.multimesh = mm; mi.material_override = gm
+				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				mi.visibility_range_end = 38.0; mi.visibility_range_end_margin = 6.0
+				mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+				mi.name = "Grass"
+				add_child(mi); hi_nodes.append(mi)
+			zz += CH
+		x += CH
+	# пруд
+	var wn := NoiseTexture2D.new(); wn.width = 256; wn.height = 256; wn.seamless = true; wn.as_normal_map = true; wn.bump_strength = 6.0
+	var wf := FastNoiseLite.new(); wf.frequency = 0.03; wn.noise = wf
+	var wn2 := NoiseTexture2D.new(); wn2.width = 256; wn2.height = 256; wn2.seamless = true; wn2.as_normal_map = true; wn2.bump_strength = 4.0
+	var wf2 := FastNoiseLite.new(); wf2.frequency = 0.06; wf2.seed = 9; wn2.noise = wf2
+	var wm := ShaderMaterial.new(); wm.shader = load("res://assets/shaders/water.gdshader")
+	wm.set_shader_parameter("wave_a", wn); wm.set_shader_parameter("wave_b", wn2); wm.set_shader_parameter("radius", POND_R)
+	var water := MeshInstance3D.new(); water.name = "Pond"
+	var wmesh := PlaneMesh.new(); wmesh.size = Vector2(POND_R * 2, POND_R * 2)
+	water.mesh = wmesh; water.material_override = wm
+	water.position = POND + Vector3(0, 0.05, 0)
+	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(water); hi_nodes.append(water)
+	var shore := U.prim("cylinder", self, POND + Vector3(0, 0.008, 0), Vector3(POND_R * 2 + 2.5, 0.004, POND_R * 2 + 2.5), Color(0.42, 0.38, 0.28))
+	hi_nodes.append(shore)
+	for i in 10:
+		var a := TAU * i / 10.0 + 0.3
+		var rk := U.prim("sphere", self, POND + Vector3(cos(a), 0.15, sin(a)) * (POND_R + 0.8), Vector3(1.1, 0.5, 0.9) * (0.6 + 0.08 * (i % 4)), STONE * 0.85)
+		hi_nodes.append(rk)
+
+## Травинка: 3 скрещённые плоскости-треугольника (UV.y — высота для ветра)
+func _blade_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new(); st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for k in 3:
+		var b := Basis(Vector3.UP, k * PI / 3.0)
+		var w := 0.07; var h := 0.5
+		var p0 := b * Vector3(-w, 0, 0); var p1 := b * Vector3(w, 0, 0); var p2 := b * Vector3(0.02, h, 0.03)
+		var nrm := b * Vector3(0, 0, 1)
+		for v in [[p0, 0.0], [p1, 0.0], [p2, 1.0]]:
+			st.set_normal(nrm); st.set_uv(Vector2(0.5, v[1])); st.add_vertex(v[0])
+	return st.commit()
 
 # ---------- статика ----------
 func _add(kind: String, pos: Vector3, scale: Vector3, c: Color, rot := Vector3.ZERO, collide := true) -> void:
@@ -399,11 +522,44 @@ func _portal(c: Vector3) -> void:
 	portal.position = c
 	_light(c + Vector3.UP * 2.5, Color(0.3, 0.8, 1), 2.0, 10)
 
+## Вход в «Склеп Эфира»: каменный склеп с аркой; до победы над троллем — печать (красный барьер)
+func _dungeon_gate(c: Vector3) -> void:
+	var rot := 115.0   # арка смотрит на тропу от руин
+	var rb := Basis(Vector3.UP, deg_to_rad(rot))
+	_add("box", c + rb * Vector3(0, 2.0, -2.2), Vector3(7.0, 4.0, 4.0), STONE * 0.6, Vector3(0, rot, 0))
+	_add("box", c + rb * Vector3(0, 4.3, -2.2), Vector3(7.6, 0.6, 4.6), STONE * 0.5, Vector3(0, rot, 0))
+	for s in [-1, 1]:
+		_add("box", c + rb * Vector3(s * 2.0, 2.0, 0.1), Vector3(0.9, 4.0, 0.9), STONE * 0.75, Vector3(0, rot, 0))
+		_glow("sphere", c + rb * Vector3(s * 2.0, 4.3, 0.4), Vector3.ONE * 0.3, Color(0.7, 0.45, 1.0), 3.0)
+	_add("box", c + rb * Vector3(0, 4.25, 0.1), Vector3(5.0, 0.7, 1.0), STONE * 0.7, Vector3(0, rot, 0))
+	var plane := U.prim("box", self, c + Vector3.UP * 1.9, Vector3(3.1, 3.6, 0.1), Color(0.5, 0.3, 1))
+	plane.rotation_degrees.y = rot
+	plane.material_override = U.fx_mat(Color(0.55, 0.3, 1.0, 0.6))
+	var lbl := Label3D.new()
+	lbl.font = UIK.title_font(); lbl.text = "Склеп Эфира"; lbl.font_size = 64; lbl.pixel_size = 0.006
+	lbl.outline_size = 10; lbl.modulate = Color(0.85, 0.7, 1.0); lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	add_child(lbl); lbl.position = c + Vector3.UP * 5.6
+	var portal := Portal.new()
+	portal.zone = zone
+	portal.target_zone = "dungeon"
+	add_child(portal)
+	portal.position = c + rb * Vector3(0, 0, 0.8)
+	_light(c + Vector3.UP * 2.5 + rb * Vector3(0, 0, 1.5), Color(0.6, 0.4, 1.0), 2.0, 9)
+	# печать: пока тролль жив
+	dungeon_seal = Node3D.new(); add_child(dungeon_seal)
+	var seal := U.prim("box", dungeon_seal, c + Vector3.UP * 1.9 + rb * Vector3(0, 0, 0.5), Vector3(3.4, 3.8, 0.15), Color(1, 0.2, 0.15))
+	seal.rotation_degrees.y = rot
+	seal.material_override = U.fx_mat(Color(1, 0.15, 0.1, 0.45))
+	dungeon_seal.visible = DB.zone_lock_reason(zone.data, "dungeon") != ""
+
+func update_seal() -> void:
+	if dungeon_seal: dungeon_seal.visible = DB.zone_lock_reason(zone.data, "dungeon") != ""
+
 func _scatter() -> void:
 	for i in 90:
 		var p := _rand_pos(SIZE - 6)
 		if p.length() < 16 or _dist_to_path(p) < 3: continue
-		if p.distance_to(Vector3(-4, 0, 64)) < 16 or p.distance_to(Vector3(52, 0, -14)) < 13 or p.distance_to(Vector3(6, 0, -46)) < 13 or p.distance_to(Vector3(66, 0, 56)) < 6: continue
+		if p.distance_to(POND) < POND_R + 3 or p.distance_to(dungeon_gate_point) < 8 or p.distance_to(Vector3(-4, 0, 64)) < 16 or p.distance_to(Vector3(52, 0, -14)) < 13 or p.distance_to(Vector3(6, 0, -46)) < 13 or p.distance_to(Vector3(66, 0, 56)) < 6: continue
 		if rng.randf() < 0.65: _tree(p, _r(0.7, 1.3), rng.randf() < 0.4)
 		else: _rock(p, _r(0.5, 1.6))
 

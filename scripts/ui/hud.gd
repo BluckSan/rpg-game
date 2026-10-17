@@ -103,24 +103,27 @@ func setup(z) -> void:
 	badge_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	talent_badge.reparent(badge_bg); UIK.full(talent_badge)
 	_top_button("Герой", _open.bind("hero"), UIK.BUTTON, 1, 210, "person")
+	_top_button("Умения", _open.bind("skills"), Color(0.32, 0.25, 0.5), 3, 230, "book-cover")
 	_top_button("Меню", _open.bind("pause"), Color(0.3, 0.3, 0.32), 2, 190, "cog")
 
 	# --- боевые кнопки (координаты от правого нижнего угла) ---
 	var cls: Dictionary = DB.CLASSES[zone.data["class"]]
 	skill_btns.append(_skill_button(cls.skills[0].name, Vector2(-50, -50), 240, Color(0.62, 0.26, 0.16), UIK.SKILL_ICONS.get(cls.skills[0].id, "broadsword")))
 	skill_btns[0].max_pips = 3
-	var pos := [Vector2.ZERO, Vector2(-310, -40), Vector2(-290, -240), Vector2(-100, -320)]
-	for i in range(1, 4):
-		skill_btns.append(_skill_button("", pos[i], 156, Color.GRAY, ""))
+	# 8 умений набора; расположение — apply_skill_layout() (веер или ряд, настройка «Панель умений»)
+	for i in range(1, DB.LOADOUT_SLOTS + 1):
+		skill_btns.append(_skill_button("", Vector2(-310, -40), 140, Color.GRAY, ""))
 	potion_btn = _skill_button("Зелье", Vector2(-60, -500), 116, Color(0.7, 0.12, 0.2), "health-potion")
 	potion_label = UIK.label(potion_btn, "", 1)   # число показывается значком на кнопке
 	potion_label.visible = false
-	jump_btn = _skill_button("Прыжок", Vector2(-480, -250), 134, Color(0.22, 0.45, 0.7), "jump-across")
-	roll_btn = _skill_button("Кувырок", Vector2(-500, -40), 134, Color(0.3, 0.5, 0.3), "dodging")
+	jump_btn = _skill_button("Прыжок", Vector2(-660, -250), 128, Color(0.22, 0.45, 0.7), "jump-across")
+	roll_btn = _skill_button("Кувырок", Vector2(-670, -40), 128, Color(0.3, 0.5, 0.3), "dodging")
+	add_to_group("hud_listeners")
+	apply_skill_layout()
 
-	interact_btn = UIK.button(root, "Торговать", _open.bind("shop"), UIK.GOLD, 34, "shop")
+	interact_btn = UIK.button(root, "Торговать", interact, UIK.GOLD, 30, "shop")
 	interact_btn.anchor_left = 0.5; interact_btn.anchor_right = 0.5; interact_btn.anchor_top = 1; interact_btn.anchor_bottom = 1
-	interact_btn.offset_left = -170; interact_btn.offset_right = 170; interact_btn.offset_top = -200; interact_btn.offset_bottom = -100
+	interact_btn.offset_left = -210; interact_btn.offset_right = 210; interact_btn.offset_top = -200; interact_btn.offset_bottom = -100
 	interact_btn.visible = false
 	blockers.append(interact_btn)
 
@@ -169,6 +172,9 @@ func setup(z) -> void:
 	boss_panel.visible = false
 	boss_bar.move_to_front()
 	refresh_skill_buttons()
+	if zone.data.has("talent_refund"):
+		Game.toast("Дерево талантов обновлено: возвращено очков — %d. Распределите их заново (путь превращения сохранён)." % int(zone.data["talent_refund"]), 6.0)
+		zone.data.erase("talent_refund")
 
 	# --- подсказка обучения ---
 	hint_panel = Panel.new()
@@ -187,10 +193,48 @@ func setup(z) -> void:
 func _top_button(t: String, cb: Callable, c: Color, idx: int, w: float, ic := "") -> Button:
 	var b := UIK.button(root, t, cb, c, 28, ic)
 	b.anchor_left = 1; b.anchor_right = 1
-	var right: float = -292.0 - [0.0, 256.0, 482.0][idx]
+	var right: float = -292.0 - [0.0, 256.0, 482.0, 692.0][idx]
 	b.offset_right = right; b.offset_left = right - w; b.offset_top = 20; b.offset_bottom = 104
 	top_buttons.append(b)
 	return b
+
+## Расположение кнопок по центру `c` (от угла/края, к которому привязана кнопка). ax: 1 — правый край, 0.5 — центр низа
+func _place(sb: Control, c: Vector2, sz: float, ax := 1.0) -> void:
+	sb.anchor_left = ax; sb.anchor_right = ax; sb.anchor_top = 1; sb.anchor_bottom = 1
+	sb.offset_left = c.x - sz / 2; sb.offset_right = c.x + sz / 2
+	sb.offset_top = c.y - sz / 2; sb.offset_bottom = c.y + sz / 2
+	sb.size = Vector2(sz, sz)
+	sb.pivot_offset = Vector2(sz, sz) / 2
+	sb.queue_redraw()
+
+## Две раскладки панели умений (переключаются в настройках на телефоне и ПК, сохраняются):
+## «mobile» — веер из двух дуг вокруг кнопки атаки справа внизу; «pc» — ряд 1–8 внизу по центру (работает и пальцем)
+var layout := ""
+func apply_skill_layout() -> void:
+	layout = Game.skill_layout
+	if interact_btn:
+		interact_btn.offset_top = -330 if layout == "pc" else -200
+		interact_btn.offset_bottom = interact_btn.offset_top + 100
+	var ac := Vector2(-170, -170)          # центр кнопки атаки
+	_place(skill_btns[0], ac, 240)
+	if layout == "pc":
+		var sz := 104.0; var gap := 12.0
+		var n := skill_btns.size() - 1
+		var x0 := -((n - 1) * (sz + gap)) / 2.0
+		for i in range(1, skill_btns.size()):
+			_place(skill_btns[i], Vector2(x0 + (i - 1) * (sz + gap), -24 - sz / 2), sz, 0.5)
+		_place(roll_btn, Vector2(-380, -90), 112)
+		_place(jump_btn, Vector2(-380, -230), 112)
+		_place(potion_btn, Vector2(-120, -390), 104)
+	else:
+		# внутренняя дуга (r 268): умения 1–4; внешняя (r 440): кувырок, прыжок, умения 5–8, зелье
+		var inner := [180.0, 210.0, 240.0, 270.0]
+		for k in 4:
+			_place(skill_btns[k + 1], ac + Vector2.from_angle(deg_to_rad(inner[k])) * 268.0, 128)
+		var outer := [180.0, 195.0, 210.0, 225.0, 240.0, 255.0, 270.0]
+		var nodes: Array = [roll_btn, jump_btn, skill_btns[5], skill_btns[6], skill_btns[7], skill_btns[8], potion_btn]
+		for k in outer.size():
+			_place(nodes[k], ac + Vector2.from_angle(deg_to_rad(outer[k])) * 440.0, 108)
 
 func _skill_button(t: String, offset: Vector2, sz: float, c: Color, ic: String) -> SkillButton:
 	var sb := SkillButton.new()
@@ -204,9 +248,9 @@ func _skill_button(t: String, offset: Vector2, sz: float, c: Color, ic: String) 
 	return sb
 
 func refresh_skill_buttons() -> void:
-	for i in range(1, 4):
+	for i in range(1, skill_btns.size()):
 		var s = player.get_skill(i)
-		skill_btns[i].text = s.name if s != null else "Путь"
+		skill_btns[i].text = s.name if s != null else ("Путь" if i == 3 and zone.data["ascendancy"] == "" else "Пусто")
 		skill_btns[i].icon = UIK.icon(UIK.SKILL_ICONS.get(s.id, "magic-swirl")) if s != null else UIK.icon("aura")
 		var sc: Color = s.color if s != null else Color(0.4, 0.4, 0.4)
 		skill_btns[i].color = Color(sc.r * 0.55, sc.g * 0.55, sc.b * 0.55, 1)
@@ -218,28 +262,28 @@ func _setup_desktop() -> void:
 	joy_base.visible = false
 	jump_btn.visible = false
 	roll_btn.visible = false
-	var keys := ["ЛКМ", "1", "2", "3"]
+	var keys := ["ЛКМ", "1", "2", "3", "4", "5", "6", "7", "8"]
 	for i in skill_btns.size(): skill_btns[i].key_hint = keys[i]
 	potion_btn.key_hint = "H"
-	interact_btn.text = "Торговать [E]"
-	var help := UIK.label(root, "WASD — ход · ЛКМ — атака · ПКМ — камера · колесо — зум\nПробел — прыжок · Shift — кувырок · H — зелье · I — герой · T — таланты · M — карта · Esc — меню", 19, Color(1, 1, 1, 0.6))
+	_key_e = " [E]"
+	var help := UIK.label(root, "WASD — ход · ЛКМ — атака · 1–8 — умения\nПКМ — камера · колесо — зум · Пробел — прыжок\nShift — кувырок · H — зелье · I — герой · T — таланты\nU — умения · M — карта · Esc — меню", 17, Color(1, 1, 1, 0.6))
 	help.autowrap_mode = TextServer.AUTOWRAP_OFF
 	help.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	help.add_theme_constant_override("outline_size", 5)
 	help.anchor_top = 1; help.anchor_bottom = 1
-	help.offset_left = 20; help.offset_right = 1100; help.offset_top = -112; help.offset_bottom = -44
+	help.offset_left = 20; help.offset_right = 480; help.offset_top = -150; help.offset_bottom = -20
 	help.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 ## Горячие клавиши (true — событие обработано)
 func _hotkey(k: int) -> bool:
 	if window != null:
 		var wname := String(window.name)
-		if k == KEY_ESCAPE or (k in [KEY_I, KEY_C] and wname == "Window_hero") or (k in [KEY_T, KEY_N] and wname == "Window_talents") \
+		if k == KEY_ESCAPE or (k in [KEY_I, KEY_C] and wname == "Window_hero") or (k in [KEY_T, KEY_N] and wname == "Window_talents") or (k in [KEY_U, KEY_P] and wname == "Window_skills") \
 				or (k == KEY_E and wname == "Window_shop"):
 			close_window(); return true
 		return false
 	match k:
-		KEY_1, KEY_2, KEY_3:
+		KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8:
 			var i := k - KEY_0
 			player.try_use(i)
 			skill_btns[i].set_held(true)
@@ -248,12 +292,12 @@ func _hotkey(k: int) -> bool:
 		KEY_SHIFT, KEY_K: press_roll()
 		KEY_H, KEY_Q: player.use_potion()
 		KEY_I, KEY_C: _open("hero")
+		KEY_U, KEY_P: _open("skills")
 		KEY_T, KEY_N: _open("talents")
 		KEY_M: minimap.toggle_big()
 		KEY_ESCAPE: _open("pause")
 		KEY_E:
-			if zone.near_merchant(): _open("shop")
-			else: return false
+			if not interact(): return false
 		_: return false
 	return true
 
@@ -265,6 +309,7 @@ func _open(which: String) -> void:
 		"talents": window = preload("res://scripts/ui/talent_tree_ui.gd").new()
 		"hero": window = preload("res://scripts/ui/inventory_ui.gd").new()
 		"shop": window = preload("res://scripts/ui/shop_ui.gd").new()
+		"skills": window = preload("res://scripts/ui/skills_ui.gd").new()
 		_: window = preload("res://scripts/ui/pause_menu.gd").new()
 	window.name = "Window_" + which
 	UIK.full(window)
@@ -546,7 +591,12 @@ func _process(delta: float) -> void:
 			_hold_time[k] += delta
 			if k > 0 and _hold_time[k] > 0.55 and _tip_slot != k:
 				show_skill_tooltip(k); _tip_slot = k
-	interact_btn.visible = window == null and zone.near_merchant()
+	var it: Dictionary = zone.nearest_interactable()
+	interact_btn.visible = window == null and (zone.near_merchant() or not it.is_empty())
+	if interact_btn.visible:
+		interact_btn.text = ("Торговать" if zone.near_merchant() else str(it["text"])) + _key_e
+		interact_btn.icon = UIK.icon("shop" if zone.near_merchant() else str(it.get("icon", "cog")))
+	_update_cast()
 	var d: Dictionary = zone.data
 	joy_default = Vector2(260, _screen().y - 240)
 	if not _has_role("joy"): _set_joy(joy_default, Vector2.ZERO)
@@ -568,7 +618,7 @@ func _process(delta: float) -> void:
 	var free := DB.free_points(d)
 	talent_badge.get_parent().visible = free > 0
 	talent_badge.text = str(free)
-	for i in range(1, 4):
+	for i in range(1, skill_btns.size()):
 		var lock: String = player.lock_reason(i)
 		var mx := player.max_cooldown(i)
 		skill_btns[i].set_state(clampf(player.cooldowns[i] / mx, 0, 1) if mx > 0 else 0.0, player.cooldowns[i], lock)
@@ -626,7 +676,82 @@ func _update_enemy_bars() -> void:
 				var m: ColorRect = boss_bar.get_node("Mark%d" % f)
 				m.color = Color(1, 0.85, 0.4, 0.95) if boss.hp / boss.max_hp > f / 100.0 else Color(0.4, 0.35, 0.3, 0.7)
 
+var _key_e := ""
+## Взаимодействие: торговец или ближайший рычаг/механизм. true — что-то сделано
+func interact() -> bool:
+	if zone.near_merchant():
+		_open("shop"); return true
+	var it: Dictionary = zone.nearest_interactable()
+	if it.is_empty(): return false
+	it["cb"].call()
+	return true
+
+# ---- полоса заклинаний босса и предупреждение ----
+var cast_panel: Panel
+var cast_bar: ProgressBar
+var cast_label: Label
+var warn_label: Label
+var enrage_label: Label
+func _build_cast_ui() -> void:
+	cast_panel = UIK.panel(root, Color(0.08, 0.04, 0.1, 0.9))
+	cast_panel.anchor_left = 0.5; cast_panel.anchor_right = 0.5
+	cast_panel.offset_left = -330; cast_panel.offset_right = 330; cast_panel.offset_top = 244; cast_panel.offset_bottom = 300
+	cast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cast_bar = UIK.bar(cast_panel, Color(0.7, 0.35, 1.0))
+	UIK.rect(cast_bar, Vector2(10, 8), Vector2(640, 40))
+	cast_label = UIK.label(cast_bar, "", 24, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	cast_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	UIK.full(cast_label)
+	cast_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	cast_label.add_theme_constant_override("outline_size", 6)
+	cast_panel.visible = false
+	warn_label = UIK.label(root, "", 40, Color(1, 0.45, 0.35), HORIZONTAL_ALIGNMENT_CENTER)
+	warn_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	warn_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	warn_label.add_theme_constant_override("outline_size", 10)
+	warn_label.anchor_left = 0.5; warn_label.anchor_right = 0.5
+	warn_label.offset_left = -600; warn_label.offset_right = 600; warn_label.offset_top = 310; warn_label.offset_bottom = 370
+	warn_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	warn_label.visible = false
+	enrage_label = UIK.label(boss_panel, "", 20, Color(1, 0.75, 0.5), HORIZONTAL_ALIGNMENT_RIGHT)
+	enrage_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	UIK.rect(enrage_label, Vector2(420, 104), Vector2(356, 26))
+
+func _update_cast() -> void:
+	if cast_panel == null: _build_cast_ui()
+	var boss = null
+	for e in zone.enemies:
+		if is_instance_valid(e) and e.alive and e.def.boss and e.brain is WardenBrain: boss = e
+	var br = boss.brain if boss else null
+	var on: bool = br != null and br.cast_name != "" and br.cast_total > 0
+	cast_panel.visible = on
+	warn_label.visible = on
+	if on:
+		_set_bar(cast_bar, br.cast_total - br.cast_left, br.cast_total, "")
+		cast_label.text = "%s  ·  %.1f с" % [br.cast_name, br.cast_left]
+		warn_label.text = br.cast_hint
+		var pulse := 0.6 + 0.4 * sin(Time.get_ticks_msec() * 0.012)
+		warn_label.modulate.a = pulse
+	enrage_label.visible = br != null and br.engaged
+	if br and br.engaged:
+		var left: float = br.enrage_left()
+		enrage_label.text = "Ярость через %d:%02d" % [int(left) / 60, int(left) % 60] if left > 0 else "ЯРОСТЬ!"
+
 func _objective() -> String:
+	if zone.is_dungeon():
+		var b = zone.builder
+		if b.boss_enemy() == null and DB.zone_flag(zone.data, "dungeon", "boss_warden_killed"):
+			return "Склеп пройден! Портал у входа ведёт в долину"
+		if not b.gate_open():
+			if b.packs_left() > 0 and zone.player.global_position.z < 40: return "Цель: пройти коридор ловушек (шипы — по таймингу или прыжком)"
+			return "Цель: рычаги в порядке с таблички у решётки (Пламя → Лёд → Тень)"
+		if zone.player.global_position.z < 86: return "Цель: огненный коридор — проходите между струями"
+		return "Цель: победить Хранителя Эфира (прячьтесь за колоннами, впитывайте разлом)"
+	if DB.zone_lock_reason(zone.data, "dungeon") == "" and not DB.zone_flag(zone.data, "dungeon", "boss_warden_killed"):
+		var troll := false
+		for e in zone.enemies:
+			if e.alive and e.def.boss: troll = true
+		if not troll: return "Цель: Склеп Эфира открыт — вход к западу от руин"
 	var boss_alive := false
 	for e in zone.enemies:
 		if e.alive and e.def.boss: boss_alive = true

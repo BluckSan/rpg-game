@@ -10,7 +10,18 @@ var mp := 0.0
 var dead := false
 var visual: CharVisual
 var cls: Dictionary
-var cooldowns := [0.0, 0.0, 0.0, 0.0]
+var cooldowns := [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]   # 0 — основная атака, 1..8 — набор умений
+var _cur_slot := 0
+var fx := {}              # пассивы и модификаторы из талантов (stats.fx)
+var _aura_t := 0.0
+var _stealth_crit := false
+var _proc_lock := false
+var aura_ticks := 0
+var procs := 0
+var cry_timer := 0.0      # боевой клич: урон и броня
+var haste_timer := 0.0    # ускорение
+var hot_timer := 0.0      # лечение со временем
+var hot_rate := 0.0
 var rage_timer := 0.0
 var shield_timer := 0.0
 var move_input := Vector2.ZERO
@@ -84,6 +95,14 @@ func recalc(fill := false) -> void:
 	var hp_frac: float = hp / stats.max_hp if not stats.is_empty() else 1.0
 	var mp_frac: float = mp / stats.max_mp if not stats.is_empty() else 1.0
 	stats = DB.compute_stats(data)
+	var before: Array = (data.get("loadout", []) as Array).duplicate()
+	DB.ensure_loadout(data)
+	fx = stats.get("fx", {})
+	Projectile.player_fx = fx
+	for id in data["loadout"]:
+		if id != "" and not before.has(id) and not before.is_empty():
+			var sk = DB.find_skill(data, id)
+			if sk: Game.toast("Новое умение «%s» — в наборе" % sk.name, 3.0)
 	hp = stats.max_hp if fill else clampf(hp_frac * stats.max_hp, 1, stats.max_hp)
 	mp = stats.max_mp if fill else clampf(mp_frac * stats.max_mp, 0, stats.max_mp)
 
@@ -91,7 +110,7 @@ func zone():
 	return get_parent()
 
 func _physics_process(delta: float) -> void:
-	for i in 4:
+	for i in cooldowns.size():
 		if cooldowns[i] > 0: cooldowns[i] -= delta
 	if roll_cd > 0: roll_cd -= delta
 	if invuln > 0: invuln -= delta
@@ -102,7 +121,17 @@ func _physics_process(delta: float) -> void:
 	hp = minf(stats.max_hp, hp + stats.regen * delta)
 	mp = minf(stats.max_mp, mp + stats.mp_regen * delta)
 	if rage_timer > 0: rage_timer -= delta
+	if fx.has("aura_dmg"):
+		_aura_t -= delta
+		if _aura_t <= 0:
+			_aura_t = 1.0
+			_aura_tick()
 	if shield_timer > 0: shield_timer -= delta
+	if cry_timer > 0: cry_timer -= delta
+	if haste_timer > 0: haste_timer -= delta
+	if hot_timer > 0:
+		hot_timer -= delta
+		hp = minf(stats.max_hp, hp + hot_rate * delta)
 	data["play_time"] = float(data["play_time"]) + delta
 
 	var input := move_input
@@ -127,7 +156,7 @@ func _physics_process(delta: float) -> void:
 		_dash_time -= delta
 		v = _dash_vel
 	else:
-		v = move * stats.move_speed
+		v = move * stats.move_speed * (1.4 if haste_timer > 0 else 1.0)
 		if move.length() > 0.05:
 			rotation.y = lerp_angle(rotation.y, atan2(move.x, move.z), minf(1.0, delta * 12))
 	velocity.x = v.x; velocity.z = v.z
@@ -170,6 +199,7 @@ func request_roll() -> bool:
 	invuln = ROLL_TIME * 0.9
 	roll_cd = ROLL_CD
 	rolls += 1
+	if fx.has("roll_stealth"): _stealth_crit = true
 	visual.play_action("roll")
 	CombatFX.burst(zone().fx_root, global_position + Vector3.UP * 0.2, Color(0.8, 0.7, 0.55, 0.6), 10, 2.0, 0.18, 0.5, Vector3.UP, 80, 0.5)
 	return true
@@ -206,8 +236,14 @@ func take_damage(dmg: float, _from: Vector3) -> void:
 		dodged += 1
 		zone().float_text(global_position + Vector3.UP * 2.2, "Уклонение!", Color(0.6, 0.9, 1.0))
 		return
-	var dr: float = stats.dr + (0.5 if shield_timer > 0 else 0.0)
+	var dr: float = stats.dr + (0.5 if shield_timer > 0 else 0.0) + (0.12 if cry_timer > 0 else 0.0)
 	var final := dmg * (1.0 - clampf(dr, 0, 0.85))
+	if fx.has("mana_guard") and dmg < stats.max_hp * 3.0:   # смертельные механики боссов мана не держит
+		var part := minf(final * clampf(float(fx["mana_guard"]) / 100.0, 0, 0.8), mp)
+		mp -= part; final -= part
+	if fx.has("thorns") and _from != Vector3.ZERO:
+		var src = _nearest_enemy(_from, 4.0)
+		if src: src.take_damage(dmg * float(fx["thorns"]) / 100.0, false)
 	hp -= final
 	zone().damage_number(global_position + Vector3.UP * 2.2, final, false, true)
 	if hp <= 0:
@@ -217,6 +253,59 @@ func take_damage(dmg: float, _from: Vector3) -> void:
 	elif final > stats.max_hp * 0.08:
 		visual.play_action("hit")
 		zone().shake(0.25 if final > stats.max_hp * 0.2 else 0.12)
+
+func _nearest_enemy(p: Vector3, r: float, skip = null):
+	var best = null; var bd := r
+	for e in zone().enemies:
+		if is_instance_valid(e) and e.alive and e != skip:
+			var d := U.flat_dist(e.global_position, p)
+			if d < bd: bd = d; best = e
+	return best
+
+## Аура из талантов: урон (и замедление) врагам рядом раз в секунду
+func _aura_tick() -> void:
+	var z = zone()
+	var dmg: float = stats.damage * stats.dmg_mult * float(fx["aura_dmg"]) / 100.0
+	var frost := fx.has("aura_frost")
+	var c := Color(0.6, 0.9, 1.0) if frost else Color(1, 0.85, 0.4)
+	var any := false
+	for e in z.enemies.duplicate():
+		if is_instance_valid(e) and e.alive and U.flat_dist(e.global_position, global_position) <= 4.5 + e.radius:
+			e.take_damage(dmg, false); any = true
+			if frost and is_instance_valid(e) and e.alive: e.slow(0.6, 1.2)
+	if any:
+		aura_ticks += 1
+		z.fx("ring", global_position + Vector3.UP * 0.1, 4.5, c, 0.35)
+
+## Срабатывания от удара: метка, лечение крита, яды/поджоги, молния, эффекты убийства (без цепных повторов)
+func _on_hit_fx(e, dmg: float, crit: bool) -> void:
+	if fx.is_empty() or _proc_lock: return
+	_proc_lock = true
+	var z = zone()
+	if crit:
+		if fx.has("crit_heal"): heal(stats.max_hp * float(fx["crit_heal"]) / 100.0)
+		if fx.has("crit_mark") and is_instance_valid(e) and e.alive: e.curse(3.0)
+	if is_instance_valid(e) and e.alive:
+		if fx.has("proc_bleed") and randf() * 100.0 < float(fx["proc_bleed"]): e.add_dot(dmg * 0.6, 3.0, Color(0.8, 0.05, 0.05)); procs += 1
+		if fx.has("proc_poison") and randf() * 100.0 < float(fx["proc_poison"]): e.add_dot(dmg * 0.8, 4.0, Color(0.4, 0.9, 0.2)); procs += 1
+		if fx.has("proc_burn") and randf() * 100.0 < float(fx["proc_burn"]): e.add_dot(dmg * 1.0, 4.0, Color(1, 0.5, 0.1)); procs += 1
+	if fx.has("proc_bolt") and randf() * 100.0 < float(fx["proc_bolt"]):
+		var t = _nearest_enemy(e.global_position if is_instance_valid(e) else global_position, 8.0, e)
+		if t == null and is_instance_valid(e) and e.alive: t = e
+		if t:
+			Tele.bolt(z.fx_root, global_position + Vector3.UP * 1.6, t.global_position + Vector3.UP, Color(0.6, 0.8, 1), 0.25, 0.08)
+			t.take_damage(dmg * 0.6, false); procs += 1
+	if is_instance_valid(e) and not e.alive:
+		if fx.has("kill_heal"): heal(stats.max_hp * float(fx["kill_heal"]) / 100.0)
+		if fx.has("kill_mana"): mp = minf(stats.max_mp, mp + stats.max_mp * float(fx["kill_mana"]) / 100.0)
+		if fx.has("kill_explode") and randf() * 100.0 < float(fx["kill_explode"]):
+			var p: Vector3 = e.global_position
+			z.fx("burst", p + Vector3.UP, 3.0, Color(0.7, 0.3, 0.9), 0.4)
+			for o in z.enemies.duplicate():
+				if is_instance_valid(o) and o.alive and U.flat_dist(o.global_position, p) <= 3.0 + o.radius:
+					o.take_damage(stats.damage * stats.dmg_mult * 0.8, false)
+			procs += 1
+	_proc_lock = false
 
 func heal(a: float) -> void:
 	if not dead: hp = minf(stats.max_hp, hp + a)
@@ -242,21 +331,26 @@ func gain_xp(amount: int) -> void:
 		recalc()
 		var extra := ""
 		for s in cls.skills:
-			if int(s.unlock) == data["class_level"]: extra = " Открыто умение «%s»!" % s.name
+			if int(s.get("unlock", 0)) == data["class_level"]: extra = " Открыто умение «%s»!" % s.name
 		Game.toast("Мастерство класса «%s»: %d.%s" % [cls.name, data["class_level"], extra], 3.5)
 
 # ---------------- умения ----------------
 func get_skill(slot: int):
-	if slot < 3: return cls.skills[slot]
-	var a := DB.get_asc(data["ascendancy"])
-	return null if a.is_empty() else a.skill
+	if slot == 0: return cls.skills[0]
+	var lo: Array = data.get("loadout", [])
+	if slot - 1 >= lo.size(): return null
+	return DB.find_skill(data, str(lo[slot - 1]))
 
 ## "" если доступно, иначе короткая причина для кнопки.
 func lock_reason(slot: int) -> String:
-	if slot < 3:
-		var need := int(cls.skills[slot].unlock)
-		return "" if data["class_level"] >= need else "мастер.\n%d" % need
-	return "" if get_skill(3) != null else "ур. %d+" % DB.ASC_LEVEL
+	if slot == 0: return ""
+	var s = get_skill(slot)
+	if s == null:
+		if slot == 3 and data["ascendancy"] == "": return "ур. %d+" % DB.ASC_LEVEL
+		return "пусто"
+	var r := DB.skill_lock(data, s)
+	if r == "": return ""
+	return r.replace("Мастерство ", "мастер.\n").replace("Уровень ", "ур. ")
 
 func max_cooldown(slot: int) -> float:
 	var s = get_skill(slot)
@@ -281,14 +375,18 @@ func try_use(slot: int) -> bool:
 	if dead or cooldowns[slot] > 0: return false
 	if lock_reason(slot) != "":
 		if slot > 0:
-			Game.toast("Умение пути откроется после превращения (дерево талантов)" if slot == 3 else "Нужно мастерство класса %d" % int(cls.skills[slot].unlock))
+			var sk = get_skill(slot)
+			if sk == null: Game.toast("Слот пуст — выберите умение в окне «Умения»" if not (slot == 3 and data["ascendancy"] == "") else "Умение пути откроется после превращения (дерево талантов)")
+			else: Game.toast("Умение «%s»: %s" % [sk.name, DB.skill_lock(data, sk)])
 		return false
 	var s = get_skill(slot)
-	if mp < s.mana:
+	var cost: float = float(s.mana) * (1.0 + float(fx.get("mana_cost", 0.0)) / 100.0)
+	if mp < cost:
 		Game.toast("Не хватает маны", 1.0)
 		return false
-	mp -= s.mana
+	mp -= cost
 	cooldowns[slot] = max_cooldown(slot)
+	_cur_slot = slot
 	_execute(s)
 	return true
 
@@ -307,17 +405,21 @@ func find_target(rng: float):
 	return best
 
 func roll_damage(mult: float, spell: bool) -> Array:
-	var dmg: float = stats.damage * stats.dmg_mult * mult * (1.5 if rage_timer > 0 else 1.0) * randf_range(0.9, 1.1)
+	var dmg: float = stats.damage * stats.dmg_mult * mult * (1.5 if rage_timer > 0 else 1.0) * (1.3 if cry_timer > 0 else 1.0) * randf_range(0.9, 1.1)
 	if spell or cls.spell: dmg *= stats.spell_mult
+	if fx.has("low_hp_dmg") and hp < stats.max_hp * 0.35: dmg *= 1.0 + float(fx["low_hp_dmg"]) / 100.0
 	var crit: bool = randf() < stats.crit
+	if _stealth_crit:
+		crit = true; _stealth_crit = false
 	if crit: dmg *= stats.crit_mult
 	return [dmg, crit]
 
 func hit(e, mult: float, spell := false, force_crit := false, fb := {}) -> void:
 	if e == null or not is_instance_valid(e) or not e.alive: return
 	var r := roll_damage(mult, spell)
-	var dmg: float = r[0]
+	var dmg: float = r[0] * Projectile.dmg_scale
 	var crit: bool = r[1]
+	if fx.has("far_dmg") and U.flat_dist(e.global_position, global_position) > 7.0: dmg *= 1.0 + float(fx["far_dmg"]) / 100.0
 	if force_crit and not crit:
 		dmg *= stats.crit_mult; crit = true
 	var dir := U.flat(e.global_position - global_position).normalized()
@@ -330,9 +432,11 @@ func hit(e, mult: float, spell := false, force_crit := false, fb := {}) -> void:
 	var sh := float(fb.get("shake", 0.0)) + (0.12 if crit else 0.0)
 	if sh > 0: z.shake(sh)
 	if stats.leech > 0: heal(dmg * stats.leech)
+	_on_hit_fx(e, dmg, crit)
 
 func hit_area(center: Vector3, radius: float, mult: float, spell: bool, extra := Callable(), fb := {"knock": 4.0, "stop": 0.05, "shake": 0.15}) -> void:
 	var fbl: Dictionary = fb.duplicate()
+	radius *= 1.0 + float(fx.get("aoe%", 0.0)) / 100.0
 	for e in zone().enemies.duplicate():
 		if not is_instance_valid(e) or not e.alive: continue
 		if U.flat_dist(e.global_position, center) <= radius + e.radius:
@@ -355,6 +459,7 @@ func _execute(s: Dictionary) -> void:
 	if s.kind in ["melee", "projectile"]:
 		_combo_attack(s, target, aspd)
 		return
+	if await SkillsExt.execute(self, s, target): return
 	visual.play_action(s.kind)
 	var origin := global_position + Vector3.UP * 1.3 + forward() * 0.6
 	match s.kind:
@@ -412,7 +517,7 @@ func _execute(s: Dictionary) -> void:
 			z.fx("burst", global_position + Vector3.UP, 2.5, s.color, 0.8)
 		"shadow_strike":
 			if target == null:
-				Game.toast("Нет цели", 1.0); cooldowns[3] = 0.5; mp += s.mana
+				Game.toast("Нет цели", 1.0); cooldowns[_cur_slot] = 0.5; mp += s.mana
 				return
 			var behind: Vector3 = target.global_position - target.global_basis.z * 1.3
 			behind.y = global_position.y
@@ -455,6 +560,11 @@ func _combo_attack(s: Dictionary, target, aspd: float) -> void:
 	if dead or not is_inside_tree(): return
 	if target != null and is_instance_valid(target) and target.alive: face_towards(target.global_position)
 	var origin := global_position + Vector3.UP * 1.3 + forward() * 0.6
+	if idx == 2 and fx.has("combo_wave"):
+		var wc := global_position + forward() * 2.0
+		CombatFX.slash_arc(z.fx_root, global_position, forward(), 4.0, 120, Color(1, 0.75, 0.4), 0.35, 0.9)
+		z.fx("ring", wc, 4.0, Color(1, 0.8, 0.45), 0.4)
+		hit_area(wc, 4.0, 1.2, false)
 	match data["class"]:
 		"warrior":
 			var reach: float = cls.range + float(c.reach)

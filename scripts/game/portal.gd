@@ -4,6 +4,7 @@ class_name Portal
 
 var zone
 var target_zone := "global"
+var arrive := ""
 var _cd := 0.0
 
 func _process(delta: float) -> void:
@@ -18,8 +19,9 @@ func _process(delta: float) -> void:
 	if not z["available"]:
 		Game.toast("Путь в «%s» откроется в следующих версиях (от %d ур.)" % [z["name"], z["min_level"]], 3.5)
 		return
-	if p.data["level"] < z["min_level"]:
-		Game.toast("Нужен %d уровень" % z["min_level"], 2.5)
+	var why := DB.zone_lock_reason(p.data, target_zone)
+	if why != "":
+		Game.toast(why, 3.0)
 		return
 	zone.save()
-	Game.travel(target_zone)
+	Game.travel(target_zone, arrive)

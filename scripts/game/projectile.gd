@@ -16,7 +16,33 @@ var _hit_set := {}
 var color := Color.WHITE
 var glow := false
 
+## Пассивы игрока для снарядов (из дерева талантов): extra_proj, proj_dmg, elem_ice. Задаёт Player.recalc.
+static var player_fx := {}
+static var dmg_scale := 1.0   # множитель урона текущего попадания снаряда (читает Player.hit)
+static var _extra := false
+
 static func fire(z, origin: Vector3, d: Vector3, spd: float, rng: float, c: Color, sz: float, player_owned: bool, cb: Callable, dmg := 0.0) -> Projectile:
+	if player_owned and not _extra and not player_fx.is_empty():
+		var scale := 1.0 + float(player_fx.get("proj_dmg", 0.0)) / 100.0
+		var ice := player_fx.has("elem_ice") and c.r > c.b * 1.4 and c.r > 0.6
+		if ice: c = Color(0.55, 0.85, 1.0)
+		var inner := cb
+		if scale != 1.0 or ice:
+			cb = func(e):
+				dmg_scale = scale
+				if inner.is_valid(): inner.call(e)
+				dmg_scale = 1.0
+				if ice and is_instance_valid(e) and e.alive: e.slow(0.6, 2.5)
+		var n := int(player_fx.get("extra_proj", 0.0))
+		if n > 0:
+			_extra = true
+			for i in n:
+				var ang := (float(i / 2) + 1.0) * 9.0 * (1.0 if i % 2 == 0 else -1.0)
+				fire(z, origin, d.rotated(Vector3.UP, deg_to_rad(ang)), spd, rng, c, sz * 0.85, true, cb, dmg)
+			_extra = false
+	return _make(z, origin, d, spd, rng, c, sz, player_owned, cb, dmg)
+
+static func _make(z, origin: Vector3, d: Vector3, spd: float, rng: float, c: Color, sz: float, player_owned: bool, cb: Callable, dmg := 0.0) -> Projectile:
 	var p := Projectile.new()
 	p.zone = z; p.dir = d.normalized(); p.speed = spd; p.max_dist = rng; p.size = sz
 	p.from_player = player_owned; p.on_hit = cb; p.damage = dmg; p.color = c

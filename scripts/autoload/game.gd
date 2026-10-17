@@ -32,6 +32,7 @@ var glow := true
 var music_volume := 0.6
 var sfx_volume := 0.8
 var sensitivity := 1.0     # чувствительность камеры (0.4–2.0)
+var skill_layout := ""      # панель умений: "mobile" — веер у кнопки атаки, "pc" — ряд внизу по центру
 var _music: AudioStreamPlayer
 var _sfx_pool: Array[AudioStreamPlayer] = []
 var _sfx_streams := {}
@@ -62,8 +63,22 @@ func _ready() -> void:
 		music_volume = clampf(cfg.get_value("audio", "music", music_volume), 0.0, 1.0)
 		sfx_volume = clampf(cfg.get_value("audio", "sfx", sfx_volume), 0.0, 1.0)
 		sensitivity = clampf(cfg.get_value("input", "sensitivity", sensitivity), 0.4, 2.0)
+		skill_layout = str(cfg.get_value("ui", "skill_layout", ""))
+	if not skill_layout in ["mobile", "pc"]: skill_layout = default_skill_layout()
 	_setup_audio()
 	apply_settings.call_deferred()
+
+## Тяжёлые эффекты (SDFGI, SSAO, объёмный туман, мягкие тени, трава, вода) — только ПК, «Высокое», Forward+
+func heavy_fx() -> bool:
+	return desktop and is_pc_platform() and quality >= 3 and RenderingServer.get_current_rendering_method() == "forward_plus"
+
+## Детальная земля (шейдер) — ПК от «Среднего»
+func pc_detail() -> bool:
+	return desktop and is_pc_platform() and quality >= 2
+
+## Панель умений по умолчанию: телефон — веер, ПК — ряд
+func default_skill_layout() -> String:
+	return "pc" if desktop else "mobile"
 
 static func is_pc_platform() -> bool:
 	return OS.has_feature("pc") and not OS.has_feature("mobile") and not OS.has_feature("android")
@@ -81,6 +96,7 @@ func save_settings() -> void:
 	cfg.set_value("audio", "music", music_volume)
 	cfg.set_value("audio", "sfx", sfx_volume)
 	cfg.set_value("input", "sensitivity", sensitivity)
+	cfg.set_value("ui", "skill_layout", skill_layout)
 	cfg.save("user://settings.cfg")
 
 func fps_options() -> Array:
@@ -276,6 +292,10 @@ func normalize(c: Dictionary) -> Dictionary:
 	var t := []
 	for id in c.get("talents", []): t.append(int(id))
 	c["talents"] = t
+	var rk := {}
+	for k in c.get("ranks", {}): rk[str(k)] = int(c["ranks"][k])
+	if c.has("ranks"): c["ranks"] = rk
+	DB.migrate_talents(c)
 	for list_name in ["inventory", "equipped"]:
 		for it in c.get(list_name, []):
 			it["slot"] = int(it["slot"]); it["rarity"] = int(it["rarity"]); it["ilvl"] = int(it["ilvl"])
@@ -310,11 +330,12 @@ func play(c: Dictionary) -> void:
 	get_tree().paused = false
 	get_tree().change_scene_to_file(z["scene"])
 
-func travel(zone_id: String) -> void:
+func travel(zone_id: String, arrive := "") -> void:
 	var z = DB.ZONES.get(zone_id)
 	if z == null or not z["available"]: return
 	current["zone"] = zone_id
 	current["has_pos"] = false
+	if arrive != "": current["arrive"] = arrive
 	save_character(current)
 	get_tree().change_scene_to_file(z["scene"])
 

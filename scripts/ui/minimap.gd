@@ -48,8 +48,9 @@ func _draw() -> void:
 	var boss_alive := false
 	for e in zone.enemies:
 		if e.alive and e.def.boss: boss_alive = true
-	_marker(c, r, zone.merchant_point, "two-coins", Color(1, 0.85, 0.3))
+	if zone.merchant != null: _marker(c, r, zone.merchant_point, "two-coins", Color(1, 0.85, 0.3))
 	_marker(c, r, zone.portal_point, "castle", Color(0.6, 0.75, 1))
+	if zone.dungeon_gate_point != Vector3.ZERO: _marker(c, r, zone.dungeon_gate_point, "castle", Color(0.75, 0.5, 1.0), DB.zone_lock_reason(zone.data, "dungeon") == "")
 	if boss_alive: _marker(c, r, zone.arena_point, "skull-crossed-bones", Color(1, 0.35, 0.3), true)
 	# игрок (стрелка — направление персонажа относительно камеры)
 	var fwd: Vector3 = zone.player.forward()

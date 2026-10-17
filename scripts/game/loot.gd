@@ -40,7 +40,19 @@ static func _boss_drop(z, e) -> void:
 		if i == 1 and first:
 			while it.rarity < 3: it = DB.roll_item(lvl + 1, d["class"], 0.9)
 		spawn(z, pos + _rand(2.5), "item", 1, it)
-	z.last_boss_drop = {"first": first, "count": 7}
+	var uniq := ""
+	if e.kind == "warden":
+		# уникальная добыча Хранителя: оружие своего класса (первая победа — гарантированно), иногда печать
+		var got: Array = d.get("warden_uniques", [])
+		var key: String = d["class"]
+		if first or randf() < 0.35:
+			if got.has(key) and randf() < 0.5: key = "ring"
+			var u := DB.warden_unique(key, lvl + 1)
+			spawn(z, pos + _rand(1.5), "item", 1, u)
+			uniq = u.name
+			if not got.has(key): got.append(key)
+			d["warden_uniques"] = got
+	z.last_boss_drop = {"first": first, "count": 7, "unique": uniq}
 
 static func _rand(rad := 1.2) -> Vector3:
 	var r := Vector2.from_angle(randf() * TAU) * (0.5 + randf()) * rad * 0.7

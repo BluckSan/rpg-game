@@ -22,8 +22,21 @@ const STAT_NAMES := {
 	"dmg": "к урону", "dmg%": "% к урону", "spell%": "% к урону чар", "as%": "% к скорости атаки",
 	"ms%": "% к скорости бега", "crit": "% шанс крит. удара", "critdmg%": "% к силе крит. удара",
 	"armor": "к броне", "armor%": "% к броне", "regen": "здоровья в сек.", "mpregen": "маны в сек.",
-	"leech%": "% похищения жизни", "cdr%": "% сокращения перезарядки",
+	"leech%": "% похищения жизни", "cdr%": "% сокращения перезарядки", "dr%": "% снижения получаемого урона",
 }
+## Пассивы и модификаторы умений из талантов (значение — за ранг; %s — число)
+const FX_NAMES := {
+	"aoe%": "+%s%% к области умений", "combo_wave": "3-й удар серии — ударная волна", "thorns": "Отражение %s%% урона",
+	"proc_bleed": "%s%% шанс кровотечения", "proc_poison": "%s%% шанс отравления", "proc_burn": "%s%% шанс поджога",
+	"proc_bolt": "%s%% шанс молнии при ударе", "leech_x": "Похищение жизни ×2", "no_regen": "Нет регенерации здоровья",
+	"low_hp_dmg": "+%s%% урона при здоровье < 35%%", "chain_plus": "+%s отскок(а) цепных умений", "mana_cost": "+%s%% к стоимости умений",
+	"elem_ice": "Огненные снаряды → ледяные (замедление)", "aura_dmg": "Аура: %s%% урона/с врагам рядом", "aura_frost": "Аура замедляет врагов",
+	"mana_guard": "%s%% урона снимается с маны", "crit_mark": "Крит проклинает цель (+30% урона по ней)", "far_dmg": "+%s%% урона по дальним целям",
+	"extra_proj": "+%s снаряд(а)", "proj_dmg": "%s%% урона снарядов", "roll_stealth": "После кувырка — гарантированный крит",
+	"kill_explode": "%s%% шанс взрыва трупа", "kill_heal": "Убийство лечит %s%% здоровья", "kill_mana": "Убийство даёт %s%% маны",
+	"crit_heal": "Крит лечит %s%% здоровья",
+}
+const TREE_VERSION := 2
 
 var CLASSES := {
 	"warrior": {
@@ -35,6 +48,11 @@ var CLASSES := {
 			{"id": "w_attack", "name": "Удар", "kind": "melee", "mult": 1.0, "cd": 0.0, "mana": 0.0, "radius": 2.6, "range": 2.6, "color": Color.WHITE, "unlock": 1},
 			{"id": "w_spin", "name": "Вихрь", "desc": "Круговой удар по всем врагам рядом", "kind": "spin", "mult": 1.6, "cd": 6.0, "mana": 15.0, "radius": 4.2, "range": 4.0, "color": Color(1,0.6,0.3), "unlock": 1},
 			{"id": "w_dash", "name": "Рывок", "desc": "Рывок вперёд, ранит врагов на пути", "kind": "dash", "mult": 2.2, "cd": 8.0, "mana": 15.0, "radius": 2.0, "range": 8.0, "color": Color(1,0.85,0.4), "unlock": 3},
+			{"id": "w_slam", "name": "Раскол земли", "desc": "Удар по земле перед собой: урон конусом и оглушение на 1.5 с", "kind": "ground_slam", "mult": 2.0, "cd": 9.0, "mana": 18.0, "radius": 5.5, "range": 5.5, "color": Color(0.85,0.6,0.35), "lvl": 4},
+			{"id": "w_cry", "name": "Боевой клич", "desc": "8 с: +30% урона и +40% брони, враги рядом замедлены", "kind": "warcry", "mult": 0.0, "cd": 20.0, "mana": 20.0, "radius": 6.0, "range": 0.0, "color": Color(1,0.75,0.3), "lvl": 6},
+			{"id": "w_leap", "name": "Прыжок героя", "desc": "Прыжок к цели, удар по области при приземлении", "kind": "leap", "mult": 2.4, "cd": 11.0, "mana": 20.0, "radius": 3.5, "range": 11.0, "color": Color(1,0.9,0.5), "lvl": 8},
+			{"id": "w_iron", "name": "Железная кожа", "desc": "5 с: урон по вам снижен на 50%, восстанавливает 10% здоровья", "kind": "iron_skin", "mult": 0.0, "cd": 18.0, "mana": 15.0, "radius": 0.0, "range": 0.0, "color": Color(0.75,0.8,0.9), "lvl": 10},
+			{"id": "w_exec", "name": "Казнь", "desc": "Мощный удар; втрое сильнее по цели с запасом здоровья ниже 30%", "kind": "execute", "mult": 3.0, "cd": 12.0, "mana": 22.0, "radius": 0.0, "range": 3.2, "color": Color(1,0.3,0.2), "lvl": 12},
 		]},
 	"archer": {
 		"name": "Лучник", "weapon": "Кривой лук", "color": Color(0.3,0.7,0.3),
@@ -45,6 +63,11 @@ var CLASSES := {
 			{"id": "a_attack", "name": "Выстрел", "kind": "projectile", "mult": 1.0, "cd": 0.0, "mana": 0.0, "radius": 0.0, "range": 16.0, "color": Color(0.9,0.8,0.5), "unlock": 1},
 			{"id": "a_volley", "name": "Залп", "desc": "Веер из пяти стрел", "kind": "volley", "mult": 0.9, "cd": 5.0, "mana": 14.0, "radius": 0.0, "range": 16.0, "color": Color(0.6,1,0.6), "unlock": 1},
 			{"id": "a_rain", "name": "Град стрел", "desc": "Дождь стрел по области у цели", "kind": "arrow_rain", "mult": 2.4, "cd": 9.0, "mana": 22.0, "radius": 4.5, "range": 14.0, "color": Color(0.8,1,0.4), "unlock": 3},
+			{"id": "a_pierce", "name": "Пронзающая стрела", "desc": "Стрела пробивает всех врагов на линии", "kind": "pierce", "mult": 2.2, "cd": 6.0, "mana": 14.0, "radius": 0.0, "range": 22.0, "color": Color(0.9,0.95,1.0), "lvl": 4},
+			{"id": "a_leap", "name": "Отскок", "desc": "Прыжок назад; на прежнем месте — ледяная вспышка, замедляющая врагов", "kind": "disengage", "mult": 1.0, "cd": 9.0, "mana": 12.0, "radius": 3.5, "range": 7.0, "color": Color(0.6,0.9,1.0), "lvl": 6},
+			{"id": "a_trap", "name": "Капкан", "desc": "Ставит капкан: взрыв обездвиживает и ранит врагов", "kind": "trap", "mult": 2.0, "cd": 12.0, "mana": 16.0, "radius": 3.0, "range": 0.0, "color": Color(0.9,0.7,0.3), "lvl": 8},
+			{"id": "a_snipe", "name": "Меткий выстрел", "desc": "Прицеливание 0.5 с — гарантированный критический выстрел", "kind": "snipe", "mult": 3.6, "cd": 11.0, "mana": 20.0, "radius": 0.0, "range": 24.0, "color": Color(1,0.9,0.4), "lvl": 10},
+			{"id": "a_poison", "name": "Ядовитая стрела", "desc": "Яд: урон в течение 6 с по цели и врагам рядом", "kind": "poison", "mult": 0.5, "cd": 8.0, "mana": 15.0, "radius": 2.5, "range": 18.0, "color": Color(0.5,1,0.3), "lvl": 12},
 		]},
 	"mage": {
 		"name": "Маг", "weapon": "Посох ученика", "color": Color(0.3,0.45,0.95),
@@ -55,6 +78,11 @@ var CLASSES := {
 			{"id": "m_bolt", "name": "Искра", "kind": "projectile", "mult": 1.0, "cd": 0.0, "mana": 0.0, "radius": 0.0, "range": 15.0, "color": Color(0.5,0.7,1), "unlock": 1},
 			{"id": "m_fireball", "name": "Огненный шар", "desc": "Взрывается и поджигает область", "kind": "fireball", "mult": 2.6, "cd": 5.0, "mana": 20.0, "radius": 3.2, "range": 15.0, "color": Color(1,0.45,0.1), "unlock": 1},
 			{"id": "m_nova", "name": "Ледяная нова", "desc": "Замораживает и ранит врагов вокруг", "kind": "frost_nova", "mult": 1.5, "cd": 8.0, "mana": 25.0, "radius": 5.0, "range": 5.0, "color": Color(0.6,0.9,1), "unlock": 3},
+			{"id": "m_chain", "name": "Цепная молния", "desc": "Молния перескакивает между 5 врагами", "kind": "chain", "mult": 1.6, "cd": 6.0, "mana": 18.0, "radius": 7.0, "range": 15.0, "color": Color(0.7,0.8,1.0), "lvl": 4},
+			{"id": "m_blink", "name": "Скачок", "desc": "Мгновенный перенос на 8 м вперёд", "kind": "blink", "mult": 0.0, "cd": 8.0, "mana": 12.0, "radius": 0.0, "range": 8.0, "color": Color(0.6,0.5,1.0), "lvl": 6},
+			{"id": "m_wall", "name": "Огненная полоса", "desc": "Полоса огня перед магом жжёт врагов 4 с", "kind": "fire_wall", "mult": 0.6, "cd": 12.0, "mana": 24.0, "radius": 1.6, "range": 9.0, "color": Color(1,0.5,0.15), "lvl": 8},
+			{"id": "m_shield", "name": "Щит маны", "desc": "6 с: урон по вам снижен на 50%, восстанавливает ману", "kind": "mana_shield", "mult": 0.0, "cd": 20.0, "mana": 0.0, "radius": 0.0, "range": 0.0, "color": Color(0.5,0.7,1.0), "lvl": 10},
+			{"id": "m_lance", "name": "Ледяное копьё", "desc": "Пробивающее копьё льда, сильно замедляет", "kind": "ice_lance", "mult": 2.6, "cd": 7.0, "mana": 20.0, "radius": 0.0, "range": 20.0, "color": Color(0.7,0.95,1.0), "lvl": 12},
 		]},
 }
 const CLASS_ORDER := ["warrior", "archer", "mage"]
@@ -63,27 +91,33 @@ var ASCENDANCIES := [
 	{"id": "berserker", "name": "Берсерк", "color": Color(0.9,0.2,0.1),
 	 "desc": "Багровая ярость: тело растёт, глаза горят.\n+25% урона, +10% скорости атаки.",
 	 "mods": [["dmg%", 25], ["as%", 10]],
-	 "skill": {"id": "asc_rage", "name": "Ярость", "desc": "8 сек: +50% урона и скорости атаки", "kind": "rage", "mult": 0.0, "cd": 20.0, "mana": 20.0, "radius": 0.0, "range": 0.0, "color": Color(1,0.2,0.1)}},
+	 "skill": {"id": "asc_rage", "name": "Ярость", "desc": "8 сек: +50% урона и скорости атаки", "kind": "rage", "mult": 0.0, "cd": 20.0, "mana": 20.0, "radius": 0.0, "range": 0.0, "color": Color(1,0.2,0.1)}, "skills_extra": [{"id": "asc_bloodspin", "name": "Кровавый вихрь", "desc": "Широкий вихрь, лечит 3% здоровья за каждого задетого врага", "kind": "blood_spin", "mult": 2.2, "cd": 9.0, "mana": 18.0, "radius": 5.0, "range": 5.0, "color": Color(0.9,0.1,0.1), "lvl": 10},
+		{"id": "asc_quake", "name": "Землетрясение", "desc": "Три волны толчков вокруг героя", "kind": "quake", "mult": 1.4, "cd": 14.0, "mana": 25.0, "radius": 6.5, "range": 0.0, "color": Color(0.8,0.45,0.25), "lvl": 12}]},
 	{"id": "paladin", "name": "Паладин", "color": Color(1,0.85,0.3),
 	 "desc": "Золотые латы и нимб света.\n+30% брони, +15% здоровья.",
 	 "mods": [["armor%", 30], ["hp%", 15]],
-	 "skill": {"id": "asc_shield", "name": "Священный щит", "desc": "Лечит 35% здоровья и снижает урон на 6 сек", "kind": "holy_shield", "mult": 0.0, "cd": 22.0, "mana": 25.0, "radius": 0.0, "range": 0.0, "color": Color(1,0.9,0.4)}},
+	 "skill": {"id": "asc_shield", "name": "Священный щит", "desc": "Лечит 35% здоровья и снижает урон на 6 сек", "kind": "holy_shield", "mult": 0.0, "cd": 22.0, "mana": 25.0, "radius": 0.0, "range": 0.0, "color": Color(1,0.9,0.4)}, "skills_extra": [{"id": "asc_hammer", "name": "Молот света", "desc": "Летящий молот: взрыв света оглушает врагов", "kind": "holy_hammer", "mult": 2.6, "cd": 9.0, "mana": 20.0, "radius": 3.0, "range": 16.0, "color": Color(1,0.9,0.5), "lvl": 10},
+		{"id": "asc_consecrate", "name": "Освящение", "desc": "Святая земля 6 с: жжёт врагов и лечит героя", "kind": "consecrate", "mult": 0.5, "cd": 16.0, "mana": 25.0, "radius": 5.0, "range": 0.0, "color": Color(1,0.85,0.4), "lvl": 12}]},
 	{"id": "elementalist", "name": "Стихийник", "color": Color(0.3,0.7,1),
 	 "desc": "Вокруг кружат сферы огня, льда и молний.\n+30% урона чар, +10% сокращения перезарядки.",
 	 "mods": [["spell%", 30], ["cdr%", 10], ["dmg%", 10]],
-	 "skill": {"id": "asc_meteor", "name": "Метеор", "desc": "Огромный метеор по области", "kind": "meteor", "mult": 5.0, "cd": 16.0, "mana": 40.0, "radius": 6.0, "range": 15.0, "color": Color(1,0.4,0.1)}},
+	 "skill": {"id": "asc_meteor", "name": "Метеор", "desc": "Огромный метеор по области", "kind": "meteor", "mult": 5.0, "cd": 16.0, "mana": 40.0, "radius": 6.0, "range": 15.0, "color": Color(1,0.4,0.1)}, "skills_extra": [{"id": "asc_storm", "name": "Буря", "desc": "8 ударов молний по врагам вокруг", "kind": "storm", "mult": 1.3, "cd": 13.0, "mana": 30.0, "radius": 10.0, "range": 0.0, "color": Color(0.7,0.85,1), "lvl": 10},
+		{"id": "asc_prison", "name": "Ледяная тюрьма", "desc": "Сковывает льдом врагов в области на 3 с", "kind": "ice_prison", "mult": 1.2, "cd": 15.0, "mana": 25.0, "radius": 4.5, "range": 14.0, "color": Color(0.6,0.95,1), "lvl": 12}]},
 	{"id": "necromancer", "name": "Некромант", "color": Color(0.55,0.3,0.8),
 	 "desc": "Бледная кожа, тёмная аура, парящие черепа.\n+20% урона чар, +3% похищения жизни.",
 	 "mods": [["spell%", 20], ["leech%", 3], ["dmg%", 10]],
-	 "skill": {"id": "asc_summon", "name": "Поднять скелетов", "desc": "Призывает 2 скелетов на 25 сек", "kind": "summon", "mult": 0.6, "cd": 25.0, "mana": 35.0, "radius": 0.0, "range": 0.0, "color": Color(0.7,0.5,1)}},
+	 "skill": {"id": "asc_summon", "name": "Поднять скелетов", "desc": "Призывает 2 скелетов на 25 сек", "kind": "summon", "mult": 0.6, "cd": 25.0, "mana": 35.0, "radius": 0.0, "range": 0.0, "color": Color(0.7,0.5,1)}, "skills_extra": [{"id": "asc_bones", "name": "Костяная буря", "desc": "Кольцо из 12 костяных осколков", "kind": "bone_nova", "mult": 1.2, "cd": 8.0, "mana": 18.0, "radius": 0.0, "range": 12.0, "color": Color(0.9,0.9,0.8), "lvl": 10},
+		{"id": "asc_curse", "name": "Проклятие", "desc": "Враги в области получают на 30% больше урона и замедлены 8 с", "kind": "curse", "mult": 0.0, "cd": 16.0, "mana": 20.0, "radius": 5.0, "range": 14.0, "color": Color(0.6,0.3,0.9), "lvl": 12}]},
 	{"id": "shadow", "name": "Тень", "color": Color(0.25,0.2,0.35),
 	 "desc": "Тело окутано дымом, движения бесшумны.\n+10% крита, +50% силы крита, +10% скорости.",
 	 "mods": [["crit", 10], ["critdmg%", 50], ["ms%", 10]],
-	 "skill": {"id": "asc_strike", "name": "Теневой удар", "desc": "Телепорт к врагу и гарантированный крит", "kind": "shadow_strike", "mult": 4.0, "cd": 10.0, "mana": 20.0, "radius": 0.0, "range": 14.0, "color": Color(0.5,0.3,0.7)}},
+	 "skill": {"id": "asc_strike", "name": "Теневой удар", "desc": "Телепорт к врагу и гарантированный крит", "kind": "shadow_strike", "mult": 4.0, "cd": 10.0, "mana": 20.0, "radius": 0.0, "range": 14.0, "color": Color(0.5,0.3,0.7)}, "skills_extra": [{"id": "asc_knives", "name": "Веер кинжалов", "desc": "8 кинжалов во все стороны", "kind": "knife_fan", "mult": 1.3, "cd": 7.0, "mana": 14.0, "radius": 0.0, "range": 11.0, "color": Color(0.7,0.6,0.9), "lvl": 10},
+		{"id": "asc_vanish", "name": "Исчезновение", "desc": "1.5 с неуязвимости и +40% скорости на 4 с", "kind": "vanish", "mult": 0.0, "cd": 18.0, "mana": 15.0, "radius": 0.0, "range": 0.0, "color": Color(0.4,0.3,0.6), "lvl": 12}]},
 	{"id": "druid", "name": "Друид-зверь", "color": Color(0.35,0.6,0.25),
 	 "desc": "Облик медведя: огромное звериное тело.\n+30% здоровья, +15% урона, +3 регенерации.",
 	 "mods": [["hp%", 30], ["dmg%", 15], ["regen", 3]],
-	 "skill": {"id": "asc_roar", "name": "Рёв зверя", "desc": "Оглушает врагов вокруг и лечит", "kind": "beast_roar", "mult": 2.0, "cd": 14.0, "mana": 20.0, "radius": 6.0, "range": 0.0, "color": Color(0.5,0.9,0.3)}},
+	 "skill": {"id": "asc_roar", "name": "Рёв зверя", "desc": "Оглушает врагов вокруг и лечит", "kind": "beast_roar", "mult": 2.0, "cd": 14.0, "mana": 20.0, "radius": 6.0, "range": 0.0, "color": Color(0.5,0.9,0.3)}, "skills_extra": [{"id": "asc_maul", "name": "Размах когтей", "desc": "Сокрушительный удар лапами перед собой", "kind": "maul", "mult": 3.0, "cd": 8.0, "mana": 15.0, "radius": 4.0, "range": 4.0, "color": Color(0.6,0.85,0.35), "lvl": 10},
+		{"id": "asc_regrow", "name": "Восстановление", "desc": "Восстанавливает 40% здоровья за 6 с", "kind": "regrowth", "mult": 0.0, "cd": 20.0, "mana": 20.0, "radius": 0.0, "range": 0.0, "color": Color(0.4,1,0.5), "lvl": 12}]},
 ]
 
 var ENEMIES := {
@@ -93,7 +127,7 @@ var ENEMIES := {
 	"skeleton": {"name": "Скелет-воин", "hp": 70.0, "dmg": 12.0, "speed": 3.4, "range": 1.9, "interval": 1.2, "aggro": 11.0, "radius": 0.5, "xp": 30.0, "ranged": false, "boss": false, "color": Color(0.85,0.83,0.75)},
 	"goblin": {"name": "Гоблин-громила", "hp": 120.0, "dmg": 18.0, "speed": 3.0, "range": 2.2, "interval": 1.6, "aggro": 10.0, "radius": 0.8, "xp": 45.0, "ranged": false, "boss": false, "color": Color(0.35,0.55,0.2)},
 	"ether_guard": {"name": "Страж Эфира", "hp": 160.0, "dmg": 16.0, "speed": 3.4, "range": 2.0, "interval": 1.3, "aggro": 30.0, "radius": 0.6, "xp": 60.0, "ranged": false, "boss": false, "color": Color(0.6,0.4,1.0)},
-	"warden": {"name": "Хранитель Эфира", "hp": 5200.0, "dmg": 30.0, "speed": 3.6, "range": 3.4, "interval": 2.0, "aggro": 17.0, "radius": 1.6, "xp": 1500.0, "ranged": false, "boss": true, "color": Color(0.45,0.35,0.7)},
+	"warden": {"name": "Хранитель Эфира", "hp": 3000.0, "dmg": 30.0, "speed": 3.6, "range": 3.4, "interval": 2.0, "aggro": 17.0, "radius": 1.6, "xp": 1500.0, "ranged": false, "boss": true, "color": Color(0.45,0.35,0.7)},
 	"troll": {"name": "Древний тролль", "hp": 2200.0, "dmg": 28.0, "speed": 3.2, "range": 3.2, "interval": 1.8, "aggro": 16.0, "radius": 1.6, "xp": 500.0, "ranged": false, "boss": true, "color": Color(0.4,0.5,0.45)},
 }
 
@@ -123,7 +157,10 @@ func _load_tree() -> void:
 	for n in data["nodes"]:
 		var node := {
 			"id": int(n["id"]), "name": n["name"], "type": n["type"], "region": n["region"], "class": n["classId"],
-			"pos": Vector2(float(n["x"]), float(n["y"])), "mods": [], "links": []}
+			"pos": Vector2(float(n["x"]), float(n["y"])), "mods": [], "links": [],
+			"max_rank": int(n.get("max_rank", 1)), "fx": n.get("fx", {}), "branch": n.get("branch", ""),
+			"req_asc": n.get("req_asc", ""), "req_branch": int(n.get("req_branch", 0)), "gate": bool(n.get("gate", false)),
+			"desc": n.get("desc", ""), "branch_name": n.get("branch_name", ""), "branch_class": n.get("branch_class", "")}
 		for m in n["mods"]:
 			node["mods"].append([m["stat"], float(m["value"])])
 		for l in n["links"]:
@@ -138,47 +175,164 @@ func start_node(class_id: String) -> int:
 			return id
 	return 0
 
+## Ворота региона превращения («Путь X»)
 func keystone_of(region: String) -> Dictionary:
 	for id in tree_order:
 		var n = tree_nodes[id]
-		if n["type"] == "keystone" and n["region"] == region:
+		if n["type"] == "keystone" and n["region"] == region and n["gate"]:
 			return n
 	return {}
+
+## Ранг узла (0 — не изучен). Ранги хранятся в c["ranks"] {"id": ранг}; c["talents"] — изученные узлы.
+func rank(c: Dictionary, id: int) -> int:
+	if not c["talents"].has(id): return 0
+	return maxi(1, int(c.get("ranks", {}).get(str(id), 1)))
 
 func points_in_region(c: Dictionary, region: String) -> int:
 	var k := 0
 	for id in c["talents"]:
 		if tree_nodes.has(int(id)) and tree_nodes[int(id)]["region"] == region:
-			k += 1
+			k += rank(c, int(id))
+	return k
+
+func points_in_branch(c: Dictionary, branch: String) -> int:
+	var k := 0
+	for id in c["talents"]:
+		var n = tree_nodes.get(int(id))
+		if n and n["branch"] == branch and n["type"] != "keystone": k += rank(c, int(id))
+	return k
+
+func spent_points(c: Dictionary) -> int:
+	var k := 0
+	for id in c["talents"]:
+		if tree_nodes.has(int(id)) and tree_nodes[int(id)]["type"] != "start": k += rank(c, int(id))
 	return k
 
 func total_points(c: Dictionary) -> int:
 	return (int(c["level"]) - 1) + 2 + (int(c["class_level"]) - 1) / 2
 
 func free_points(c: Dictionary) -> int:
-	return total_points(c) - max(0, c["talents"].size() - 1)
+	return total_points(c) - spent_points(c)
 
 func has_talent(c: Dictionary, id: int) -> bool:
 	return c["talents"].has(id)
 
-func can_allocate(c: Dictionary, id: int) -> bool:
-	if not tree_nodes.has(id): return false
+## "" — можно вложить очко (новый узел или следующий ранг), иначе причина
+func alloc_block(c: Dictionary, id: int) -> String:
+	if not tree_nodes.has(id): return "Нет узла"
 	var n = tree_nodes[id]
-	if n["type"] == "start" or has_talent(c, id) or free_points(c) <= 0:
-		return false
+	if n["type"] == "start": return "Стартовая точка"
+	if has_talent(c, id) and rank(c, id) >= int(n["max_rank"]): return "Максимальный ранг"
+	if free_points(c) <= 0: return "Нет очков"
+	if n["req_asc"] != "" and c.get("ascendancy", "") != n["req_asc"]: return "Только для пути «%s»" % get_asc(n["req_asc"]).get("name", "?")
+	if int(n["req_branch"]) > 0 and not has_talent(c, id) and points_in_branch(c, n["branch"]) < int(n["req_branch"]):
+		return "Нужно %d очк. в ветви (%d)" % [int(n["req_branch"]), points_in_branch(c, n["branch"])]
+	if has_talent(c, id): return ""
 	for l in n["links"]:
-		if has_talent(c, l):
-			return true
-	return false
+		if has_talent(c, l): return ""
+	return "Нет связи с изученным узлом"
+
+func can_allocate(c: Dictionary, id: int) -> bool:
+	return alloc_block(c, id) == ""
 
 func allocate(c: Dictionary, id: int) -> bool:
 	if not can_allocate(c, id): return false
-	c["talents"].append(id)
+	if not c.has("ranks"): c["ranks"] = {}
+	if has_talent(c, id): c["ranks"][str(id)] = rank(c, id) + 1
+	else:
+		c["talents"].append(id)
+		c["ranks"][str(id)] = 1
+	return true
+
+## "" — можно вернуть один ранг узла (без разрыва дерева и требований), иначе причина
+func refund_block(c: Dictionary, id: int) -> String:
+	if not has_talent(c, id): return "Не изучено"
+	var n = tree_nodes[id]
+	if n["type"] == "start": return "Стартовая точка"
+	var asc: String = c.get("ascendancy", "")
+	if rank(c, id) > 1:
+		var tmp := c.duplicate(true)
+		tmp["ranks"][str(id)] = rank(c, id) - 1
+		return _req_broken(tmp, asc)
+	# узел уходит целиком: остальные должны остаться связанными со стартом
+	var rest: Array = c["talents"].duplicate(); rest.erase(id)
+	var seen := {rest[0]: true} if not rest.is_empty() else {}
+	var q: Array = [start_node(c["class"])]
+	seen = {q[0]: true}
+	while not q.is_empty():
+		var cur: int = q.pop_back()
+		for l in tree_nodes[cur]["links"]:
+			if rest.has(l) and not seen.has(l):
+				seen[l] = true; q.append(l)
+	if seen.size() < rest.size(): return "Узел связывает другие изученные"
+	var tmp2 := c.duplicate(true)
+	tmp2["talents"] = rest
+	return _req_broken(tmp2, asc)
+
+func _req_broken(c: Dictionary, asc: String) -> String:
+	for tid in c["talents"]:
+		var m = tree_nodes.get(int(tid))
+		if m and int(m["req_branch"]) > 0 and points_in_branch(c, m["branch"]) < int(m["req_branch"]):
+			return "Нужно для «%s»" % m["name"]
+	if asc != "":
+		var key := keystone_of(asc)
+		if not has_talent(c, key["id"]) or points_in_region(c, asc) < ASC_REGION_POINTS:
+			return "Нужно для пути превращения (полный сброс отменит путь)"
+	return ""
+
+func refund(c: Dictionary, id: int) -> bool:
+	if refund_block(c, id) != "": return false
+	if rank(c, id) > 1: c["ranks"][str(id)] = rank(c, id) - 1
+	else:
+		c["talents"].erase(id)
+		c.get("ranks", {}).erase(str(id))
 	return true
 
 func reset_talents(c: Dictionary) -> void:
 	c["talents"] = [start_node(c["class"])]
+	c["ranks"] = {}
 	c["ascendancy"] = ""
+	c["tree_v"] = TREE_VERSION
+
+## Миграция сохранений со старым деревом: очки возвращаются, путь превращения сохраняется
+func migrate_talents(c: Dictionary) -> int:
+	if int(c.get("tree_v", 1)) >= TREE_VERSION and c.has("ranks"): return 0
+	var old: int = maxi(0, (c.get("talents", []) as Array).size() - 1)
+	var asc: String = c.get("ascendancy", "")
+	c["talents"] = [start_node(c["class"])]
+	c["ranks"] = {}
+	c["ascendancy"] = asc
+	c["tree_v"] = TREE_VERSION
+	if old > 0: c["talent_refund"] = old
+	return old
+
+## Описание узла с рангами: текущее значение и следующий ранг
+func describe_node(c: Dictionary, id: int) -> String:
+	var n: Dictionary = tree_nodes[id]
+	var r := rank(c, id)
+	var mr := int(n["max_rank"])
+	var t := ""
+	if n["desc"] != "": t += n["desc"] + "\n"
+	var shown := maxi(1, r)
+	for m in n["mods"]: t += describe_mod([m[0], float(m[1]) * shown]) + "\n"
+	for k in n["fx"]: t += describe_fx(k, float(n["fx"][k]) * shown) + "\n"
+	if mr > 1:
+		t += "[color=#e6c27a]Ранг %d/%d[/color]" % [r, mr]
+		if r > 0 and r < mr:
+			t += "  · след.: "
+			var parts := []
+			for m in n["mods"]: parts.append(describe_mod([m[0], float(m[1]) * (r + 1)]))
+			for k in n["fx"]: parts.append(describe_fx(k, float(n["fx"][k]) * (r + 1)))
+			t += ", ".join(parts)
+		t += "\n"
+	return t.strip_edges()
+
+func describe_fx(k: String, v: float) -> String:
+	var f: String = FX_NAMES.get(k, k)
+	if "%s" in f:
+		var vs := str(int(round(v))) if absf(v - round(v)) < 0.01 else ("%.1f" % v)
+		return f % vs
+	return f
 
 func get_asc(id: String) -> Dictionary:
 	for a in ASCENDANCIES:
@@ -196,6 +350,78 @@ func asc_block_reason(c: Dictionary, a: Dictionary) -> String:
 	if pts < ASC_REGION_POINTS: return "Нужно %d очков в регионе (%d)" % [ASC_REGION_POINTS, pts]
 	return ""
 
+# ---------------- Умения и набор ----------------
+const LOADOUT_SLOTS := 8   # + основная атака = 9 кнопок
+
+## Все активные умения персонажа (без основной атаки): класс + путь превращения
+func skill_pool(c: Dictionary) -> Array:
+	var out: Array = []
+	var cls: Dictionary = CLASSES[c["class"]]
+	for i in range(1, cls.skills.size()): out.append(cls.skills[i])
+	var a := get_asc(c.get("ascendancy", ""))
+	if not a.is_empty():
+		out.append(a.skill)
+		for x in a.get("skills_extra", []): out.append(x)
+	return out
+
+## Все умения всех путей класса (для окна набора: показать будущие)
+func skill_pool_all(c: Dictionary) -> Array:
+	var out := skill_pool(c)
+	return out
+
+func find_skill(c: Dictionary, id: String):
+	if id == "": return null
+	for s in skill_pool(c):
+		if s.id == id: return s
+	return null
+
+## "" — умение открыто, иначе причина
+func skill_lock(c: Dictionary, s: Dictionary) -> String:
+	if s.has("unlock") and int(c["class_level"]) < int(s.unlock): return "Мастерство %d" % int(s.unlock)
+	if s.has("lvl") and int(c["level"]) < int(s.lvl): return "Уровень %d" % int(s.lvl)
+	return ""
+
+## Привести набор в порядок: убрать недоступные, умение пути — в слот, новые открытые — в пустые слоты
+func ensure_loadout(c: Dictionary) -> void:
+	var lo: Array = c.get("loadout", [])
+	var cls: Dictionary = CLASSES[c["class"]]
+	if lo.is_empty():
+		lo = [cls.skills[1].id, cls.skills[2].id, "", "", "", "", "", ""]
+	while lo.size() < LOADOUT_SLOTS: lo.append("")
+	lo.resize(LOADOUT_SLOTS)
+	for i in lo.size():
+		var s = find_skill(c, str(lo[i]))
+		if s == null: lo[i] = ""
+	var a := get_asc(c.get("ascendancy", ""))
+	if not a.is_empty() and not lo.has(a.skill.id):
+		# умение пути — в третий слот (кнопка 3), прежнее умение оттуда — в свободный слот
+		if lo[2] != "":
+			var free := lo.find("")
+			if free >= 0: lo[free] = lo[2]
+		lo[2] = a.skill.id
+	var auto: Array = c.get("auto_slotted", [])
+	for s in skill_pool(c):
+		if skill_lock(c, s) == "" and not lo.has(s.id) and not auto.has(s.id):
+			var free := lo.find("")
+			if free < 0: break
+			lo[free] = s.id
+			auto.append(s.id)
+	c["auto_slotted"] = auto
+	c["loadout"] = lo
+
+func set_loadout_slot(c: Dictionary, slot: int, id: String) -> bool:
+	ensure_loadout(c)
+	var lo: Array = c["loadout"]
+	if slot < 0 or slot >= lo.size(): return false
+	if id != "":
+		var s = find_skill(c, id)
+		if s == null or skill_lock(c, s) != "": return false
+		var prev := lo.find(id)
+		if prev >= 0: lo[prev] = lo[slot]   # меняем местами
+	lo[slot] = id
+	c["loadout"] = lo
+	return true
+
 # ---------------- Персонаж ----------------
 static func xp_to_next(level: int) -> int:
 	return int(60.0 * pow(level, 1.6))
@@ -207,7 +433,7 @@ func new_character(char_name: String, class_id: String, look: Dictionary) -> Dic
 	return {
 		"version": 2, "id": "%x%x" % [Time.get_ticks_usec(), randi()], "name": char_name, "class": class_id, "look": CharAssets.normalize_look(look),
 		"level": 1, "xp": 0, "class_level": 1, "class_xp": 0,
-		"talents": [start_node(class_id)], "ascendancy": "",
+		"talents": [start_node(class_id)], "ranks": {}, "tree_v": TREE_VERSION, "ascendancy": "",
 		"gold": 0, "potions": 3, "inventory": [], "equipped": [starter_weapon(class_id)],
 		"zone": "starter", "has_pos": false, "pos": [0, 0, 0], "zones": {},
 		"created": Time.get_unix_time_from_system(), "play_time": 0.0, "kills": 0,
@@ -231,9 +457,13 @@ func compute_stats(c: Dictionary) -> Dictionary:
 	var add := func(mods):
 		for m in mods:
 			raw[m[0]] = raw.get(m[0], 0.0) + float(m[1])
+	var fx := {}
 	for id in c["talents"]:
 		if tree_nodes.has(int(id)):
-			add.call(tree_nodes[int(id)]["mods"])
+			var n: Dictionary = tree_nodes[int(id)]
+			var r := rank(c, int(id))
+			for m in n["mods"]: raw[m[0]] = raw.get(m[0], 0.0) + float(m[1]) * r
+			for k in n["fx"]: fx[k] = float(fx.get(k, 0.0)) + float(n["fx"][k]) * r
 	var asc := get_asc(c["ascendancy"])
 	if not asc.is_empty():
 		add.call(asc["mods"])
@@ -262,7 +492,10 @@ func compute_stats(c: Dictionary) -> Dictionary:
 	s.mp_regen = 2.0 + g.call("mpregen")
 	s.leech = g.call("leech%") / 100.0
 	s.cdr = clampf(g.call("cdr%"), 0, 50) / 100.0
-	s.dr = s.armor / (s.armor + 120.0) * 0.8
+	s.dr = s.armor / (s.armor + 120.0) * 0.8 + g.call("dr%") / 100.0
+	if fx.has("leech_x"): s.leech *= 2.0
+	if fx.has("no_regen"): s.regen = 0.0
+	s.fx = fx
 	return s
 
 # ---------------- Добыча ----------------

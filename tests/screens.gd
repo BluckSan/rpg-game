@@ -3,7 +3,7 @@ extends Node
 ## godot --path . --rendering-driver opengl3 --resolution 1920x1080 res://tests/screens.tscn
 ## Сохраняет в /workspace/rpg-shots/ (или в user://shots, если папки нет).
 var is_runner := false
-var out := "/workspace/rpg-shots/v033"
+var out := "/workspace/rpg-shots/v040"
 var only := ""
 
 func shot(n: String) -> void:
@@ -66,6 +66,8 @@ func _ready() -> void:
 	Game.play(c); await w(2.5)
 	var z = get_tree().current_scene
 	if want("zone"): await shot("07_zone")
+	if want("v040"):
+		await _v040_shots(z); return
 	# --- сцены-витрины в зоне (своя камера) ---
 	var cam := Camera3D.new(); z.add_child(cam)
 	var base := Vector3(-4, 0.8, 65)
@@ -317,3 +319,47 @@ func _clear(n: Node) -> void:
 	for ch in n.get_children():
 		if ch is Enemy: ch.zone.enemies.erase(ch)
 		ch.queue_free()
+
+
+func _v040_shots(z) -> void:
+	var p: Player = z.player
+	p.god_mode = true
+	z.data["level"] = 12; z.data["class_level"] = 3; p.recalc(true)
+	z.cam_rig.yaw = 150.0; z.cam_rig.distance = 8.0
+	p.teleport(Vector3(-14, 0.1, -24)); await w(2.0)
+	await shot("40_world_%s" % ("hi" if Game.heavy_fx() else "std"))
+	p.teleport(Vector3(-24, 0.1, 50)); z.cam_rig.yaw = 200.0; await w(1.5)
+	await shot("41_dungeon_gate")
+	p.teleport(Vector3(4, 0.1, 6)); await w(0.8)
+	Game.skill_layout = "mobile"; z.hud.apply_skill_layout(); await w(0.4)
+	await shot("42_layout_mobile")
+	Game.skill_layout = "pc"; z.hud.apply_skill_layout(); await w(0.4)
+	await shot("43_layout_pc")
+	Game.skill_layout = Game.default_skill_layout(); z.hud.apply_skill_layout()
+	z.hud._open("skills"); await w(0.6)
+	await shot("44_skills_window")
+	z.hud.close_window(); await w(0.3)
+	z.hud._open("talents"); await w(0.6)
+	var tw = z.hud.window
+	tw.search.text = "огонь"; tw.find_next(); await w(0.5)
+	await shot("45_talents_search")
+	tw.set_filter("key"); await w(0.4)
+	await shot("46_talents_keystones")
+	z.hud.close_window(); await w(0.3)
+	DB.set_zone_flag(z.data, "starter", "boss_troll_killed")
+	Game.travel("dungeon"); await w(3.0)
+	var d = get_tree().current_scene
+	d.player.god_mode = true
+	d.cam_rig.yaw = 180.0; d.cam_rig.distance = 8.0
+	d.player.teleport(Vector3(0, 0.1, 8)); await w(1.2)
+	await shot("47_crypt_hall")
+	d.player.teleport(Vector3(0, 0.1, 50)); await w(1.0)
+	await shot("48_lever_hall")
+	var b = d.builder.boss_enemy()
+	d.player.teleport(Vector3(0, 0.1, 96)); await w(4.0)
+	await shot("49_warden_fight")
+	if b and b.brain:
+		var t0 := Time.get_ticks_msec()
+		while b.brain.cast_name == "" and Time.get_ticks_msec() - t0 < 12000: await w(0.2)
+		await w(0.8)
+		await shot("50_warden_telegraph")

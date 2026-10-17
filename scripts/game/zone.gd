@@ -17,6 +17,12 @@ var merchant: Node3D
 var merchant_point := Vector3.ZERO
 var arena_point := Vector3.ZERO
 var portal_point := Vector3.ZERO
+var dungeon_gate_point := Vector3.ZERO
+var builder: StarterZoneBuilder
+## Точки взаимодействия (рычаги, двери): {pos, r, text, icon, cb, visible?}
+var interactables: Array = []
+var pillars: Array = []
+var pillar_r := 1.4
 ## Возвышенности для наземных врагов (у игрока — физика): диски, коробки, пандусы
 var _h_discs: Array = []
 var _h_boxes: Array = []
@@ -50,7 +56,9 @@ func _ready() -> void:
 		Game.current = list[0] if list.size() > 0 else DB.new_character("Тестовый герой", "warrior", {})
 	data = Game.current
 	fx_root = Node3D.new(); fx_root.name = "FX"; add_child(fx_root)
-	var builder := StarterZoneBuilder.new()
+	if not DB.ZONES.has(data.get("zone", "")) or (data["zone"] == "dungeon" and DB.zone_lock_reason(data, "dungeon") != ""):
+		data["zone"] = "starter"
+	builder = DungeonBuilder.new() if data["zone"] == "dungeon" else StarterZoneBuilder.new()
 	builder.name = "World"
 	add_child(builder)
 	builder.build(self)
@@ -58,8 +66,17 @@ func _ready() -> void:
 	merchant_point = builder.merchant_point
 	arena_point = builder.arena_point
 	portal_point = builder.portal_point
-	DB.shop_ensure(data)
-	_spawn_merchant()
+	dungeon_gate_point = builder.dungeon_gate_point
+	if builder is DungeonBuilder:
+		pillars = builder.pillars; pillar_r = builder.pillar_r
+	else:
+		DB.shop_ensure(data)
+		_spawn_merchant()
+	var arrive: String = data.get("arrive", "")
+	if arrive == "dungeon" and not data.get("has_pos", false):
+		data["pos"] = [dungeon_gate_point.x + 3.5, 0.1, dungeon_gate_point.z - 2.0]
+		data["has_pos"] = true
+	data.erase("arrive")
 
 	player = Player.new()
 	player.name = "Player"
@@ -96,6 +113,20 @@ func _spawn_merchant() -> void:
 	ic.billboard = BaseMaterial3D.BILLBOARD_ENABLED; ic.no_depth_test = true
 	ic.render_priority = 10
 	m.add_child(ic); ic.position = Vector3(0, 3.6, 0.6)
+
+func is_dungeon() -> bool:
+	return builder is DungeonBuilder
+
+## Ближайшая доступная точка взаимодействия рядом с игроком (или пустой словарь)
+func nearest_interactable() -> Dictionary:
+	if player == null: return {}
+	var best := {}
+	var bd := INF
+	for it in interactables:
+		if it.has("visible") and not it["visible"].call(): continue
+		var d := U.flat_dist(player.global_position, it["pos"])
+		if d < float(it["r"]) and d < bd: bd = d; best = it
+	return best
 
 func near_merchant() -> bool:
 	return merchant != null and player != null and U.flat_dist(player.global_position, merchant_point) < 3.2

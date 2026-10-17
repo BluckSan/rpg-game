@@ -1,5 +1,6 @@
 extends Control
-## Окно пассивного дерева талантов: перетаскивание, зум (щипок/колёсико), выбор и изучение узлов, пути превращения.
+## Окно дерева талантов: перетаскивание, зум (щипок/колёсико/кнопки), поиск и фильтры, ранги узлов (+/−),
+## ветви-специализации классов и путей превращения, пассивы и модификаторы умений, сброс с подтверждением.
 
 var zone
 var data: Dictionary
@@ -18,6 +19,15 @@ var _touches := {}
 var _pinch := 0.0
 var _press_pos := Vector2.ZERO
 var _dragged := false
+var refund_btn: Button
+var reset_btn: Button
+var search: LineEdit
+var filter := "all"
+var filter_btns := {}
+var matches: Array = []
+var _match_i := -1
+var _reset_armed := 0.0
+const FILTERS := [["all", "Все"], ["avail", "Можно"], ["key", "Ключевые"], ["fx", "Пассивы"], ["has", "Изучено"]]
 
 func setup(z) -> void:
 	zone = z
@@ -46,20 +56,98 @@ func setup(z) -> void:
 	UIK.place(info_body, 0.05, 0.22, 0.95, 0.78)
 	info_body.scroll_active = true
 	info_body.mouse_filter = Control.MOUSE_FILTER_PASS
-	learn_btn = UIK.button(info, "Изучить", _learn, UIK.GREEN, 30)
-	UIK.place(learn_btn, 0.05, 0.03, 0.95, 0.19)
+	learn_btn = UIK.button(info, "Изучить", _learn, UIK.GREEN, 28)
+	learn_btn.name = "Learn"
+	UIK.place(learn_btn, 0.05, 0.03, 0.62, 0.19)
+	refund_btn = UIK.button(info, "−1 ранг", _refund, Color(0.45, 0.25, 0.18), 24)
+	refund_btn.name = "Refund"
+	UIK.place(refund_btn, 0.65, 0.03, 0.95, 0.19)
 	UIK.place(UIK.label(side, "Пути превращения", 30, UIK.ACCENT, HORIZONTAL_ALIGNMENT_CENTER), 0, 0.415, 1, 0.465)
 	var ap := Control.new(); side.add_child(ap)
 	UIK.place(ap, 0.02, 0.135, 0.98, 0.415)
 	asc_list = UIK.scroll_list(ap, 8)
-	UIK.place(UIK.button(side, "Сброс", _reset, Color(0.45, 0.18, 0.15), 28), 0.04, 0.02, 0.36, 0.12)
+	reset_btn = UIK.button(side, "Сброс", _reset, Color(0.45, 0.18, 0.15), 24)
+	UIK.place(reset_btn, 0.04, 0.02, 0.36, 0.12)
+	_build_tools()
 	UIK.place(UIK.button(side, "Закрыть", _close, UIK.BUTTON, 30), 0.4, 0.02, 0.96, 0.12)
 	var start: Dictionary = DB.tree_nodes[DB.start_node(data["class"])]
 	offset = -start["pos"] * zoom
 	refresh()
 
+## Поиск, фильтры и кнопки зума поверх области дерева (удобно на телефоне)
+func _build_tools() -> void:
+	var bar := HBoxContainer.new(); bar.add_theme_constant_override("separation", 8)
+	canvas.add_child(bar)
+	UIK.place(bar, 0.01, 0.91, 0.99, 0.99)
+	search = LineEdit.new()
+	search.placeholder_text = "Поиск: имя или эффект…"
+	search.add_theme_font_size_override("font_size", 24)
+	search.custom_minimum_size = Vector2(330, 0)
+	search.text_changed.connect(func(_t): _update_matches())
+	search.text_submitted.connect(func(_t): find_next())
+	bar.add_child(search)
+	var fb := UIK.button(bar, "Найти", find_next, UIK.BUTTON, 22, "magnifying-glass")
+	fb.custom_minimum_size.x = 130
+	for f in FILTERS:
+		var b := UIK.button(bar, f[1], set_filter.bind(f[0]), Color(0.22, 0.2, 0.26), 20)
+		b.custom_minimum_size.x = 104
+		filter_btns[f[0]] = b
+	var zb := VBoxContainer.new(); zb.add_theme_constant_override("separation", 8)
+	canvas.add_child(zb)
+	UIK.place(zb, 0.01, 0.02, 0.08, 0.36)
+	for z in [["+", func(): _zoom_at(1.25, canvas.size / 2)], ["−", func(): _zoom_at(0.8, canvas.size / 2)], ["⌂", center_on_start]]:
+		var b := UIK.button(zb, z[0], z[1], Color(0.25, 0.23, 0.3), 34)
+		b.custom_minimum_size = Vector2(80, 80)
+	set_filter("all")
+
+func set_filter(f: String) -> void:
+	filter = f
+	for k in filter_btns: filter_btns[k].modulate = Color(1.3, 1.2, 0.8) if k == f else Color(1, 1, 1)
+	_update_matches()
+
+func _node_match(id: int) -> bool:
+	var n: Dictionary = DB.tree_nodes[id]
+	match filter:
+		"avail": if not DB.can_allocate(data, id): return false
+		"key": if n["type"] != "keystone": return false
+		"fx": if (n["fx"] as Dictionary).is_empty(): return false
+		"has": if not DB.has_talent(data, id): return false
+	var q := search.text.strip_edges().to_lower() if search else ""
+	if q == "": return true
+	var hay: String = (str(n["name"]) + " " + str(n["desc"]) + " " + str(n["branch_name"])).to_lower()
+	for m in n["mods"]: hay += " " + DB.describe_mod(m).to_lower()
+	for k in n["fx"]: hay += " " + DB.describe_fx(k, float(n["fx"][k])).to_lower()
+	return q in hay
+
+func _update_matches() -> void:
+	matches.clear(); _match_i = -1
+	if filter == "all" and (search == null or search.text.strip_edges() == ""):
+		canvas.queue_redraw(); return
+	for id in DB.tree_order:
+		if _node_match(id): matches.append(id)
+	canvas.queue_redraw()
+
+func _filtering() -> bool:
+	return not (filter == "all" and (search == null or search.text.strip_edges() == ""))
+
+## Следующее совпадение поиска: выбрать и показать по центру
+func find_next() -> void:
+	if not _filtering(): _update_matches()
+	if matches.is_empty():
+		Game.toast("Ничего не найдено", 1.2); return
+	_match_i = (_match_i + 1) % matches.size()
+	var id: int = matches[_match_i]
+	selected = id
+	offset = -DB.tree_nodes[id]["pos"] * zoom
+	_clamp()
+	refresh()
+
+func center_on_start() -> void:
+	offset = -DB.tree_nodes[DB.start_node(data["class"])]["pos"] * zoom
+	canvas.queue_redraw()
+
 func refresh() -> void:
-	points_label.text = "[center]Свободных очков: [b]%d[/b]  (изучено %d)[/center]" % [DB.free_points(data), data["talents"].size() - 1]
+	points_label.text = "[center]Свободных очков: [b]%d[/b]  (вложено %d)[/center]" % [DB.free_points(data), DB.spent_points(data)]
 	_update_info()
 	_build_asc_list()
 	canvas.queue_redraw()
@@ -92,18 +180,47 @@ func _draw_tree() -> void:
 			var col := rc.lerp(Color.WHITE, 0.3) if (ha and hb) else (rc.darkened(0.5) if (ha or hb) else Color(0.2, 0.2, 0.24))
 			canvas.draw_line(_to_screen(n["pos"]), _to_screen(m["pos"]), col, maxf(2.0, 6.0 * zoom), true)
 	var labels := []
+	var filt := _filtering()
+	var fs_r := maxi(13, int(18 * zoom / 0.6))
 	for id in DB.tree_order:
 		var n: Dictionary = DB.tree_nodes[id]
 		var p := _to_screen(n["pos"])
 		var r := _node_radius(n) * zoom
 		if p.x < -60 or p.y < -60 or p.x > canvas.size.x + 60 or p.y > canvas.size.y + 60: continue
 		var has := DB.has_talent(data, id)
-		var avail := not has and DB.can_allocate(data, id)
+		var rk := DB.rank(data, id)
+		var mr := int(n["max_rank"])
+		var avail := DB.can_allocate(data, id)
 		var rc := _region_color(n["region"])
+		if n["type"] == "mod": rc = Color(0.3, 0.85, 0.8)
 		var ring := Color.WHITE if id == selected else (UIK.ACCENT if has else (Color(0.6, 0.6, 0.6) if avail else Color(0.1, 0.1, 0.12)))
 		var fill := rc.lerp(Color.WHITE, 0.25) if has else (rc.darkened(0.35) if avail else Color(0.18, 0.18, 0.2))
-		canvas.draw_circle(p, r + 5 * zoom, ring)
-		canvas.draw_circle(p, r, fill)
+		if n["req_asc"] != "" and data["ascendancy"] != n["req_asc"]: fill = fill.darkened(0.4)
+		if filt and not matches.has(id):
+			ring.a = 0.2; fill.a = 0.2
+		elif filt:
+			canvas.draw_arc(p, r + 12 * zoom + 4, 0, TAU, 32, Color(1, 0.95, 0.4, 0.9), 3.0)
+		if n["type"] == "mod":
+			var d := r + 5 * zoom
+			canvas.draw_colored_polygon(PackedVector2Array([p + Vector2(0, -d), p + Vector2(d, 0), p + Vector2(0, d), p + Vector2(-d, 0)]), ring)
+			canvas.draw_colored_polygon(PackedVector2Array([p + Vector2(0, -r), p + Vector2(r, 0), p + Vector2(0, r), p + Vector2(-r, 0)]), fill)
+		else:
+			canvas.draw_circle(p, r + 5 * zoom, ring)
+			canvas.draw_circle(p, r, fill)
+		if has and avail and mr > 1:   # можно поднять ранг
+			canvas.draw_arc(p, r + 9 * zoom, 0, TAU, 24, Color(0.5, 1, 0.5, 0.8), 2.0)
+		if mr > 1 and zoom >= 0.45 and (not filt or matches.has(id)):
+			var rt := "%d/%d" % [rk, mr]
+			var rw := font.get_string_size(rt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs_r).x
+			var rp := p + Vector2(-rw / 2, fs_r * 0.36)
+			canvas.draw_string_outline(font, rp, rt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs_r, 4, Color.BLACK)
+			canvas.draw_string(font, rp, rt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs_r, Color(1, 1, 0.85) if rk > 0 else Color(0.75, 0.75, 0.75))
+		if n["branch_name"] != "" and zoom >= 0.35:
+			var bt: String = n["branch_name"]
+			var bfs := maxi(14, int(19 * zoom / 0.6))
+			var bw := font.get_string_size(bt, HORIZONTAL_ALIGNMENT_LEFT, -1, bfs).x
+			var dirv: Vector2 = (n["pos"] as Vector2).normalized()
+			labels.append([p - dirv * (r + bfs * 1.2) + Vector2(-bw / 2, bfs * 0.35), bt, bfs])
 		if n["type"] == "keystone" or n["type"] == "start":
 			var t: String = DB.CLASSES[n["class"]].name if n["type"] == "start" else n["name"]
 			var fs := maxi(14, int(22 * zoom / 0.6))
@@ -166,7 +283,7 @@ func _canvas_input(ev: InputEvent) -> void:
 		_clamp(); canvas.queue_redraw()
 
 func _zoom_at(k: float, at: Vector2) -> void:
-	var nz := clampf(zoom * k, 0.25, 1.8)
+	var nz := clampf(zoom * k, 0.2, 1.8)
 	var tree_pt := (at - canvas.size / 2 - offset) / zoom
 	zoom = nz
 	offset = at - canvas.size / 2 - tree_pt * zoom
@@ -174,7 +291,7 @@ func _zoom_at(k: float, at: Vector2) -> void:
 	canvas.queue_redraw()
 
 func _clamp() -> void:
-	var lim := 800 * zoom
+	var lim := 1400 * zoom
 	offset = offset.clamp(Vector2(-lim, -lim), Vector2(lim, lim))
 
 func _tap(p: Vector2) -> void:
@@ -199,12 +316,14 @@ func _show_tip(id: int, at: Vector2) -> void:
 	if tip and is_instance_valid(tip): tip.queue_free()
 	var n: Dictionary = DB.tree_nodes[id]
 	var title: String = ("Начало: " + DB.CLASSES[n["class"]].name) if n["type"] == "start" else n["name"]
-	var t := ""
-	for m in n["mods"]: t += DB.describe_mod(m) + "\n"
+	var t := DB.describe_node(data, id) + "\n"
+	var blk := DB.alloc_block(data, id)
 	var has := DB.has_talent(data, id)
-	t += "[color=#7fd87f]Изучено[/color]" if has else ("[color=#e6c27a]Можно изучить[/color]" if DB.can_allocate(data, id) else "[color=#999]Нужна связь с изученным узлом[/color]")
-	var col: Color = {"keystone": Color(1, 0.6, 0.25), "notable": UIK.ACCENT}.get(n["type"], UIK.TEXT)
-	var ic: String = {"keystone": "aura", "notable": "crystal-ball", "start": "swords-emblem"}.get(n["type"], "gem-pendant")
+	if has and blk == "Максимальный ранг": t += "[color=#7fd87f]Изучено полностью[/color]"
+	elif blk == "": t += "[color=#e6c27a]%s[/color]" % ("Можно поднять ранг" if has else "Можно изучить")
+	else: t += "[color=#999]%s[/color]" % blk
+	var col: Color = {"keystone": Color(1, 0.6, 0.25), "notable": UIK.ACCENT, "mod": Color(0.4, 0.95, 0.9)}.get(n["type"], UIK.TEXT)
+	var ic: String = {"keystone": "aura", "notable": "crystal-ball", "start": "swords-emblem", "mod": "magic-swirl"}.get(n["type"], "gem-pendant")
 	tip = UIK.tooltip(self, title, t.strip_edges(), ic, col, 440)
 	UIK.place_tooltip(tip, Rect2(at - Vector2(30, 30), Vector2(60, 60)), get_viewport_rect().size)
 
@@ -213,19 +332,27 @@ func _update_info() -> void:
 		learn_btn.visible = false
 		return
 	var n: Dictionary = DB.tree_nodes[selected]
-	var type_name: String = {"keystone": "Ключевой талант", "notable": "Особый талант", "start": "Стартовая точка"}.get(n["type"], "Малый талант")
+	var type_name: String = {"keystone": "Ключевой пассив", "notable": "Особый талант", "start": "Стартовая точка", "mod": "Модификатор умений"}.get(n["type"], "Малый талант")
+	if n["gate"]: type_name = "Ворота превращения"
 	info_title.text = ("Начало: " + DB.CLASSES[n["class"]].name) if n["type"] == "start" else n["name"]
-	var t := "[i]%s%s[/i]\n" % [type_name, (" · " + DB.tree_regions[n["region"]]["name"]) if DB.tree_regions.has(n["region"]) else ""]
-	for m in n["mods"]: t += DB.describe_mod(m) + "\n"
-	if n["type"] == "keystone":
+	var where := ""
+	if DB.tree_regions.has(n["region"]): where = " · " + DB.tree_regions[n["region"]]["name"]
+	var t := "[i]%s%s[/i]\n" % [type_name, where]
+	t += DB.describe_node(data, selected) + "\n"
+	if n["gate"]:
 		var a := DB.get_asc(n["region"])
 		if not a.is_empty(): t += "\nОткрывает путь: [b]%s[/b]" % a["name"]
 	info_body.text = t
 	var has := DB.has_talent(data, selected)
-	learn_btn.visible = not has and n["type"] != "start"
-	learn_btn.disabled = not DB.can_allocate(data, selected)
-	UIK.place(info_body, 0.05, 0.22 if learn_btn.visible else 0.04, 0.95, 0.78)
-	learn_btn.text = "Нет очков" if DB.free_points(data) <= 0 else ("Изучить" if not learn_btn.disabled else "Недоступно (нет связи)")
+	var blk := DB.alloc_block(data, selected)
+	learn_btn.visible = n["type"] != "start" and blk != "Максимальный ранг"
+	learn_btn.disabled = blk != ""
+	refund_btn.visible = has and n["type"] != "start"
+	refund_btn.disabled = DB.refund_block(data, selected) != ""
+	UIK.place(info_body, 0.05, 0.22 if (learn_btn.visible or refund_btn.visible) else 0.04, 0.95, 0.78)
+	if blk == "": learn_btn.text = ("+1 ранг (%d/%d)" % [DB.rank(data, selected) + 1, int(n["max_rank"])]) if has else "Изучить"
+	else: learn_btn.text = blk
+	if refund_btn.disabled and has: info_body.text += "\n[color=#999]Вернуть: %s[/color]" % DB.refund_block(data, selected)
 
 func _build_asc_list() -> void:
 	UIK.clear(asc_list)
@@ -281,7 +408,25 @@ func _learn() -> void:
 		zone.apply_character_changes(false)
 	refresh()
 
+func _refund() -> void:
+	if DB.refund(data, selected):
+		zone.apply_character_changes(false)
+	refresh()
+
+func _process(delta: float) -> void:
+	if _reset_armed > 0:
+		_reset_armed -= delta
+		if _reset_armed <= 0: reset_btn.text = "Сброс"
+
+## Полный сброс (возврат всех очков, путь превращения отменяется) — по второму нажатию
 func _reset() -> void:
+	if _reset_armed <= 0:
+		_reset_armed = 3.0
+		reset_btn.text = "Точно?"
+		Game.toast("Нажмите «Сброс» ещё раз: все очки вернутся, путь превращения отменится", 3.0)
+		return
+	_reset_armed = 0
+	reset_btn.text = "Сброс"
 	var had: bool = data["ascendancy"] != ""
 	DB.reset_talents(data)
 	zone.apply_character_changes(had)

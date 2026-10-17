@@ -283,7 +283,13 @@ const SKILL_ICONS := {"w_attack": "broadsword", "w_spin": "spinning-sword", "w_d
 	"a_attack": "high-shot", "a_volley": "arrow-cluster", "a_rain": "arrow-flights",
 	"m_bolt": "magic-swirl", "m_fireball": "fireball", "m_nova": "frozen-orb",
 	"asc_rage": "burning-passion", "asc_shield": "shield-reflect", "asc_meteor": "meteor-impact",
-	"asc_summon": "raise-skeleton", "asc_strike": "backstab", "asc_roar": "wolf-howl"}
+	"asc_summon": "raise-skeleton", "asc_strike": "backstab", "asc_roar": "wolf-howl",
+	"w_slam": "earth-crack", "w_cry": "shouting", "w_leap": "jump-across", "w_iron": "armor-upgrade", "w_exec": "decapitation",
+	"a_pierce": "supersonic-arrow", "a_leap": "boot-kick", "a_trap": "wolf-trap", "a_snipe": "bullseye", "a_poison": "poison-gas",
+	"m_chain": "lightning-branches", "m_blink": "teleport", "m_wall": "fire-zone", "m_shield": "magic-shield", "m_lance": "ice-spear",
+	"asc_bloodspin": "bloody-sword", "asc_quake": "quake-stomp", "asc_hammer": "thor-hammer", "asc_consecrate": "holy-symbol",
+	"asc_storm": "lightning-storm", "asc_prison": "ice-cube", "asc_bones": "bone-knife", "asc_curse": "cursed-star",
+	"asc_knives": "thrown-daggers", "asc_vanish": "invisible", "asc_maul": "claw-slashes", "asc_regrow": "regeneration"}
 const WEAPON_ICONS := {"warrior": "broadsword", "archer": "pocket-bow", "mage": "wizard-staff"}
 const SLOT_ICONS := ["broadsword", "breastplate", "visored-helm", "ring"]
 const STAT_ICONS := {"max_hp": "heart-bottle", "max_mp": "drop", "damage": "sword-wound", "attack_speed": "lightning-frequency",

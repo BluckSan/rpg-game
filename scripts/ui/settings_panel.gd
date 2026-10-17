@@ -66,6 +66,10 @@ func _build() -> void:
 			Game.apply_settings())
 		rs.disabled = Game.fullscreen
 	_section("Интерфейс")
+	_cycle("SkillLayout", "Панель умений", func(): return "Веер (телефон)" if Game.skill_layout == "mobile" else "Ряд (ПК)", func():
+		Game.skill_layout = "pc" if Game.skill_layout == "mobile" else "mobile"
+		Game.save_settings()
+		get_tree().call_group("hud_listeners", "apply_skill_layout"))
 	_cycle("UiScale", "Масштаб интерфейса", func(): return "%d%%" % roundi(Game.ui_scale * 100), func():
 		var i := _nearest(Game.UI_SCALES, Game.ui_scale)
 		Game.ui_scale = Game.UI_SCALES[(i + 1) % Game.UI_SCALES.size()]

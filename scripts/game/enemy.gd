@@ -32,6 +32,20 @@ var brain   # BossBrain для босса
 var damage_mult := 1.0
 var speed_mult := 1.0
 var hits_taken := 0
+var curse_timer := 0.0   # проклятие: +30% получаемого урона
+
+var _dots: Array = []     # [урон за тик, тиков осталось, таймер, цвет] — яд/кровотечение/поджог
+
+## Урон со временем: total за dur секунд (тик 0.5 с)
+func add_dot(total: float, dur: float, c: Color) -> void:
+	if not alive: return
+	var ticks := maxi(1, int(dur / 0.5))
+	if _dots.size() >= 4: _dots.pop_front()
+	_dots.append([total / ticks, ticks, 0.5, c])
+
+func curse(t: float) -> void:
+	curse_timer = maxf(curse_timer, t)
+	if model: CombatFX.burst(zone.fx_root, global_position + Vector3.UP * 1.5, Color(0.6, 0.3, 0.9), 16, 2.0, 0.1, 0.6, Vector3.UP, 180, 0.5)
 
 static func spawn(z, k: String, lvl: int, pos: Vector3, parent: Node) -> Enemy:
 	var e := Enemy.new()
@@ -50,7 +64,7 @@ static func spawn(z, k: String, lvl: int, pos: Vector3, parent: Node) -> Enemy:
 	e._build_model()
 	if not e.def.boss: U.set_view_range(e, Game.view_distance * 0.85)
 	if e.def.boss:
-		e.brain = BossBrain.new()
+		e.brain = WardenBrain.new() if k == "warden" else BossBrain.new()
 		e.brain.setup(e)
 	z.enemies.append(e)
 	return e
@@ -81,9 +95,16 @@ func _build_model() -> void:
 			else:
 				model.attach("R.DownLeg.001", "props/sword2", Vector3(0, 0.1, 0), Vector3(180, 0, 0), 0.36)
 				model.attach("L.DownLeg.001", "props/shield_round", Vector3(0, 0.1, 0), Vector3(0, 90, 0), 0.22)
-		"goblin", "troll":
+		"ether_guard":
+			model = MobModel.new(); add_child(model)
+			model.setup("skeleton", {"tint": Color(0.55, 0.45, 0.85), "emission": Color(0.75, 0.4, 1.0), "scale": 1.15})
+			model.walk_ref = 2.0; model.run_ref = 4.0
+			model.attach("R.DownLeg.001", "props/sword2", Vector3(0, 0.1, 0), Vector3(180, 0, 0), 0.42)
+			model.attach("L.DownLeg.001", "props/shield_round", Vector3(0, 0.1, 0), Vector3(0, 90, 0), 0.26)
+		"goblin", "troll", "warden":
 			model = CharVisual.new(); add_child(model)
 			model.build({}, "warrior", "", kind)
+			if kind == "warden": model._build_fx("embers", Color(0.7, 0.4, 1.0), model)
 		_:
 			model = MobModel.new(); add_child(model)
 			model.setup("slime")
@@ -96,6 +117,7 @@ func take_damage(dmg: float, crit: bool) -> void:
 	if brain and brain.invulnerable: 
 		zone.float_text(global_position + Vector3.UP * 4.5, "Неуязвим", Color(0.8, 0.8, 0.8))
 		return
+	if curse_timer > 0: dmg *= 1.3
 	hp -= dmg
 	hits_taken += 1
 	_flash = 0.12
@@ -160,6 +182,16 @@ func _choose_target() -> Node3D:
 func _process(delta: float) -> void:
 	if not alive: return
 	if _attack_timer > 0: _attack_timer -= delta
+	if curse_timer > 0: curse_timer -= delta
+	if not _dots.is_empty():
+		for d in _dots.duplicate():
+			d[2] -= delta
+			if d[2] <= 0:
+				d[2] = 0.5; d[1] -= 1
+				if model: CombatFX.burst(zone.fx_root, global_position + Vector3.UP * 1.2, d[3], 5, 1.5, 0.08, 0.4, Vector3.UP, 120, 0.3)
+				take_damage(d[0], false)
+				if not alive: return
+				if d[1] <= 0: _dots.erase(d)
 	if _slow_timer > 0:
 		_slow_timer -= delta
 		if _slow_timer <= 0: _slow_factor = 1.0

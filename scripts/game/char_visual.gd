@@ -16,6 +16,7 @@ const WEAPONS := {
 	"mage": [["hand_r", "props/staff", "grip", Vector3.ZERO, 0.58]],
 	"goblin": [["hand_r", "props/axe", "grip", Vector3.ZERO, 0.55]],
 	"troll": [["hand_r", "props/axe", "grip", Vector3.ZERO, 0.8]],
+	"warden": [["hand_r", "props/sword1", "grip", Vector3.ZERO, 1.05]],
 }
 ## Хват: точка на оси модели (y в единицах модели), где смыкается кулак, и поворот вокруг оси (°)
 ## Толщина древка относительно длины (посох модели слишком толстый для кулака — сужаем по X/Z)
@@ -60,6 +61,11 @@ const MONSTERS := {
 		"skin": Color(0.48, 0.56, 0.47), "hair": Color(0.2, 0.2, 0.17), "eye": Color(1, 0.25, 0.08), "glow": 3.0,
 		"parts": ["Peasant_Legs"], "pants": {"hue": 0.0, "sat": 0.6, "val": 0.45},
 		"loco": ["zombie_idle", "zombie_walk", "run"], "attack": ["attack_heavy", "hook", "attack_c"]},
+	"warden": {"look": {"gender": 0, "height": 2.35, "build": 1.2, "head": 0.9, "hair": 0, "brows": 1, "beard": 0,
+		"morphs": {"jaw_width": 0.6, "brow_depth": 0.8, "brow_height": -0.5, "eye_size": -0.3, "face_width": 0.3, "cheekbones": 0.8, "chin": 0.7}},
+		"skin": Color(0.42, 0.36, 0.62), "hair": Color(0.1, 0.08, 0.15), "eye": Color(0.8, 0.5, 1.0), "glow": 4.0,
+		"parts": ["Peasant_Legs", "Peasant_Feet"], "pants": {"hue": 0.75, "sat": 0.5, "val": 0.3},
+		"loco": ["idle_sword", "walk", "run"], "attack": ["attack_heavy", "attack_c", "hook"]},
 }
 
 var look: Dictionary = {}
