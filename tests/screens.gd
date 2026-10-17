@@ -72,6 +72,8 @@ func _ready() -> void:
 		await _v041_shots(z); return
 	if want("v050ui"):
 		await _v050_ui_shots(z); return
+	if want("v050bal"):
+		await _v050_bal_shots(z); return
 	if want("v050world"):
 		await _v050_world_shots(z); return
 	# --- сцены-витрины в зоне (своя камера) ---
@@ -503,3 +505,24 @@ func _v050_world_shots(z) -> void:
 	get_tree().paused = false
 	get_tree().quit()
 
+
+func _v050_bal_shots(z) -> void:
+	out = "/workspace/rpg-shots/v050"; DirAccess.make_dir_recursive_absolute(out)
+	var p: Player = z.player
+	p.god_mode = true
+	z.data["level"] = 4; p.recalc(true)
+	var boss = null
+	for e in z.enemies: if e.def.boss: boss = e
+	p.teleport(boss.global_position + Vector3(0, 0.1, -7)); z.cam_rig.yaw = 0.0
+	await w(1.5)
+	for i in 6:
+		if is_instance_valid(boss) and boss.alive:
+			p.hit(boss, 1.0, false, false, {"elem": ["phys", "fire", "ice", "poison"][i % 4]})
+		await w(0.12)
+	await shot("b1_troll_lvl4_resists")
+	z.hud._open("pause"); await w(0.5)
+	z.hud.window.open_credits(); await w(0.6)
+	await shot("b2_credits")
+	z.hud.close_window(); await w(0.3)
+	get_tree().paused = false
+	get_tree().quit()

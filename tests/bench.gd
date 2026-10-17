@@ -48,6 +48,25 @@ func _ready() -> void:
 			prim += Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)
 		var ms := (Time.get_ticks_usec() - t0) / 1000.0 / n
 		res.append("%s: %.1f мс/кадр (%.0f fps), вызовов %.0f, примитивов %.0fk" % [spot[0], ms, 1000.0 / ms, dc / n, prim / n / 1000.0])
+	# открытый мир: город, луга, лес, руины (с подгрузкой чанков)
+	c["level"] = 12
+	Game.travel("global", "world")
+	await get_tree().create_timer(4.0).timeout
+	for spot in [["мир: Перекрёсток", Vector3(4, 0, 572)], ["мир: луга", Vector3(160, 0, 640)], ["мир: лес", Vector3(-640, 0, 300)], ["мир: руины", Vector3(60, 0, -700)]]:
+		var z = get_tree().current_scene
+		var q: Vector3 = spot[1]; q.y = WorldData.height(q.x, q.z) + 0.4
+		z.player.teleport(q)
+		await get_tree().create_timer(3.0).timeout
+		var t0 := Time.get_ticks_usec(); var n := 0
+		var dc := 0.0; var prim := 0.0; var worst := 0.0; var last := t0
+		while Time.get_ticks_usec() - t0 < 3000000:
+			await get_tree().process_frame
+			var now := Time.get_ticks_usec(); worst = maxf(worst, (now - last) / 1000.0); last = now
+			n += 1
+			dc += Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
+			prim += Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)
+		var ms := (Time.get_ticks_usec() - t0) / 1000.0 / n
+		res.append("%s: %.1f мс/кадр (%.0f fps, худший %.0f мс), вызовов %.0f, примитивов %.0fk, чанков %d" % [spot[0], ms, 1000.0 / ms, worst, dc / n, prim / n / 1000.0, get_tree().current_scene.builder.chunks.size()])
 	print("BENCH desktop=%s scale=%.2f method=%s q=%d" % [str(Game.desktop), get_tree().root.scaling_3d_scale, RenderingServer.get_current_rendering_method(), Game.quality])
 	for r in res: print("BENCH ", r)
 	Game.delete_character(c["id"])
