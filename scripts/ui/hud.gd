@@ -687,6 +687,7 @@ func _update_enemy_bars() -> void:
 		var rec := Combat.boss_rec(boss.kind, boss.level)
 		var rec_c := "ff6655" if int(zone.data["level"]) < rec else "bbffaa"
 		boss_name.text = str(boss.def.name) + "  ·  ур. %d" % boss.level
+		boss_name.add_theme_font_size_override("font_size", 30 if boss_name.text.length() <= 24 else 23)   # длинные имена боссов мира не наезжают на фазу
 		if boss_res: boss_res.text = "[center][color=#%s]Рекомендуемый уровень: %d+[/color]   %s[/center]" % [rec_c, rec, Combat.resist_text(boss.kind, boss.rank, true)]
 		var br = boss.brain
 		if br:
