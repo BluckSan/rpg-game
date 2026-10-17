@@ -1,0 +1,2967 @@
+{
+ "version": 1,
+ "regions": [
+  {
+   "id": "berserker",
+   "name": "Ярость",
+   "color": "#d9412b"
+  },
+  {
+   "id": "paladin",
+   "name": "Вера",
+   "color": "#e8c547"
+  },
+  {
+   "id": "elementalist",
+   "name": "Стихии",
+   "color": "#3fa7e8"
+  },
+  {
+   "id": "necromancer",
+   "name": "Тлен",
+   "color": "#8b4fc9"
+  },
+  {
+   "id": "shadow",
+   "name": "Тени",
+   "color": "#3b3f58"
+  },
+  {
+   "id": "druid",
+   "name": "Дикость",
+   "color": "#4caf50"
+  }
+ ],
+ "nodes": [
+  {
+   "id": 0,
+   "name": "Начало: Воин",
+   "type": "start",
+   "region": "",
+   "classId": "warrior",
+   "x": 60.6,
+   "y": -35.0,
+   "mods": [],
+   "links": [
+    4,
+    3,
+    5
+   ]
+  },
+  {
+   "id": 1,
+   "name": "Начало: Маг",
+   "type": "start",
+   "region": "",
+   "classId": "mage",
+   "x": -60.6,
+   "y": -35.0,
+   "mods": [],
+   "links": [
+    8,
+    7,
+    9
+   ]
+  },
+  {
+   "id": 2,
+   "name": "Начало: Лучник",
+   "type": "start",
+   "region": "",
+   "classId": "archer",
+   "x": -0.0,
+   "y": 70.0,
+   "mods": [],
+   "links": [
+    12,
+    11,
+    13
+   ]
+  },
+  {
+   "id": 3,
+   "name": "Основы",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": 140.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "hp",
+     "value": 8
+    }
+   ],
+   "links": [
+    4,
+    14,
+    0,
+    15
+   ]
+  },
+  {
+   "id": 4,
+   "name": "Основы",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": 121.2,
+   "y": -70.0,
+   "mods": [
+    {
+     "stat": "hp",
+     "value": 8
+    }
+   ],
+   "links": [
+    3,
+    5,
+    0
+   ]
+  },
+  {
+   "id": 5,
+   "name": "Основы",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": 70.0,
+   "y": -121.2,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 4
+    }
+   ],
+   "links": [
+    4,
+    6,
+    0,
+    35
+   ]
+  },
+  {
+   "id": 6,
+   "name": "Основы",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": 0.0,
+   "y": -140.0,
+   "mods": [
+    {
+     "stat": "mp",
+     "value": 8
+    }
+   ],
+   "links": [
+    5,
+    7
+   ]
+  },
+  {
+   "id": 7,
+   "name": "Основы",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": -70.0,
+   "y": -121.2,
+   "mods": [
+    {
+     "stat": "mp",
+     "value": 8
+    }
+   ],
+   "links": [
+    6,
+    8,
+    1,
+    55
+   ]
+  },
+  {
+   "id": 8,
+   "name": "Основы",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": -121.2,
+   "y": -70.0,
+   "mods": [
+    {
+     "stat": "mp",
+     "value": 8
+    }
+   ],
+   "links": [
+    7,
+    9,
+    1
+   ]
+  },
+  {
+   "id": 9,
+   "name": "Основы",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": -140.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "hp",
+     "value": 8
+    }
+   ],
+   "links": [
+    8,
+    10,
+    1,
+    75
+   ]
+  },
+  {
+   "id": 10,
+   "name": "Основы",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": -121.2,
+   "y": 70.0,
+   "mods": [
+    {
+     "stat": "hp",
+     "value": 8
+    }
+   ],
+   "links": [
+    9,
+    11
+   ]
+  },
+  {
+   "id": 11,
+   "name": "Основы",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": -70.0,
+   "y": 121.2,
+   "mods": [
+    {
+     "stat": "armor",
+     "value": 6
+    }
+   ],
+   "links": [
+    10,
+    12,
+    2,
+    95
+   ]
+  },
+  {
+   "id": 12,
+   "name": "Основы",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": -0.0,
+   "y": 140.0,
+   "mods": [
+    {
+     "stat": "hp",
+     "value": 8
+    }
+   ],
+   "links": [
+    11,
+    13,
+    2
+   ]
+  },
+  {
+   "id": 13,
+   "name": "Основы",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": 70.0,
+   "y": 121.2,
+   "mods": [
+    {
+     "stat": "hp",
+     "value": 8
+    }
+   ],
+   "links": [
+    12,
+    14,
+    2,
+    115
+   ]
+  },
+  {
+   "id": 14,
+   "name": "Основы",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": 121.2,
+   "y": 70.0,
+   "mods": [
+    {
+     "stat": "hp",
+     "value": 8
+    }
+   ],
+   "links": [
+    13,
+    3
+   ]
+  },
+  {
+   "id": 15,
+   "name": "Сила удара",
+   "type": "minor",
+   "region": "berserker",
+   "classId": "",
+   "x": 200.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 6
+    }
+   ],
+   "links": [
+    16,
+    3
+   ]
+  },
+  {
+   "id": 16,
+   "name": "Скорость атаки",
+   "type": "minor",
+   "region": "berserker",
+   "classId": "",
+   "x": 255.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "as%",
+     "value": 4
+    }
+   ],
+   "links": [
+    15,
+    17
+   ]
+  },
+  {
+   "id": 17,
+   "name": "Кровожадность",
+   "type": "minor",
+   "region": "berserker",
+   "classId": "",
+   "x": 310.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "leech%",
+     "value": 0.6
+    }
+   ],
+   "links": [
+    16,
+    18,
+    24,
+    27
+   ]
+  },
+  {
+   "id": 18,
+   "name": "Кровавая жатва",
+   "type": "notable",
+   "region": "berserker",
+   "classId": "",
+   "x": 365.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 14
+    },
+    {
+     "stat": "leech%",
+     "value": 1.5
+    }
+   ],
+   "links": [
+    17,
+    19
+   ]
+  },
+  {
+   "id": 19,
+   "name": "Сила удара",
+   "type": "minor",
+   "region": "berserker",
+   "classId": "",
+   "x": 420.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 6
+    }
+   ],
+   "links": [
+    18,
+    20,
+    135,
+    145
+   ]
+  },
+  {
+   "id": 20,
+   "name": "Скорость атаки",
+   "type": "minor",
+   "region": "berserker",
+   "classId": "",
+   "x": 475.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "as%",
+     "value": 4
+    }
+   ],
+   "links": [
+    19,
+    21,
+    29,
+    31
+   ]
+  },
+  {
+   "id": 21,
+   "name": "Неистовство",
+   "type": "notable",
+   "region": "berserker",
+   "classId": "",
+   "x": 530.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "as%",
+     "value": 10
+    },
+    {
+     "stat": "dmg%",
+     "value": 8
+    }
+   ],
+   "links": [
+    20,
+    22
+   ]
+  },
+  {
+   "id": 22,
+   "name": "Здоровье",
+   "type": "minor",
+   "region": "berserker",
+   "classId": "",
+   "x": 585.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "hp",
+     "value": 12
+    }
+   ],
+   "links": [
+    21,
+    23,
+    136,
+    146
+   ]
+  },
+  {
+   "id": 23,
+   "name": "Сила удара",
+   "type": "minor",
+   "region": "berserker",
+   "classId": "",
+   "x": 640.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 6
+    }
+   ],
+   "links": [
+    22,
+    34
+   ]
+  },
+  {
+   "id": 24,
+   "name": "Кровожадность",
+   "type": "minor",
+   "region": "berserker",
+   "classId": "",
+   "x": 307.0,
+   "y": 43.1,
+   "mods": [
+    {
+     "stat": "leech%",
+     "value": 0.6
+    }
+   ],
+   "links": [
+    17,
+    25
+   ]
+  },
+  {
+   "id": 25,
+   "name": "Здоровье",
+   "type": "minor",
+   "region": "berserker",
+   "classId": "",
+   "x": 298.0,
+   "y": 85.4,
+   "mods": [
+    {
+     "stat": "hp",
+     "value": 12
+    }
+   ],
+   "links": [
+    24,
+    26
+   ]
+  },
+  {
+   "id": 26,
+   "name": "Сила удара II",
+   "type": "minor",
+   "region": "berserker",
+   "classId": "",
+   "x": 333.6,
+   "y": 121.4,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 9.0
+    }
+   ],
+   "links": [
+    25
+   ]
+  },
+  {
+   "id": 27,
+   "name": "Сила удара",
+   "type": "minor",
+   "region": "berserker",
+   "classId": "",
+   "x": 307.0,
+   "y": -43.1,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 6
+    }
+   ],
+   "links": [
+    17,
+    28
+   ]
+  },
+  {
+   "id": 28,
+   "name": "Скорость атаки",
+   "type": "minor",
+   "region": "berserker",
+   "classId": "",
+   "x": 298.0,
+   "y": -85.4,
+   "mods": [
+    {
+     "stat": "as%",
+     "value": 4
+    }
+   ],
+   "links": [
+    27
+   ]
+  },
+  {
+   "id": 29,
+   "name": "Скорость атаки",
+   "type": "minor",
+   "region": "berserker",
+   "classId": "",
+   "x": 470.4,
+   "y": 66.1,
+   "mods": [
+    {
+     "stat": "as%",
+     "value": 4
+    }
+   ],
+   "links": [
+    20,
+    30
+   ]
+  },
+  {
+   "id": 30,
+   "name": "Кровожадность",
+   "type": "minor",
+   "region": "berserker",
+   "classId": "",
+   "x": 456.6,
+   "y": 130.9,
+   "mods": [
+    {
+     "stat": "leech%",
+     "value": 0.6
+    }
+   ],
+   "links": [
+    29
+   ]
+  },
+  {
+   "id": 31,
+   "name": "Здоровье",
+   "type": "minor",
+   "region": "berserker",
+   "classId": "",
+   "x": 470.4,
+   "y": -66.1,
+   "mods": [
+    {
+     "stat": "hp",
+     "value": 12
+    }
+   ],
+   "links": [
+    20,
+    32
+   ]
+  },
+  {
+   "id": 32,
+   "name": "Сила удара",
+   "type": "minor",
+   "region": "berserker",
+   "classId": "",
+   "x": 456.6,
+   "y": -130.9,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 6
+    }
+   ],
+   "links": [
+    31,
+    33
+   ]
+  },
+  {
+   "id": 33,
+   "name": "Шрамы ветерана",
+   "type": "notable",
+   "region": "berserker",
+   "classId": "",
+   "x": 488.6,
+   "y": -177.9,
+   "mods": [
+    {
+     "stat": "hp",
+     "value": 40
+    },
+    {
+     "stat": "regen",
+     "value": 1.5
+    }
+   ],
+   "links": [
+    32
+   ]
+  },
+  {
+   "id": 34,
+   "name": "Путь Берсерка",
+   "type": "keystone",
+   "region": "berserker",
+   "classId": "",
+   "x": 700.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 20
+    },
+    {
+     "stat": "as%",
+     "value": 8
+    },
+    {
+     "stat": "armor%",
+     "value": -10
+    }
+   ],
+   "links": [
+    23
+   ]
+  },
+  {
+   "id": 35,
+   "name": "Броня",
+   "type": "minor",
+   "region": "paladin",
+   "classId": "",
+   "x": 100.0,
+   "y": -173.2,
+   "mods": [
+    {
+     "stat": "armor",
+     "value": 10
+    }
+   ],
+   "links": [
+    36,
+    5
+   ]
+  },
+  {
+   "id": 36,
+   "name": "Стойкость",
+   "type": "minor",
+   "region": "paladin",
+   "classId": "",
+   "x": 127.5,
+   "y": -220.8,
+   "mods": [
+    {
+     "stat": "hp%",
+     "value": 4
+    }
+   ],
+   "links": [
+    35,
+    37
+   ]
+  },
+  {
+   "id": 37,
+   "name": "Восстановление",
+   "type": "minor",
+   "region": "paladin",
+   "classId": "",
+   "x": 155.0,
+   "y": -268.5,
+   "mods": [
+    {
+     "stat": "regen",
+     "value": 0.6
+    }
+   ],
+   "links": [
+    36,
+    38,
+    44,
+    47
+   ]
+  },
+  {
+   "id": 38,
+   "name": "Святой бастион",
+   "type": "notable",
+   "region": "paladin",
+   "classId": "",
+   "x": 182.5,
+   "y": -316.1,
+   "mods": [
+    {
+     "stat": "armor",
+     "value": 40
+    },
+    {
+     "stat": "armor%",
+     "value": 12
+    }
+   ],
+   "links": [
+    37,
+    39
+   ]
+  },
+  {
+   "id": 39,
+   "name": "Броня",
+   "type": "minor",
+   "region": "paladin",
+   "classId": "",
+   "x": 210.0,
+   "y": -363.7,
+   "mods": [
+    {
+     "stat": "armor",
+     "value": 10
+    }
+   ],
+   "links": [
+    38,
+    40,
+    135,
+    137
+   ]
+  },
+  {
+   "id": 40,
+   "name": "Стойкость",
+   "type": "minor",
+   "region": "paladin",
+   "classId": "",
+   "x": 237.5,
+   "y": -411.4,
+   "mods": [
+    {
+     "stat": "hp%",
+     "value": 4
+    }
+   ],
+   "links": [
+    39,
+    41,
+    49,
+    51
+   ]
+  },
+  {
+   "id": 41,
+   "name": "Благословение",
+   "type": "notable",
+   "region": "paladin",
+   "classId": "",
+   "x": 265.0,
+   "y": -459.0,
+   "mods": [
+    {
+     "stat": "hp%",
+     "value": 10
+    },
+    {
+     "stat": "regen",
+     "value": 2
+    }
+   ],
+   "links": [
+    40,
+    42
+   ]
+  },
+  {
+   "id": 42,
+   "name": "Закалка",
+   "type": "minor",
+   "region": "paladin",
+   "classId": "",
+   "x": 292.5,
+   "y": -506.6,
+   "mods": [
+    {
+     "stat": "armor%",
+     "value": 6
+    }
+   ],
+   "links": [
+    41,
+    43,
+    136,
+    138
+   ]
+  },
+  {
+   "id": 43,
+   "name": "Броня",
+   "type": "minor",
+   "region": "paladin",
+   "classId": "",
+   "x": 320.0,
+   "y": -554.3,
+   "mods": [
+    {
+     "stat": "armor",
+     "value": 10
+    }
+   ],
+   "links": [
+    42,
+    54
+   ]
+  },
+  {
+   "id": 44,
+   "name": "Восстановление",
+   "type": "minor",
+   "region": "paladin",
+   "classId": "",
+   "x": 190.9,
+   "y": -244.3,
+   "mods": [
+    {
+     "stat": "regen",
+     "value": 0.6
+    }
+   ],
+   "links": [
+    37,
+    45
+   ]
+  },
+  {
+   "id": 45,
+   "name": "Закалка",
+   "type": "minor",
+   "region": "paladin",
+   "classId": "",
+   "x": 223.0,
+   "y": -215.3,
+   "mods": [
+    {
+     "stat": "armor%",
+     "value": 6
+    }
+   ],
+   "links": [
+    44,
+    46
+   ]
+  },
+  {
+   "id": 46,
+   "name": "Броня II",
+   "type": "minor",
+   "region": "paladin",
+   "classId": "",
+   "x": 271.9,
+   "y": -228.2,
+   "mods": [
+    {
+     "stat": "armor",
+     "value": 15.0
+    }
+   ],
+   "links": [
+    45
+   ]
+  },
+  {
+   "id": 47,
+   "name": "Броня",
+   "type": "minor",
+   "region": "paladin",
+   "classId": "",
+   "x": 116.1,
+   "y": -287.4,
+   "mods": [
+    {
+     "stat": "armor",
+     "value": 10
+    }
+   ],
+   "links": [
+    37,
+    48
+   ]
+  },
+  {
+   "id": 48,
+   "name": "Стойкость",
+   "type": "minor",
+   "region": "paladin",
+   "classId": "",
+   "x": 75.0,
+   "y": -300.8,
+   "mods": [
+    {
+     "stat": "hp%",
+     "value": 4
+    }
+   ],
+   "links": [
+    47
+   ]
+  },
+  {
+   "id": 49,
+   "name": "Стойкость",
+   "type": "minor",
+   "region": "paladin",
+   "classId": "",
+   "x": 292.4,
+   "y": -374.3,
+   "mods": [
+    {
+     "stat": "hp%",
+     "value": 4
+    }
+   ],
+   "links": [
+    40,
+    50
+   ]
+  },
+  {
+   "id": 50,
+   "name": "Восстановление",
+   "type": "minor",
+   "region": "paladin",
+   "classId": "",
+   "x": 341.7,
+   "y": -330.0,
+   "mods": [
+    {
+     "stat": "regen",
+     "value": 0.6
+    }
+   ],
+   "links": [
+    49
+   ]
+  },
+  {
+   "id": 51,
+   "name": "Закалка",
+   "type": "minor",
+   "region": "paladin",
+   "classId": "",
+   "x": 177.9,
+   "y": -440.4,
+   "mods": [
+    {
+     "stat": "armor%",
+     "value": 6
+    }
+   ],
+   "links": [
+    40,
+    52
+   ]
+  },
+  {
+   "id": 52,
+   "name": "Броня",
+   "type": "minor",
+   "region": "paladin",
+   "classId": "",
+   "x": 114.9,
+   "y": -460.9,
+   "mods": [
+    {
+     "stat": "armor",
+     "value": 10
+    }
+   ],
+   "links": [
+    51,
+    53
+   ]
+  },
+  {
+   "id": 53,
+   "name": "Праведный гнев",
+   "type": "notable",
+   "region": "paladin",
+   "classId": "",
+   "x": 90.3,
+   "y": -512.1,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 10
+    },
+    {
+     "stat": "hp",
+     "value": 30
+    }
+   ],
+   "links": [
+    52
+   ]
+  },
+  {
+   "id": 54,
+   "name": "Путь Паладина",
+   "type": "keystone",
+   "region": "paladin",
+   "classId": "",
+   "x": 350.0,
+   "y": -606.2,
+   "mods": [
+    {
+     "stat": "hp%",
+     "value": 15
+    },
+    {
+     "stat": "armor%",
+     "value": 20
+    },
+    {
+     "stat": "regen",
+     "value": 3
+    }
+   ],
+   "links": [
+    43
+   ]
+  },
+  {
+   "id": 55,
+   "name": "Сила магии",
+   "type": "minor",
+   "region": "elementalist",
+   "classId": "",
+   "x": -100.0,
+   "y": -173.2,
+   "mods": [
+    {
+     "stat": "spell%",
+     "value": 6
+    }
+   ],
+   "links": [
+    56,
+    7
+   ]
+  },
+  {
+   "id": 56,
+   "name": "Мана",
+   "type": "minor",
+   "region": "elementalist",
+   "classId": "",
+   "x": -127.5,
+   "y": -220.8,
+   "mods": [
+    {
+     "stat": "mp",
+     "value": 12
+    }
+   ],
+   "links": [
+    55,
+    57
+   ]
+  },
+  {
+   "id": 57,
+   "name": "Перезарядка",
+   "type": "minor",
+   "region": "elementalist",
+   "classId": "",
+   "x": -155.0,
+   "y": -268.5,
+   "mods": [
+    {
+     "stat": "cdr%",
+     "value": 3
+    }
+   ],
+   "links": [
+    56,
+    58,
+    64,
+    67
+   ]
+  },
+  {
+   "id": 58,
+   "name": "Повелитель огня",
+   "type": "notable",
+   "region": "elementalist",
+   "classId": "",
+   "x": -182.5,
+   "y": -316.1,
+   "mods": [
+    {
+     "stat": "spell%",
+     "value": 15
+    },
+    {
+     "stat": "crit",
+     "value": 3
+    }
+   ],
+   "links": [
+    57,
+    59
+   ]
+  },
+  {
+   "id": 59,
+   "name": "Сила магии",
+   "type": "minor",
+   "region": "elementalist",
+   "classId": "",
+   "x": -210.0,
+   "y": -363.7,
+   "mods": [
+    {
+     "stat": "spell%",
+     "value": 6
+    }
+   ],
+   "links": [
+    58,
+    60,
+    137,
+    139
+   ]
+  },
+  {
+   "id": 60,
+   "name": "Мана",
+   "type": "minor",
+   "region": "elementalist",
+   "classId": "",
+   "x": -237.5,
+   "y": -411.4,
+   "mods": [
+    {
+     "stat": "mp",
+     "value": 12
+    }
+   ],
+   "links": [
+    59,
+    61,
+    69,
+    71
+   ]
+  },
+  {
+   "id": 61,
+   "name": "Поток маны",
+   "type": "notable",
+   "region": "elementalist",
+   "classId": "",
+   "x": -265.0,
+   "y": -459.0,
+   "mods": [
+    {
+     "stat": "mp",
+     "value": 40
+    },
+    {
+     "stat": "mpregen",
+     "value": 1.5
+    }
+   ],
+   "links": [
+    60,
+    62
+   ]
+  },
+  {
+   "id": 62,
+   "name": "Точность чар",
+   "type": "minor",
+   "region": "elementalist",
+   "classId": "",
+   "x": -292.5,
+   "y": -506.6,
+   "mods": [
+    {
+     "stat": "crit",
+     "value": 1.5
+    }
+   ],
+   "links": [
+    61,
+    63,
+    138,
+    140
+   ]
+  },
+  {
+   "id": 63,
+   "name": "Сила магии",
+   "type": "minor",
+   "region": "elementalist",
+   "classId": "",
+   "x": -320.0,
+   "y": -554.3,
+   "mods": [
+    {
+     "stat": "spell%",
+     "value": 6
+    }
+   ],
+   "links": [
+    62,
+    74
+   ]
+  },
+  {
+   "id": 64,
+   "name": "Перезарядка",
+   "type": "minor",
+   "region": "elementalist",
+   "classId": "",
+   "x": -116.1,
+   "y": -287.4,
+   "mods": [
+    {
+     "stat": "cdr%",
+     "value": 3
+    }
+   ],
+   "links": [
+    57,
+    65
+   ]
+  },
+  {
+   "id": 65,
+   "name": "Точность чар",
+   "type": "minor",
+   "region": "elementalist",
+   "classId": "",
+   "x": -75.0,
+   "y": -300.8,
+   "mods": [
+    {
+     "stat": "crit",
+     "value": 1.5
+    }
+   ],
+   "links": [
+    64,
+    66
+   ]
+  },
+  {
+   "id": 66,
+   "name": "Сила магии II",
+   "type": "minor",
+   "region": "elementalist",
+   "classId": "",
+   "x": -61.6,
+   "y": -349.6,
+   "mods": [
+    {
+     "stat": "spell%",
+     "value": 9.0
+    }
+   ],
+   "links": [
+    65
+   ]
+  },
+  {
+   "id": 67,
+   "name": "Сила магии",
+   "type": "minor",
+   "region": "elementalist",
+   "classId": "",
+   "x": -190.9,
+   "y": -244.3,
+   "mods": [
+    {
+     "stat": "spell%",
+     "value": 6
+    }
+   ],
+   "links": [
+    57,
+    68
+   ]
+  },
+  {
+   "id": 68,
+   "name": "Мана",
+   "type": "minor",
+   "region": "elementalist",
+   "classId": "",
+   "x": -223.0,
+   "y": -215.3,
+   "mods": [
+    {
+     "stat": "mp",
+     "value": 12
+    }
+   ],
+   "links": [
+    67
+   ]
+  },
+  {
+   "id": 69,
+   "name": "Мана",
+   "type": "minor",
+   "region": "elementalist",
+   "classId": "",
+   "x": -177.9,
+   "y": -440.4,
+   "mods": [
+    {
+     "stat": "mp",
+     "value": 12
+    }
+   ],
+   "links": [
+    60,
+    70
+   ]
+  },
+  {
+   "id": 70,
+   "name": "Перезарядка",
+   "type": "minor",
+   "region": "elementalist",
+   "classId": "",
+   "x": -114.9,
+   "y": -460.9,
+   "mods": [
+    {
+     "stat": "cdr%",
+     "value": 3
+    }
+   ],
+   "links": [
+    69
+   ]
+  },
+  {
+   "id": 71,
+   "name": "Точность чар",
+   "type": "minor",
+   "region": "elementalist",
+   "classId": "",
+   "x": -292.4,
+   "y": -374.3,
+   "mods": [
+    {
+     "stat": "crit",
+     "value": 1.5
+    }
+   ],
+   "links": [
+    60,
+    72
+   ]
+  },
+  {
+   "id": 72,
+   "name": "Сила магии",
+   "type": "minor",
+   "region": "elementalist",
+   "classId": "",
+   "x": -341.7,
+   "y": -330.0,
+   "mods": [
+    {
+     "stat": "spell%",
+     "value": 6
+    }
+   ],
+   "links": [
+    71,
+    73
+   ]
+  },
+  {
+   "id": 73,
+   "name": "Буря",
+   "type": "notable",
+   "region": "elementalist",
+   "classId": "",
+   "x": -398.3,
+   "y": -334.2,
+   "mods": [
+    {
+     "stat": "cdr%",
+     "value": 8
+    },
+    {
+     "stat": "spell%",
+     "value": 8
+    }
+   ],
+   "links": [
+    72
+   ]
+  },
+  {
+   "id": 74,
+   "name": "Путь Стихийника",
+   "type": "keystone",
+   "region": "elementalist",
+   "classId": "",
+   "x": -350.0,
+   "y": -606.2,
+   "mods": [
+    {
+     "stat": "spell%",
+     "value": 25
+    },
+    {
+     "stat": "cdr%",
+     "value": 10
+    }
+   ],
+   "links": [
+    63
+   ]
+  },
+  {
+   "id": 75,
+   "name": "Тёмная магия",
+   "type": "minor",
+   "region": "necromancer",
+   "classId": "",
+   "x": -200.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "spell%",
+     "value": 5
+    }
+   ],
+   "links": [
+    76,
+    9
+   ]
+  },
+  {
+   "id": 76,
+   "name": "Глубины разума",
+   "type": "minor",
+   "region": "necromancer",
+   "classId": "",
+   "x": -255.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "mp%",
+     "value": 5
+    }
+   ],
+   "links": [
+    75,
+    77
+   ]
+  },
+  {
+   "id": 77,
+   "name": "Похищение жизни",
+   "type": "minor",
+   "region": "necromancer",
+   "classId": "",
+   "x": -310.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "leech%",
+     "value": 0.5
+    }
+   ],
+   "links": [
+    76,
+    78,
+    84,
+    87
+   ]
+  },
+  {
+   "id": 78,
+   "name": "Жатва душ",
+   "type": "notable",
+   "region": "necromancer",
+   "classId": "",
+   "x": -365.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "leech%",
+     "value": 2
+    },
+    {
+     "stat": "spell%",
+     "value": 10
+    }
+   ],
+   "links": [
+    77,
+    79
+   ]
+  },
+  {
+   "id": 79,
+   "name": "Тёмная магия",
+   "type": "minor",
+   "region": "necromancer",
+   "classId": "",
+   "x": -420.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "spell%",
+     "value": 5
+    }
+   ],
+   "links": [
+    78,
+    80,
+    139,
+    141
+   ]
+  },
+  {
+   "id": 80,
+   "name": "Глубины разума",
+   "type": "minor",
+   "region": "necromancer",
+   "classId": "",
+   "x": -475.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "mp%",
+     "value": 5
+    }
+   ],
+   "links": [
+    79,
+    81,
+    89,
+    91
+   ]
+  },
+  {
+   "id": 81,
+   "name": "Костяной доспех",
+   "type": "notable",
+   "region": "necromancer",
+   "classId": "",
+   "x": -530.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "armor",
+     "value": 30
+    },
+    {
+     "stat": "hp",
+     "value": 30
+    }
+   ],
+   "links": [
+    80,
+    82
+   ]
+  },
+  {
+   "id": 82,
+   "name": "Ток силы",
+   "type": "minor",
+   "region": "necromancer",
+   "classId": "",
+   "x": -585.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "mpregen",
+     "value": 0.5
+    }
+   ],
+   "links": [
+    81,
+    83,
+    140,
+    142
+   ]
+  },
+  {
+   "id": 83,
+   "name": "Тёмная магия",
+   "type": "minor",
+   "region": "necromancer",
+   "classId": "",
+   "x": -640.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "spell%",
+     "value": 5
+    }
+   ],
+   "links": [
+    82,
+    94
+   ]
+  },
+  {
+   "id": 84,
+   "name": "Похищение жизни",
+   "type": "minor",
+   "region": "necromancer",
+   "classId": "",
+   "x": -307.0,
+   "y": -43.1,
+   "mods": [
+    {
+     "stat": "leech%",
+     "value": 0.5
+    }
+   ],
+   "links": [
+    77,
+    85
+   ]
+  },
+  {
+   "id": 85,
+   "name": "Ток силы",
+   "type": "minor",
+   "region": "necromancer",
+   "classId": "",
+   "x": -298.0,
+   "y": -85.4,
+   "mods": [
+    {
+     "stat": "mpregen",
+     "value": 0.5
+    }
+   ],
+   "links": [
+    84,
+    86
+   ]
+  },
+  {
+   "id": 86,
+   "name": "Тёмная магия II",
+   "type": "minor",
+   "region": "necromancer",
+   "classId": "",
+   "x": -333.6,
+   "y": -121.4,
+   "mods": [
+    {
+     "stat": "spell%",
+     "value": 7.5
+    }
+   ],
+   "links": [
+    85
+   ]
+  },
+  {
+   "id": 87,
+   "name": "Тёмная магия",
+   "type": "minor",
+   "region": "necromancer",
+   "classId": "",
+   "x": -307.0,
+   "y": 43.1,
+   "mods": [
+    {
+     "stat": "spell%",
+     "value": 5
+    }
+   ],
+   "links": [
+    77,
+    88
+   ]
+  },
+  {
+   "id": 88,
+   "name": "Глубины разума",
+   "type": "minor",
+   "region": "necromancer",
+   "classId": "",
+   "x": -298.0,
+   "y": 85.4,
+   "mods": [
+    {
+     "stat": "mp%",
+     "value": 5
+    }
+   ],
+   "links": [
+    87
+   ]
+  },
+  {
+   "id": 89,
+   "name": "Глубины разума",
+   "type": "minor",
+   "region": "necromancer",
+   "classId": "",
+   "x": -470.4,
+   "y": -66.1,
+   "mods": [
+    {
+     "stat": "mp%",
+     "value": 5
+    }
+   ],
+   "links": [
+    80,
+    90
+   ]
+  },
+  {
+   "id": 90,
+   "name": "Похищение жизни",
+   "type": "minor",
+   "region": "necromancer",
+   "classId": "",
+   "x": -456.6,
+   "y": -130.9,
+   "mods": [
+    {
+     "stat": "leech%",
+     "value": 0.5
+    }
+   ],
+   "links": [
+    89
+   ]
+  },
+  {
+   "id": 91,
+   "name": "Ток силы",
+   "type": "minor",
+   "region": "necromancer",
+   "classId": "",
+   "x": -470.4,
+   "y": 66.1,
+   "mods": [
+    {
+     "stat": "mpregen",
+     "value": 0.5
+    }
+   ],
+   "links": [
+    80,
+    92
+   ]
+  },
+  {
+   "id": 92,
+   "name": "Тёмная магия",
+   "type": "minor",
+   "region": "necromancer",
+   "classId": "",
+   "x": -456.6,
+   "y": 130.9,
+   "mods": [
+    {
+     "stat": "spell%",
+     "value": 5
+    }
+   ],
+   "links": [
+    91,
+    93
+   ]
+  },
+  {
+   "id": 93,
+   "name": "Шёпот мёртвых",
+   "type": "notable",
+   "region": "necromancer",
+   "classId": "",
+   "x": -488.6,
+   "y": 177.9,
+   "mods": [
+    {
+     "stat": "mp%",
+     "value": 12
+    },
+    {
+     "stat": "mpregen",
+     "value": 1.5
+    }
+   ],
+   "links": [
+    92
+   ]
+  },
+  {
+   "id": 94,
+   "name": "Путь Некроманта",
+   "type": "keystone",
+   "region": "necromancer",
+   "classId": "",
+   "x": -700.0,
+   "y": -0.0,
+   "mods": [
+    {
+     "stat": "spell%",
+     "value": 15
+    },
+    {
+     "stat": "leech%",
+     "value": 3
+    },
+    {
+     "stat": "hp%",
+     "value": 8
+    }
+   ],
+   "links": [
+    83
+   ]
+  },
+  {
+   "id": 95,
+   "name": "Шанс крита",
+   "type": "minor",
+   "region": "shadow",
+   "classId": "",
+   "x": -100.0,
+   "y": 173.2,
+   "mods": [
+    {
+     "stat": "crit",
+     "value": 2
+    }
+   ],
+   "links": [
+    96,
+    11
+   ]
+  },
+  {
+   "id": 96,
+   "name": "Сила крита",
+   "type": "minor",
+   "region": "shadow",
+   "classId": "",
+   "x": -127.5,
+   "y": 220.8,
+   "mods": [
+    {
+     "stat": "critdmg%",
+     "value": 10
+    }
+   ],
+   "links": [
+    95,
+    97
+   ]
+  },
+  {
+   "id": 97,
+   "name": "Ловкость",
+   "type": "minor",
+   "region": "shadow",
+   "classId": "",
+   "x": -155.0,
+   "y": 268.5,
+   "mods": [
+    {
+     "stat": "ms%",
+     "value": 3
+    }
+   ],
+   "links": [
+    96,
+    98,
+    104,
+    107
+   ]
+  },
+  {
+   "id": 98,
+   "name": "Удар в спину",
+   "type": "notable",
+   "region": "shadow",
+   "classId": "",
+   "x": -182.5,
+   "y": 316.1,
+   "mods": [
+    {
+     "stat": "critdmg%",
+     "value": 30
+    },
+    {
+     "stat": "crit",
+     "value": 3
+    }
+   ],
+   "links": [
+    97,
+    99
+   ]
+  },
+  {
+   "id": 99,
+   "name": "Шанс крита",
+   "type": "minor",
+   "region": "shadow",
+   "classId": "",
+   "x": -210.0,
+   "y": 363.7,
+   "mods": [
+    {
+     "stat": "crit",
+     "value": 2
+    }
+   ],
+   "links": [
+    98,
+    100,
+    141,
+    143
+   ]
+  },
+  {
+   "id": 100,
+   "name": "Сила крита",
+   "type": "minor",
+   "region": "shadow",
+   "classId": "",
+   "x": -237.5,
+   "y": 411.4,
+   "mods": [
+    {
+     "stat": "critdmg%",
+     "value": 10
+    }
+   ],
+   "links": [
+    99,
+    101,
+    109,
+    111
+   ]
+  },
+  {
+   "id": 101,
+   "name": "Неуловимость",
+   "type": "notable",
+   "region": "shadow",
+   "classId": "",
+   "x": -265.0,
+   "y": 459.0,
+   "mods": [
+    {
+     "stat": "ms%",
+     "value": 10
+    },
+    {
+     "stat": "as%",
+     "value": 6
+    }
+   ],
+   "links": [
+    100,
+    102
+   ]
+  },
+  {
+   "id": 102,
+   "name": "Быстрые руки",
+   "type": "minor",
+   "region": "shadow",
+   "classId": "",
+   "x": -292.5,
+   "y": 506.6,
+   "mods": [
+    {
+     "stat": "as%",
+     "value": 4
+    }
+   ],
+   "links": [
+    101,
+    103,
+    142,
+    144
+   ]
+  },
+  {
+   "id": 103,
+   "name": "Шанс крита",
+   "type": "minor",
+   "region": "shadow",
+   "classId": "",
+   "x": -320.0,
+   "y": 554.3,
+   "mods": [
+    {
+     "stat": "crit",
+     "value": 2
+    }
+   ],
+   "links": [
+    102,
+    114
+   ]
+  },
+  {
+   "id": 104,
+   "name": "Ловкость",
+   "type": "minor",
+   "region": "shadow",
+   "classId": "",
+   "x": -190.9,
+   "y": 244.3,
+   "mods": [
+    {
+     "stat": "ms%",
+     "value": 3
+    }
+   ],
+   "links": [
+    97,
+    105
+   ]
+  },
+  {
+   "id": 105,
+   "name": "Быстрые руки",
+   "type": "minor",
+   "region": "shadow",
+   "classId": "",
+   "x": -223.0,
+   "y": 215.3,
+   "mods": [
+    {
+     "stat": "as%",
+     "value": 4
+    }
+   ],
+   "links": [
+    104,
+    106
+   ]
+  },
+  {
+   "id": 106,
+   "name": "Шанс крита II",
+   "type": "minor",
+   "region": "shadow",
+   "classId": "",
+   "x": -271.9,
+   "y": 228.2,
+   "mods": [
+    {
+     "stat": "crit",
+     "value": 3.0
+    }
+   ],
+   "links": [
+    105
+   ]
+  },
+  {
+   "id": 107,
+   "name": "Шанс крита",
+   "type": "minor",
+   "region": "shadow",
+   "classId": "",
+   "x": -116.1,
+   "y": 287.4,
+   "mods": [
+    {
+     "stat": "crit",
+     "value": 2
+    }
+   ],
+   "links": [
+    97,
+    108
+   ]
+  },
+  {
+   "id": 108,
+   "name": "Сила крита",
+   "type": "minor",
+   "region": "shadow",
+   "classId": "",
+   "x": -75.0,
+   "y": 300.8,
+   "mods": [
+    {
+     "stat": "critdmg%",
+     "value": 10
+    }
+   ],
+   "links": [
+    107
+   ]
+  },
+  {
+   "id": 109,
+   "name": "Сила крита",
+   "type": "minor",
+   "region": "shadow",
+   "classId": "",
+   "x": -292.4,
+   "y": 374.3,
+   "mods": [
+    {
+     "stat": "critdmg%",
+     "value": 10
+    }
+   ],
+   "links": [
+    100,
+    110
+   ]
+  },
+  {
+   "id": 110,
+   "name": "Ловкость",
+   "type": "minor",
+   "region": "shadow",
+   "classId": "",
+   "x": -341.7,
+   "y": 330.0,
+   "mods": [
+    {
+     "stat": "ms%",
+     "value": 3
+    }
+   ],
+   "links": [
+    109
+   ]
+  },
+  {
+   "id": 111,
+   "name": "Быстрые руки",
+   "type": "minor",
+   "region": "shadow",
+   "classId": "",
+   "x": -177.9,
+   "y": 440.4,
+   "mods": [
+    {
+     "stat": "as%",
+     "value": 4
+    }
+   ],
+   "links": [
+    100,
+    112
+   ]
+  },
+  {
+   "id": 112,
+   "name": "Шанс крита",
+   "type": "minor",
+   "region": "shadow",
+   "classId": "",
+   "x": -114.9,
+   "y": 460.9,
+   "mods": [
+    {
+     "stat": "crit",
+     "value": 2
+    }
+   ],
+   "links": [
+    111,
+    113
+   ]
+  },
+  {
+   "id": 113,
+   "name": "Яд клинка",
+   "type": "notable",
+   "region": "shadow",
+   "classId": "",
+   "x": -90.3,
+   "y": 512.1,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 12
+    },
+    {
+     "stat": "crit",
+     "value": 2
+    }
+   ],
+   "links": [
+    112
+   ]
+  },
+  {
+   "id": 114,
+   "name": "Путь Тени",
+   "type": "keystone",
+   "region": "shadow",
+   "classId": "",
+   "x": -350.0,
+   "y": 606.2,
+   "mods": [
+    {
+     "stat": "crit",
+     "value": 8
+    },
+    {
+     "stat": "critdmg%",
+     "value": 40
+    },
+    {
+     "stat": "ms%",
+     "value": 8
+    }
+   ],
+   "links": [
+    103
+   ]
+  },
+  {
+   "id": 115,
+   "name": "Жизненная сила",
+   "type": "minor",
+   "region": "druid",
+   "classId": "",
+   "x": 100.0,
+   "y": 173.2,
+   "mods": [
+    {
+     "stat": "hp%",
+     "value": 4
+    }
+   ],
+   "links": [
+    116,
+    13
+   ]
+  },
+  {
+   "id": 116,
+   "name": "Регенерация",
+   "type": "minor",
+   "region": "druid",
+   "classId": "",
+   "x": 127.5,
+   "y": 220.8,
+   "mods": [
+    {
+     "stat": "regen",
+     "value": 0.6
+    }
+   ],
+   "links": [
+    115,
+    117
+   ]
+  },
+  {
+   "id": 117,
+   "name": "Звериная мощь",
+   "type": "minor",
+   "region": "druid",
+   "classId": "",
+   "x": 155.0,
+   "y": 268.5,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 5
+    }
+   ],
+   "links": [
+    116,
+    118,
+    124,
+    127
+   ]
+  },
+  {
+   "id": 118,
+   "name": "Шкура медведя",
+   "type": "notable",
+   "region": "druid",
+   "classId": "",
+   "x": 182.5,
+   "y": 316.1,
+   "mods": [
+    {
+     "stat": "hp%",
+     "value": 12
+    },
+    {
+     "stat": "armor",
+     "value": 25
+    }
+   ],
+   "links": [
+    117,
+    119
+   ]
+  },
+  {
+   "id": 119,
+   "name": "Жизненная сила",
+   "type": "minor",
+   "region": "druid",
+   "classId": "",
+   "x": 210.0,
+   "y": 363.7,
+   "mods": [
+    {
+     "stat": "hp%",
+     "value": 4
+    }
+   ],
+   "links": [
+    118,
+    120,
+    143,
+    145
+   ]
+  },
+  {
+   "id": 120,
+   "name": "Регенерация",
+   "type": "minor",
+   "region": "druid",
+   "classId": "",
+   "x": 237.5,
+   "y": 411.4,
+   "mods": [
+    {
+     "stat": "regen",
+     "value": 0.6
+    }
+   ],
+   "links": [
+    119,
+    121,
+    129,
+    131
+   ]
+  },
+  {
+   "id": 121,
+   "name": "Клыки",
+   "type": "notable",
+   "region": "druid",
+   "classId": "",
+   "x": 265.0,
+   "y": 459.0,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 14
+    },
+    {
+     "stat": "as%",
+     "value": 5
+    }
+   ],
+   "links": [
+    120,
+    122
+   ]
+  },
+  {
+   "id": 122,
+   "name": "Бег зверя",
+   "type": "minor",
+   "region": "druid",
+   "classId": "",
+   "x": 292.5,
+   "y": 506.6,
+   "mods": [
+    {
+     "stat": "ms%",
+     "value": 3
+    }
+   ],
+   "links": [
+    121,
+    123,
+    144,
+    146
+   ]
+  },
+  {
+   "id": 123,
+   "name": "Жизненная сила",
+   "type": "minor",
+   "region": "druid",
+   "classId": "",
+   "x": 320.0,
+   "y": 554.3,
+   "mods": [
+    {
+     "stat": "hp%",
+     "value": 4
+    }
+   ],
+   "links": [
+    122,
+    134
+   ]
+  },
+  {
+   "id": 124,
+   "name": "Звериная мощь",
+   "type": "minor",
+   "region": "druid",
+   "classId": "",
+   "x": 116.1,
+   "y": 287.4,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 5
+    }
+   ],
+   "links": [
+    117,
+    125
+   ]
+  },
+  {
+   "id": 125,
+   "name": "Бег зверя",
+   "type": "minor",
+   "region": "druid",
+   "classId": "",
+   "x": 75.0,
+   "y": 300.8,
+   "mods": [
+    {
+     "stat": "ms%",
+     "value": 3
+    }
+   ],
+   "links": [
+    124,
+    126
+   ]
+  },
+  {
+   "id": 126,
+   "name": "Жизненная сила II",
+   "type": "minor",
+   "region": "druid",
+   "classId": "",
+   "x": 61.6,
+   "y": 349.6,
+   "mods": [
+    {
+     "stat": "hp%",
+     "value": 6.0
+    }
+   ],
+   "links": [
+    125
+   ]
+  },
+  {
+   "id": 127,
+   "name": "Жизненная сила",
+   "type": "minor",
+   "region": "druid",
+   "classId": "",
+   "x": 190.9,
+   "y": 244.3,
+   "mods": [
+    {
+     "stat": "hp%",
+     "value": 4
+    }
+   ],
+   "links": [
+    117,
+    128
+   ]
+  },
+  {
+   "id": 128,
+   "name": "Регенерация",
+   "type": "minor",
+   "region": "druid",
+   "classId": "",
+   "x": 223.0,
+   "y": 215.3,
+   "mods": [
+    {
+     "stat": "regen",
+     "value": 0.6
+    }
+   ],
+   "links": [
+    127
+   ]
+  },
+  {
+   "id": 129,
+   "name": "Регенерация",
+   "type": "minor",
+   "region": "druid",
+   "classId": "",
+   "x": 177.9,
+   "y": 440.4,
+   "mods": [
+    {
+     "stat": "regen",
+     "value": 0.6
+    }
+   ],
+   "links": [
+    120,
+    130
+   ]
+  },
+  {
+   "id": 130,
+   "name": "Звериная мощь",
+   "type": "minor",
+   "region": "druid",
+   "classId": "",
+   "x": 114.9,
+   "y": 460.9,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 5
+    }
+   ],
+   "links": [
+    129
+   ]
+  },
+  {
+   "id": 131,
+   "name": "Бег зверя",
+   "type": "minor",
+   "region": "druid",
+   "classId": "",
+   "x": 292.4,
+   "y": 374.3,
+   "mods": [
+    {
+     "stat": "ms%",
+     "value": 3
+    }
+   ],
+   "links": [
+    120,
+    132
+   ]
+  },
+  {
+   "id": 132,
+   "name": "Жизненная сила",
+   "type": "minor",
+   "region": "druid",
+   "classId": "",
+   "x": 341.7,
+   "y": 330.0,
+   "mods": [
+    {
+     "stat": "hp%",
+     "value": 4
+    }
+   ],
+   "links": [
+    131,
+    133
+   ]
+  },
+  {
+   "id": 133,
+   "name": "Зов леса",
+   "type": "notable",
+   "region": "druid",
+   "classId": "",
+   "x": 398.3,
+   "y": 334.2,
+   "mods": [
+    {
+     "stat": "regen",
+     "value": 3
+    },
+    {
+     "stat": "ms%",
+     "value": 6
+    }
+   ],
+   "links": [
+    132
+   ]
+  },
+  {
+   "id": 134,
+   "name": "Путь Друида",
+   "type": "keystone",
+   "region": "druid",
+   "classId": "",
+   "x": 350.0,
+   "y": 606.2,
+   "mods": [
+    {
+     "stat": "hp%",
+     "value": 20
+    },
+    {
+     "stat": "dmg%",
+     "value": 12
+    },
+    {
+     "stat": "regen",
+     "value": 2
+    }
+   ],
+   "links": [
+    123
+   ]
+  },
+  {
+   "id": 135,
+   "name": "Перекрёсток",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": 344.4,
+   "y": -198.8,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 4
+    }
+   ],
+   "links": [
+    19,
+    39
+   ]
+  },
+  {
+   "id": 136,
+   "name": "Перекрёсток",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": 495.6,
+   "y": -286.1,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 4
+    }
+   ],
+   "links": [
+    22,
+    42
+   ]
+  },
+  {
+   "id": 137,
+   "name": "Перекрёсток",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": 0.0,
+   "y": -397.7,
+   "mods": [
+    {
+     "stat": "armor",
+     "value": 8
+    }
+   ],
+   "links": [
+    39,
+    59
+   ]
+  },
+  {
+   "id": 138,
+   "name": "Перекрёсток",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": 0.0,
+   "y": -572.3,
+   "mods": [
+    {
+     "stat": "armor",
+     "value": 8
+    }
+   ],
+   "links": [
+    42,
+    62
+   ]
+  },
+  {
+   "id": 139,
+   "name": "Перекрёсток",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": -344.4,
+   "y": -198.8,
+   "mods": [
+    {
+     "stat": "hp",
+     "value": 10
+    }
+   ],
+   "links": [
+    59,
+    79
+   ]
+  },
+  {
+   "id": 140,
+   "name": "Перекрёсток",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": -495.6,
+   "y": -286.1,
+   "mods": [
+    {
+     "stat": "armor",
+     "value": 8
+    }
+   ],
+   "links": [
+    62,
+    82
+   ]
+  },
+  {
+   "id": 141,
+   "name": "Перекрёсток",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": -344.4,
+   "y": 198.9,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 4
+    }
+   ],
+   "links": [
+    79,
+    99
+   ]
+  },
+  {
+   "id": 142,
+   "name": "Перекрёсток",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": -495.6,
+   "y": 286.2,
+   "mods": [
+    {
+     "stat": "armor",
+     "value": 8
+    }
+   ],
+   "links": [
+    82,
+    102
+   ]
+  },
+  {
+   "id": 143,
+   "name": "Перекрёсток",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": -0.0,
+   "y": 397.7,
+   "mods": [
+    {
+     "stat": "ms%",
+     "value": 2
+    }
+   ],
+   "links": [
+    99,
+    119
+   ]
+  },
+  {
+   "id": 144,
+   "name": "Перекрёсток",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": -0.0,
+   "y": 572.3,
+   "mods": [
+    {
+     "stat": "dmg%",
+     "value": 4
+    }
+   ],
+   "links": [
+    102,
+    122
+   ]
+  },
+  {
+   "id": 145,
+   "name": "Перекрёсток",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": 344.4,
+   "y": 198.9,
+   "mods": [
+    {
+     "stat": "ms%",
+     "value": 2
+    }
+   ],
+   "links": [
+    119,
+    19
+   ]
+  },
+  {
+   "id": 146,
+   "name": "Перекрёсток",
+   "type": "minor",
+   "region": "",
+   "classId": "",
+   "x": 495.6,
+   "y": 286.2,
+   "mods": [
+    {
+     "stat": "armor",
+     "value": 8
+    }
+   ],
+   "links": [
+    122,
+    22
+   ]
+  }
+ ]
+}
