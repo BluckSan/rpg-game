@@ -1,0 +1,24 @@
+[Unit]
+Description=Oskolki Efira — сервис аккаунтов (HTTPS :7780)
+After=network-online.target postgresql@16-main.service
+Requires=postgresql@16-main.service
+
+[Service]
+User=rpg
+Group=rpg
+EnvironmentFile=/etc/rpg/rpg.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/rpg-game/auth/auth_server.py
+Restart=always
+RestartSec=3
+MemoryHigh=128M
+MemoryMax=160M
+TasksMax=64
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+
+[Install]
+WantedBy=multi-user.target

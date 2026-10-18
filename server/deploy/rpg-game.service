@@ -1,0 +1,27 @@
+[Unit]
+Description=Oskolki Efira — игровой сервер Godot (ENet UDP :7777, до 10 игроков)
+After=network-online.target rpg-auth.service
+Wants=rpg-auth.service
+
+[Service]
+User=rpg
+Group=rpg
+EnvironmentFile=/etc/rpg/rpg.env
+Environment=HOME=/var/lib/rpg-game
+WorkingDirectory=/var/lib/rpg-game
+ExecStart=/opt/rpg-game/server/godot --headless --main-pack /opt/rpg-game/server/oskolki-server.pck -- --server --port=7777
+Restart=always
+RestartSec=3
+MemoryHigh=400M
+MemoryMax=512M
+TasksMax=64
+CPUQuota=80%
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/rpg-game
+PrivateTmp=true
+PrivateDevices=true
+
+[Install]
+WantedBy=multi-user.target
