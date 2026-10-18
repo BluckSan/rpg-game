@@ -212,7 +212,8 @@ func _hurt(ev: Dictionary) -> void:
 	var p = zone.player
 	if p == null or p.dead: return
 	var src := Vector3(float(ev.x), 0, float(ev.z))
-	var dmg: float = float(ev.f) * float(p.stats.max_hp)
+	# v0.8.0: броня героя после перехода на плоские характеристики режет меньше — механики ×0.75 (смертельные — без изменений)
+	var dmg: float = float(ev.f) * float(p.stats.max_hp) * 0.75
 	if bool(ev.l):
 		p.invuln = 0.0
 		dmg = float(p.stats.max_hp) * 20.0

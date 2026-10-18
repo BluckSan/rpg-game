@@ -95,7 +95,7 @@ func _run() -> void:
 		was = p.dead
 		if boss and is_instance_valid(boss) and boss.alive: hp_seen[int(boss.hp)] = true
 		if int(t * 10) % 300 == 0 and int((t - dt) * 10) % 300 != 0:
-			print("    [%s] t=%.0f босс %s фаза %d, вайпов %d, смертей %d, событий %s" % [user, t, ("%.0f%%" % (100.0 * boss.hp / boss.max_hp)) if boss and is_instance_valid(boss) else "-", rc.brain.phase, rc.stats.wipes, deaths, str(rc.stats.events)])
+			print("    [%s] t=%.0f босс %s фаза %d, вайпов %d, смертей %d (смертельных %d), урон по источникам %s, событий %s" % [user, t, ("%.0f%%" % (100.0 * boss.hp / boss.max_hp)) if boss and is_instance_valid(boss) else "-", rc.brain.phase, rc.stats.wipes, deaths, rc.stats.lethal, str(rc.stats.src), str(rc.stats.events)])
 	if is_instance_valid(p): p.force_move = Vector3.ZERO
 	check(hp_seen.size() > 20, "здоровье босса синхронизируется с сервера (%d значений)" % hp_seen.size())
 	check(rc.stats.events.get("tele", 0) > 3 and rc.stats.events.get("hurt", 0) > 0, "механики сервера пришли: меток %d, ударов по герою %d" % [rc.stats.events.get("tele", 0), rc.stats.events.get("hurt", 0)])
