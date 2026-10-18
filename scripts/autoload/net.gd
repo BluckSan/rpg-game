@@ -703,7 +703,8 @@ func _srv_buff_pub(p: Dictionary) -> Array:
 	for k in bf.keys():
 		var b: Dictionary = bf[k]
 		if float(b.until) <= now: bf.erase(k); continue
-		out.append([k, str(b.icon), (b.col as Color).to_html(false), float(b.until) - now, float(b.dur), bool(b.get("good", true))])
+		out.append([k, str(b.icon), (b.col as Color).to_html(false), float(b.until) - now, float(b.dur), bool(b.get("good", true)),
+			str(b.get("n", k)), str(b.get("d", "")), int(b.get("st", 1)), str(b.get("src", ""))])
 	return out
 
 func _srv_party_send(pid: int) -> void:
@@ -1031,7 +1032,9 @@ func c_support(sid: String, ally: int, eid: int, pos: Vector3) -> void:
 		if not players.has(r): continue
 		if dur > 0.0:
 			if not players[r].has("buffs"): players[r].buffs = {}
-			players[r].buffs[sid] = {"until": now + dur, "icon": str(UIK.SKILL_ICONS.get(sid, "aura")), "col": s.color, "dur": dur, "good": true}
+			var pst: int = mini(9, int(players[r].buffs[sid].get("st", 1)) + 1) if players[r].buffs.has(sid) and float(players[r].buffs[sid].until) > now else 1
+			players[r].buffs[sid] = {"until": now + dur, "icon": str(UIK.SKILL_ICONS.get(sid, "aura")), "col": s.color, "dur": dur, "good": true,
+				"n": str(s.name), "d": Support.describe_eff(ally_eff), "st": pst, "src": str(p.name)}
 		s_support.rpc_id(r, payload)
 		support_stats.sent += 1
 	# враги подземелья: метка, ослабление, замедление, провокация — в серверной RaidSim

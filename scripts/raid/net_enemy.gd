@@ -98,6 +98,7 @@ func net_debuffs(l: Dictionary) -> void:
 		var d: Array = l[k]
 		buffs[k] = {"id": k, "v": float(d[0]), "t": float(d[1]), "dur": maxf(float(d[1]), float(d[2]) if d.size() > 2 else float(d[1])),
 			"icon": Support.debuff_icon(k), "col": Support.debuff_color(k), "name": Support.debuff_name(k), "good": false}
+		if d.size() > 3: buffs[k]["st"] = int(d[3])
 
 func _process(delta: float) -> void:
 	if not alive: return

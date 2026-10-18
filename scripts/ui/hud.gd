@@ -536,6 +536,65 @@ func _release_all() -> void:
 	for b in skill_btns: b.set_held(false)
 	_set_joy(joy_default, Vector2.ZERO)
 
+# ---------------- v0.9.1: подсказки по баффам (ПК — наведение, телефон — долгое нажатие) ----------------
+var buff_tip: PanelContainer
+var buff_tip_text: RichTextLabel
+var _tip_icon: Control = null
+var _tip_touch := false
+var _tip_press_t := -1.0
+var _tip_press_icon: Control = null
+
+func buff_icon_at(p: Vector2) -> Control:
+	for ic in get_tree().get_nodes_in_group("buff_icon"):
+		var c := ic as Control
+		if c.is_visible_in_tree() and c.has_meta("b") and c.get_global_rect().grow(4).has_point(p): return c
+	return null
+
+func _ensure_tip() -> void:
+	if buff_tip != null: return
+	buff_tip = PanelContainer.new(); buff_tip.name = "BuffTip"
+	var sb := StyleBoxFlat.new(); sb.bg_color = Color(0.05, 0.04, 0.07, 0.95); sb.border_color = UIK.ACCENT
+	sb.set_border_width_all(2); sb.set_corner_radius_all(10); sb.set_content_margin_all(12)
+	buff_tip.add_theme_stylebox_override("panel", sb)
+	buff_tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	buff_tip.z_index = 100
+	buff_tip_text = RichTextLabel.new(); buff_tip_text.bbcode_enabled = true; buff_tip_text.fit_content = true
+	buff_tip_text.custom_minimum_size = Vector2(440, 0); buff_tip_text.scroll_active = false
+	buff_tip_text.add_theme_font_size_override("normal_font_size", 22); buff_tip_text.add_theme_font_size_override("bold_font_size", 24)
+	buff_tip_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	buff_tip.add_child(buff_tip_text)
+	root.add_child(buff_tip)
+	buff_tip.visible = false
+
+func show_buff_tip(ic: Control) -> void:
+	_ensure_tip()
+	_tip_icon = ic
+	buff_tip.visible = ic != null
+	_update_buff_tip()
+
+func _update_buff_tip() -> void:
+	if buff_tip == null or not buff_tip.visible: return
+	if _tip_icon == null or not is_instance_valid(_tip_icon) or not _tip_icon.is_visible_in_tree() or not _tip_icon.has_meta("b"):
+		buff_tip.visible = false; _tip_icon = null; return
+	buff_tip_text.text = Support.describe_buff(_tip_icon.get_meta("b"))
+	buff_tip.reset_size()
+	var r := _tip_icon.get_global_rect()
+	var s := _screen()
+	var pos := Vector2(r.position.x, r.end.y + 8)
+	if pos.y + buff_tip.size.y > s.y - 10: pos.y = r.position.y - buff_tip.size.y - 8
+	pos.x = clampf(pos.x, 10, s.x - buff_tip.size.x - 10)
+	buff_tip.global_position = pos
+
+## каждый кадр: долгое нажатие (0.35 с) или наведение мыши
+func _tick_buff_tip(delta: float) -> void:
+	if _tip_press_icon != null:
+		_tip_press_t += delta
+		if _tip_press_t >= 0.35 and _tip_icon != _tip_press_icon: show_buff_tip(_tip_press_icon)
+	elif not _tip_touch and (Game.desktop or not DisplayServer.is_touchscreen_available()):
+		var ic := buff_icon_at(get_viewport().get_mouse_position())
+		if ic != _tip_icon: show_buff_tip(ic)
+	_update_buff_tip()
+
 func _over_top_button(p: Vector2) -> bool:
 	for b in top_buttons + blockers:
 		if b.is_visible_in_tree() and b.get_global_rect().has_point(p): return true
@@ -567,6 +626,13 @@ func _screen() -> Vector2:
 
 func _touch_down(idx: int, p: Vector2) -> void:
 	if _over_top_button(p): return
+	var bic := buff_icon_at(p)
+	if bic != null:
+		touches[idx] = {"role": "buff"}
+		_tip_touch = idx != -1
+		_tip_press_icon = bic; _tip_press_t = 0.0
+		if idx == -1: show_buff_tip(bic)
+		return
 	for i in skill_btns.size():
 		if skill_btns[i].hit(p):
 			touches[idx] = {"role": "skill", "slot": i}
@@ -629,6 +695,10 @@ func _touch_move(idx: int, p: Vector2, rel: Vector2) -> void:
 	if not touches.has(idx): return
 	var t: Dictionary = touches[idx]
 	match t["role"]:
+		"buff":
+			_tip_press_icon = null; _tip_press_t = -1.0
+			if _tip_touch: show_buff_tip(null)
+			_tip_touch = false
 		"joy":
 			var v: Vector2 = (p - t["origin"]).limit_length(JOY_R)
 			_set_joy(t["origin"], v)
@@ -689,6 +759,8 @@ func _set_joy(center: Vector2, knob: Vector2) -> void:
 # ---------------- обновление ----------------
 func _process(delta: float) -> void:
 	if player == null or player.stats.is_empty(): return
+	if window == null: _tick_buff_tip(delta)
+	elif buff_tip != null and buff_tip.visible: show_buff_tip(null)
 	if window == null:
 		_update_hints(delta)
 		for k in _hold_time.keys():
@@ -950,7 +1022,7 @@ func _player_buffs() -> Array:
 	var out: Array = player.buffs.values()
 	if player.shield_hp > 0.0:
 		out = out.duplicate()
-		out.append({"id": "_shield", "icon": "magic-shield", "col": Color(0.6, 0.85, 1.0), "t": -1.0, "dur": 0.0, "good": true, "name": "Щит: %d" % roundi(player.shield_hp)})
+		out.append({"id": "_shield", "icon": "magic-shield", "col": Color(0.6, 0.85, 1.0), "t": -1.0, "dur": 0.0, "good": true, "name": "Щит", "desc": "поглощает ещё %d урона" % roundi(player.shield_hp)})
 	return out
 
 ## Значки: [{icon, col, t (осталось; <0 — без таймера), good, name}]
@@ -961,7 +1033,12 @@ func _fill_buffs(box: HBoxContainer, list: Array) -> void:
 		ic.custom_minimum_size = Vector2(34, 34)
 		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ic.mouse_filter = Control.MOUSE_FILTER_STOP   # v0.9.1: наведение / долгое нажатие — подсказка
+		ic.add_to_group("buff_icon")
+		var stl := UIK.label(ic, "", 13, Color(1, 0.85, 0.4)); stl.name = "St"
+		stl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		stl.add_theme_color_override("font_outline_color", Color.BLACK); stl.add_theme_constant_override("outline_size", 4)
+		UIK.rect(stl, Vector2(1, -4), Vector2(30, 18))
 		var bg := ColorRect.new(); bg.name = "Bg"; bg.show_behind_parent = true; bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		ic.add_child(bg); UIK.full(bg)
 		var tl := UIK.label(ic, "", 14, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT); tl.name = "T"
@@ -979,13 +1056,16 @@ func _fill_buffs(box: HBoxContainer, list: Array) -> void:
 		(ic.get_node("Bg") as ColorRect).color = Color(0.1, 0.35, 0.12, 0.85) if b.get("good", true) else Color(0.45, 0.08, 0.08, 0.85)
 		var tt := float(b.get("t", -1.0))
 		(ic.get_node("T") as Label).text = ("%d" % ceili(tt)) if tt >= 0.0 else ""
-		ic.tooltip_text = str(b.get("name", ""))
+		(ic.get_node("St") as Label).text = ("×%d" % int(b.st)) if int(b.get("st", 1)) > 1 else ""
+		ic.set_meta("b", b)
 
 ## Баффы удалённого игрока — из состояния группы (сервер)
 static func party_buffs(m: Dictionary) -> Array:
 	var out := []
 	for b in m.get("bf", []):
-		out.append({"id": str(b[0]), "icon": str(b[1]), "col": Color.html(str(b[2])), "t": float(b[3]), "dur": float(b[4]), "good": bool(b[5])})
+		var e := {"id": str(b[0]), "icon": str(b[1]), "col": Color.html(str(b[2])), "t": float(b[3]), "dur": float(b[4]), "good": bool(b[5])}
+		if b.size() > 9: e.merge({"name": str(b[6]), "desc": str(b[7]), "st": int(b[8]), "src": str(b[9])})
+		out.append(e)
 	return out
 
 func _update_target_frame() -> void:
@@ -998,7 +1078,7 @@ func _update_target_frame() -> void:
 	if t is Enemy:
 		nm = t.display_name; lvl = t.level; hpv = t.hp; hpm = t.max_hp
 		bl = t.buffs.values()
-		if t.curse_timer > 0: bl = bl.duplicate(); bl.append({"icon": "cursed-star", "col": Color(0.6, 0.3, 0.9), "t": t.curse_timer, "good": false, "name": "Проклятие"})
+		if t.curse_timer > 0: bl = bl.duplicate(); bl.append({"icon": "cursed-star", "col": Color(0.6, 0.3, 0.9), "t": t.curse_timer, "dur": 8.0, "good": false, "name": "Проклятие", "id": "curse"})
 		col = Color(1, 0.45, 0.4)
 	elif t is Player:
 		nm = str(zone.data["name"]) + " (вы)"; lvl = int(zone.data["level"]); hpv = t.hp; hpm = t.stats.max_hp

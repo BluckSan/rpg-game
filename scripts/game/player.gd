@@ -398,6 +398,7 @@ func buff_mods() -> Array:
 
 func add_buff(b: Dictionary) -> void:
 	var had: bool = buffs.has(b.id) and not (buffs[b.id].get("mods", []) as Array).is_empty()
+	b["st"] = mini(9, int(buffs[b.id].get("st", 1)) + 1) if buffs.has(b.id) else 1
 	buffs[b.id] = b
 	if had or not (b.get("mods", []) as Array).is_empty(): recalc()
 

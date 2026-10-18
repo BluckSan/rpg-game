@@ -51,7 +51,51 @@ static func make_buff(s: Dictionary, eff: Dictionary, src := "") -> Dictionary:
 	if eff.has("shield"): b.dur = maxf(b.dur, float(eff.shield_dur)); b["shield"] = true
 	if eff.has("hot"): b.dur = maxf(b.dur, 6.0)
 	b.t = b.dur
+	b["desc"] = describe_eff(eff)
 	return b
+
+## v0.9.1: текст эффекта для подсказки по значку
+static func describe_eff(eff: Dictionary) -> String:
+	var parts := []
+	if eff.has("buff"):
+		for m in eff.buff.mods: parts.append(DB.describe_mod(m).strip_edges())
+	if eff.has("shield"): parts.append("щит %d%% макс. здоровья" % roundi(float(eff.shield) * 100.0))
+	if eff.has("hot"): parts.append("лечение %d%% здоровья за 6 с" % roundi(float(eff.hot) * 100.0))
+	if eff.has("heal"): parts.append("мгновенно +%d%% здоровья" % roundi(float(eff.heal) * 100.0))
+	if eff.has("mana"): parts.append("+%d%% маны" % roundi(float(eff.mana) * 100.0))
+	return ", ".join(parts)
+
+static func debuff_effect(kind: String, v: float) -> String:
+	match kind:
+		"mark": return "получает +%d%% урона" % roundi(v * 100.0)
+		"weaken": return "наносит −%d%% урона" % roundi(v * 100.0)
+		"slow": return "скорость −%d%%" % roundi(v * 100.0)
+		"taunt": return "атакует только наложившего провокацию"
+		"curse": return "получает +30% урона"
+	return ""
+
+## Подсказка по значку баффа/дебаффа: название, эффект, оставшееся время, наложения
+static func describe_buff(b: Dictionary) -> String:
+	var good: bool = bool(b.get("good", true))
+	var nm := str(b.get("name", ""))
+	var eff := str(b.get("desc", ""))
+	if eff == "":
+		if not good: eff = debuff_effect(str(b.get("id", "")), float(b.get("v", 0.0)))
+		else:
+			var mods: Array = b.get("mods", [])
+			var p := []
+			for m in mods: p.append(DB.describe_mod(m).strip_edges())
+			if b.get("shield", false): p.append("поглощает урон")
+			eff = ", ".join(p)
+	if nm.contains(":") and not good: nm = nm.split(":")[0]
+	if nm == "": nm = str(b.get("id", "Эффект"))
+	var s := "[b][color=#%s]%s[/color][/b]  [color=#888]%s[/color]" % ["9adf7a" if good else "ff7a6a", nm, "бафф" if good else "дебафф"]
+	if eff != "": s += "\n" + eff
+	var t := float(b.get("t", -1.0))
+	s += "\n[color=#cccccc]%s[/color]" % (("Осталось: %.1f с из %d с" % [maxf(0.0, t), roundi(float(b.get("dur", t)))]) if t >= 0.0 else "Без ограничения по времени")
+	if int(b.get("st", 1)) > 1: s += "\n[color=#f2c46d]Наложений: %d[/color] [color=#888](время обновляется, действует сильнейшее)[/color]" % int(b.st)
+	if str(b.get("src", "")) != "": s += "\n[color=#888]Источник: %s[/color]" % str(b.src)
+	return s
 
 static func debuff_icon(kind: String) -> String:
 	return {"mark": "bullseye", "weaken": "broken-skull", "slow": "hourglass", "taunt": "shouting"}.get(kind, "cursed-star")

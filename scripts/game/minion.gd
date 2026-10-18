@@ -66,7 +66,9 @@ func ground_error() -> float:
 	return absf(global_position.y - floor_y())
 
 func add_buff(b: Dictionary) -> void:
+	var st: int = mini(9, int(buffs[b.id].get("st", 1)) + 1) if buffs.has(b.id) else 1
 	buffs[b.id] = b.duplicate()
+	buffs[b.id]["st"] = st
 
 ## Множители от баффов: урон (dmg%) и защита (armor%/dr%)
 func buff_mult(stat: String) -> float:

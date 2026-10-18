@@ -317,7 +317,7 @@ func add_debuff(k: String, v: float, dur: float) -> void:
 	var cur: Dictionary = buffs.get(k, {})
 	var nv := maxf(v, float(cur.get("v", 0.0)))
 	buffs[k] = {"id": k, "v": nv, "t": maxf(dur, float(cur.get("t", 0.0))), "dur": dur, "icon": Support.debuff_icon(k), "col": Support.debuff_color(k),
-		"name": Support.debuff_name(k), "good": false}
+		"name": Support.debuff_name(k), "good": false, "st": mini(9, int(cur.get("st", 0)) + 1)}
 	if k == "slow": slow(1.0 - nv, dur)
 	if k == "taunt": _aggro = true
 
