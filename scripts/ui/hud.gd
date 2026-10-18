@@ -389,12 +389,22 @@ func _open(which: String) -> void:
 	if which == "shop": _mark_hint("shop")
 	_release_all()
 	get_tree().paused = true
+	_set_main_view(false)
 
 func close_window() -> void:
 	if window: UIK.pop_out(window)
 	window = null
+	_set_main_view(true)
 	get_tree().paused = false
 	refresh_skill_buttons()
+
+## v0.9.1: рамки группы, онлайн-список, чат и панели рейда — только на основном экране
+func _set_main_view(v: bool) -> void:
+	if zone == null: return
+	if zone.party_ui and "ui_root" in zone.party_ui and zone.party_ui.ui_root: zone.party_ui.ui_root.visible = v
+	if zone.raid and zone.raid.ui: zone.raid.ui.visible = v
+	if Net._overlay and is_instance_valid(Net._overlay) and Net._overlay.ui_root: Net._overlay.ui_root.visible = v
+	_hide_tooltip()
 
 ## Лента добычи: иконка + текст, плавно появляется и исчезает
 func pickup(t: String, c: Color, ic := "") -> void:

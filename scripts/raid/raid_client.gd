@@ -56,6 +56,7 @@ func _drain() -> void:
 	for e in evs: handle(e[1])
 
 func _process(delta: float) -> void:
+	if ui: ui.visible = zone.hud == null or zone.hud.window == null   # v0.9.1: окно HUD скрывает панели рейда
 	brain.step(delta)
 	var p = zone.player
 	if sim and p:

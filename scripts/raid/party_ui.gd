@@ -3,24 +3,38 @@ class_name PartyUI
 ## v0.8.0: рамки группы (имя, уровень, здоровье — для телефона и ПК) и окно «Группа / Подземелья»:
 ## приглашения, вступление, выход, исключение (лидер), вход в групповые подземелья (лидер ведёт группу;
 ## один игрок тоже может войти — здоровье врагов масштабируется под размер группы). Клавиша G.
+## v0.9.1: кнопка «Группа» и G открывают вкладку «Группа» (приглашения, список игроков в сети, приглашение
+## по имени, участники, выход, исключение); кнопка «Подземелья» — вкладку подземелий. Пока открыто любое окно
+## (инвентарь, умения, таланты, карта, лавка, сундук, меню/настройки) кнопки и рамки скрыты.
 
 var zone
-var btn: Button
+var btn: Button           # «Группа» (G)
+var dbtn: Button          # «Подземелья»
+var ui_root: Control
+var name_edit: LineEdit
 var frames: VBoxContainer
 var win: Panel
 var body: VBoxContainer
-var tab := "dungeons"
+var tab := "party"
 var _t := 0.0
 static var preview := false   # снимки/тесты: показать рамки из Net.party без сервера
 
 func _ready() -> void:
 	layer = 41
+	process_mode = Node.PROCESS_MODE_ALWAYS   # окна HUD ставят игру на паузу — скрываться нужно и тогда
 	var root := Control.new(); root.set_anchors_preset(Control.PRESET_FULL_RECT); root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
-	btn = UIK.button(root, "Группа" if Net.in_game else "Подземелья", toggle, UIK.PURPLE, 24, "crossed-swords")
+	ui_root = root
+	btn = UIK.button(root, "Группа", open_tab.bind("party"), UIK.PURPLE, 24, "three-friends")
+	btn.name = "PartyBtn"
 	btn.custom_minimum_size = Vector2(0, 48)
 	btn.anchor_top = 0.3; btn.anchor_bottom = 0.3
-	btn.offset_left = 144 if Net.in_game else 24; btn.offset_right = btn.offset_left + 210; btn.offset_bottom = 52
+	btn.offset_left = 144 if Net.in_game else 24; btn.offset_right = btn.offset_left + 200; btn.offset_bottom = 52
+	dbtn = UIK.button(root, "Подземелья", open_tab.bind("dungeons"), UIK.PURPLE, 24, "crossed-swords")
+	dbtn.name = "DungeonsBtn"
+	dbtn.custom_minimum_size = Vector2(0, 48)
+	dbtn.anchor_top = 0.3; dbtn.anchor_bottom = 0.3
+	dbtn.offset_left = btn.offset_right + 10; dbtn.offset_right = dbtn.offset_left + 220; dbtn.offset_bottom = 52
 	frames = VBoxContainer.new()
 	frames.add_theme_constant_override("separation", 6)
 	frames.anchor_top = 0.36; frames.anchor_bottom = 0.36
@@ -32,10 +46,10 @@ func _ready() -> void:
 	win.offset_left = -560; win.offset_right = 560; win.offset_top = -380; win.offset_bottom = 380
 	var head := UIK.hbox(win, 64)
 	UIK.rect(head, Vector2(24, 18), Vector2(1072, 64))
-	if Net.in_game: UIK.button(head, "Группа", func(): tab = "party"; refresh(), UIK.BUTTON, 26, "three-friends")
-	UIK.button(head, "Подземелья", func(): tab = "dungeons"; refresh(), UIK.BUTTON, 26, "dungeon-gate")
+	var tp := UIK.button(head, "Группа", func(): tab = "party"; refresh(), UIK.BUTTON, 26, "three-friends"); tp.name = "Tab_party"
+	var td := UIK.button(head, "Подземелья", func(): tab = "dungeons"; refresh(), UIK.BUTTON, 26, "dungeon-gate"); td.name = "Tab_dungeons"
 	var sp := Control.new(); UIK.expand(sp); head.add_child(sp)
-	UIK.button(head, "Закрыть", toggle, UIK.RED, 26)
+	UIK.button(head, "Закрыть", close, UIK.RED, 26)
 	var holder := Control.new(); win.add_child(holder)
 	UIK.rect(holder, Vector2(10, 92), Vector2(1100, 650))
 	body = UIK.scroll_list(holder, 12)
@@ -45,27 +59,40 @@ func _ready() -> void:
 	refresh()
 
 func toggle() -> void:
-	win.visible = not win.visible
-	if win.visible:
-		if Net.in_game and (not Net.party_invites.is_empty() or tab == ""): tab = "party"
-		refresh()
-		UIK.pop_in(win)
+	if win.visible: close()
+	else: open_tab(tab)
+
+func close() -> void:
+	win.visible = false
+	if name_edit and is_instance_valid(name_edit): name_edit.release_focus()
+
+## Открыть окно на вкладке («party» / «dungeons»); повторное нажатие той же кнопки закрывает окно
+func open_tab(t: String) -> void:
+	if win.visible and tab == t: close(); return
+	if zone and zone.hud and zone.hud.window: return   # поверх других окон не открываем
+	tab = t
+	win.visible = true
+	refresh()
+	UIK.pop_in(win)
 
 func _unhandled_input(e: InputEvent) -> void:
 	if (e is InputEventKey or e is InputEventMouseButton) and e.pressed and not (e is InputEventKey and e.echo) and Controls.action_of(e) == "party":
 		var fo = get_viewport().gui_get_focus_owner()
 		if fo is LineEdit: return
-		toggle(); get_viewport().set_input_as_handled()
+		open_tab("party"); get_viewport().set_input_as_handled()
 
 func _process(delta: float) -> void:
+	# v0.9.1: только на основном экране — любое окно HUD скрывает кнопки, рамки и окно группы
+	var main_view: bool = not (zone and zone.hud and zone.hud.window != null)
+	ui_root.visible = main_view
+	if not main_view: return
 	_t -= delta
 	if _t > 0.0: return
 	_t = 0.25
 	if not _pending_blockers.is_empty() and zone and zone.hud:
 		zone.hud.blockers.append_array(_pending_blockers); _pending_blockers.clear()
 	_frames()
-	if Net.in_game:
-		btn.text = "Группа" + (" (%d)" % (Net.party.members.size()) if Net.in_party() else "") + (" !" if not Net.party_invites.is_empty() else "")
+	btn.text = "Группа" + (" (%d)" % (Net.party.members.size()) if Net.in_party() else "") + (" !" if not Net.party_invites.is_empty() else "")
 
 # ---------- рамки группы ----------
 func _frames() -> void:
@@ -138,12 +165,19 @@ func _frame() -> Control:
 func refresh() -> void:
 	if body == null or not win.visible: return
 	UIK.clear(body)
-	if tab == "party" and Net.in_game: _party_tab()
+	for t in ["party", "dungeons"]:
+		var b = win.find_child("Tab_" + t, true, false)
+		if b: b.modulate = Color(1.2, 1.15, 0.85) if tab == t else Color(0.75, 0.75, 0.75)
+	if tab == "party": _party_tab()
 	else: _dungeon_tab()
 
 func _row(h := 64.0) -> HBoxContainer: return UIK.hbox(body, h, 12)
 
 func _party_tab() -> void:
+	if not Net.in_game:
+		UIK.label(body, "Группа", 30, UIK.ACCENT)
+		UIK.label(body, "Группы доступны в онлайн-режиме: войдите в аккаунт в главном меню («Онлайн»), чтобы приглашать игроков, видеть участников и ходить в подземелья вместе. Соло-подземелья — на вкладке «Подземелья».", 24, UIK.MUTED)
+		return
 	for pid in Net.party_invites:
 		var r := _row()
 		UIK.expand(UIK.label(r, "Приглашение от %s" % Net.party_invites[pid], 26, UIK.ACCENT))
@@ -163,7 +197,18 @@ func _party_tab() -> void:
 		UIK.label(body, "Вы играете один. Пригласите игроков ниже (до %d в группе)." % Net.PARTY_MAX, 24, UIK.MUTED)
 	else:
 		UIK.button(body, "Покинуть группу", Net.party_leave, UIK.RED, 26)
-	UIK.label(body, "Игроки в сети", 30, UIK.ACCENT)
+	# приглашение по имени
+	var can_inv: bool = (not Net.in_party() or Net.is_leader()) and mem.size() < Net.PARTY_MAX
+	var ir := _row(70)
+	name_edit = LineEdit.new(); name_edit.name = "InviteName"
+	name_edit.placeholder_text = "Имя героя или логин…"; name_edit.max_length = 40
+	name_edit.add_theme_font_size_override("font_size", 24)
+	UIK.expand(name_edit); ir.add_child(name_edit)
+	name_edit.text_submitted.connect(func(_t): _invite_typed())
+	var ib := UIK.button(ir, "Пригласить по имени", _invite_typed, UIK.GREEN, 24)
+	ib.disabled = not can_inv; name_edit.editable = can_inv
+	if not can_inv: UIK.label(body, "Приглашать может только лидер группы" if mem.size() < Net.PARTY_MAX else "Группа полная", 22, UIK.MUTED)
+	UIK.label(body, "Игроки в сети: %d" % (Net.remotes.size() + 1), 30, UIK.ACCENT)
 	var any := false
 	for id in Net.remotes:
 		var nm := str(Net.remotes[id].name)
@@ -175,11 +220,19 @@ func _party_tab() -> void:
 		b.disabled = Net.in_party() and not Net.is_leader() or mem.size() >= Net.PARTY_MAX
 	if not any: UIK.label(body, "Больше никого нет в сети", 24, UIK.MUTED)
 
+func _invite_typed() -> void:
+	if name_edit == null: return
+	var n := name_edit.text.strip_edges()
+	if n == "": Game.toast("Введите имя игрока", 1.5); return
+	Net.party_invite(n)
+	name_edit.text = ""
+	name_edit.release_focus()
+
 func _dungeon_tab() -> void:
 	var in_raid: bool = zone != null and zone.is_raid()
 	if in_raid:
 		UIK.label(body, "Вы в подземелье «%s»" % DB.ZONES[zone.data.zone].name, 30, UIK.ACCENT)
-		UIK.button(body, "Выйти в долину", func(): toggle(); zone.raid.leave(), UIK.RED, 26)
+		UIK.button(body, "Выйти из подземелья", func(): close(); zone.raid.leave(), UIK.RED, 26)
 		return
 	var n := maxi(1, (Net.party.get("members", []) as Array).size()) if Net.in_game else 1
 	UIK.label(body, "Групповые подземелья: босс со сложными механиками, комплекты рейда. Здоровье врагов — ×%.2f под группу из %d." % [RaidDefs.party_k(n), n], 24, UIK.MUTED)
@@ -201,5 +254,5 @@ func _dungeon_tab() -> void:
 		b.disabled = not can
 
 func _enter(did: String) -> void:
-	win.visible = false
+	close()
 	Net.raid_enter(did)

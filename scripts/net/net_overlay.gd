@@ -6,10 +6,13 @@ var roster: Label
 var log_label: RichTextLabel
 var input: LineEdit
 var chat_btn: Button
+var ui_root: Control
 
 func _ready() -> void:
 	layer = 40
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	var root := Control.new(); root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ui_root = root
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
 	roster = Label.new()
@@ -45,6 +48,14 @@ func _ready() -> void:
 	Net.party_changed.connect(_refresh)
 	_refresh()
 
+## v0.9.1: список онлайна и чат — только на основном экране (скрыты, пока открыто окно HUD)
+func _process(_d: float) -> void:
+	var z = get_parent()
+	var main_view: bool = not (z and "hud" in z and z.hud and z.hud.window != null)
+	if ui_root.visible != main_view:
+		ui_root.visible = main_view
+		if not main_view and input.visible: input.visible = false; input.release_focus()
+
 func _refresh() -> void:
 	if not is_instance_valid(roster): return
 	roster.visible = not Net.in_party()   # в группе вместо списка — рамки группы (PartyUI)
@@ -67,6 +78,6 @@ func _submit(text: String) -> void:
 	input.release_focus()
 
 func _unhandled_input(e: InputEvent) -> void:
-	if e is InputEventKey and e.pressed and not e.echo and Controls.action_of(e) == "chat" and not input.visible:
+	if e is InputEventKey and e.pressed and not e.echo and Controls.action_of(e) == "chat" and not input.visible and ui_root.visible:
 		open_chat()
 		get_viewport().set_input_as_handled()
