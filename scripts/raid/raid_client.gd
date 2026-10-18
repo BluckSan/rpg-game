@@ -48,7 +48,7 @@ func send_hit(id: int, dmg: float, skill: bool) -> void:
 func leave() -> void:
 	if Net.in_game: Net.raid_leave()
 	zone.save()
-	Game.travel("starter", "")
+	Game.travel_back("starter")
 
 func _drain() -> void:
 	var evs := sim.events.duplicate()

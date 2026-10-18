@@ -431,14 +431,40 @@ func play(c: Dictionary) -> void:
 	get_tree().paused = false
 	get_tree().change_scene_to_file(z["scene"])
 
+## v0.9.1: подземелья (соло-склеп и групповые) запоминают место входа в мире: выход возвращает туда же
+static func is_dungeon_zone(zone_id: String) -> bool: return zone_id == "dungeon" or RaidDefs.is_raid_zone(zone_id)
+
 func travel(zone_id: String, arrive := "") -> void:
 	var z = DB.ZONES.get(zone_id)
 	if z == null or not z["available"]: return
+	var from := str(current.get("zone", ""))
+	if is_dungeon_zone(zone_id) and not is_dungeon_zone(from) and current.get("has_pos", false) and current.has("pos"):
+		current["ret"] = {"zone": from, "pos": (current["pos"] as Array).duplicate()}
 	current["zone"] = zone_id
 	current["has_pos"] = false
+	current.erase("arrive")
 	if arrive != "": current["arrive"] = arrive
+	if is_dungeon_zone(from) and not is_dungeon_zone(zone_id): apply_return(current)
 	save_character(current)
 	get_tree().change_scene_to_file(z["scene"])
+
+## Выход из подземелья: туда, откуда вошли (зона и точка); без записи — в долину
+func travel_back(fallback := "starter") -> void:
+	var r = current.get("ret", {})
+	var zid: String = str(r.get("zone", fallback)) if r is Dictionary else fallback
+	if not DB.ZONES.has(zid) or is_dungeon_zone(zid): zid = fallback
+	travel(zid, "")
+
+## Если есть запись о точке входа в эту зону — поставить героя туда (и стереть запись)
+static func apply_return(c: Dictionary) -> bool:
+	var r = c.get("ret", {})
+	if not (r is Dictionary) or str(r.get("zone", "")) != str(c.get("zone", "")): return false
+	var pos = r.get("pos", [])
+	if not (pos is Array) or pos.size() < 3: return false
+	c["pos"] = [float(pos[0]), float(pos[1]), float(pos[2])]
+	c["has_pos"] = true
+	c.erase("arrive"); c.erase("ret")
+	return true
 
 func to_menu() -> void:
 	save_character(current)

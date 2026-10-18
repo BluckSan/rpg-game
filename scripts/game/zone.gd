@@ -65,7 +65,10 @@ func _ready() -> void:
 		data["zone"] = "starter"
 	# групповое подземелье: онлайн — только внутри экземпляра сервера, офлайн — соло-забег (своя симуляция)
 	if RaidDefs.is_raid_zone(data["zone"]) and (RaidDefs.by_zone(data["zone"]) == "" or (Net.in_game and Net.raid_iid == 0)):
-		data["zone"] = "starter"; data["has_pos"] = false
+		var r = data.get("ret", {})
+		data["zone"] = str(r.get("zone", "starter")) if r is Dictionary and DB.ZONES.has(str(r.get("zone", ""))) and not Game.is_dungeon_zone(str(r.get("zone", ""))) else "starter"
+		data["has_pos"] = false
+		Game.apply_return(data)   # v0.9.1: экземпляр закрыт — герой возвращается к месту входа
 	if RaidDefs.is_raid_zone(data["zone"]): builder = PartyDungeonBuilder.new()
 	elif data["zone"] == "dungeon": builder = DungeonBuilder.new()
 	elif data["zone"] == "global": builder = WorldBuilder.new()

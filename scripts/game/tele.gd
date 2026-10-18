@@ -43,7 +43,7 @@ static func make(parent: Node, kind: String, pos: Vector3, radius: float, c: Col
 	if dir.length() > 0.01: root.rotation.y = atan2(dir.x, dir.z)
 	var m: Mesh
 	match kind:
-		"cone": m = fan_mesh(angle)
+		"cone": m = fan_mesh(angle, inner)   # v0.9.1: inner > 0 — усечённый сектор (тень за колонной)
 		"ring": m = fan_mesh(360.0, inner, 48)
 		_: m = disc_mesh()
 	var base := MeshInstance3D.new(); base.mesh = m; base.name = "Base"

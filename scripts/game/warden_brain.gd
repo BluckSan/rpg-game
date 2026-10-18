@@ -179,6 +179,11 @@ func _soak(t) -> void:
 	_end_cast()
 
 # ---------- Взор Пустоты: за колонну ----------
+const VOID_R := 18.0
+const COVER_PAD := 0.15     # запас к радиусу колонны (луч взгляда задевает колонну)
+const COVER_TT := 0.98      # колонна должна быть ближе к боссу, чем 98% пути до героя
+
+## Герой в тени колонны: отрезок «босс → герой» проходит через колонну, и колонна — между ними
 func behind_pillar(p: Vector3) -> bool:
 	var a := Vector2(center().x, center().z)
 	var b := Vector2(p.x, p.z)
@@ -186,8 +191,15 @@ func behind_pillar(p: Vector3) -> bool:
 		var c := Vector2(pl.x, pl.z)
 		var ab := b - a
 		var tt := clampf((c - a).dot(ab) / maxf(0.0001, ab.length_squared()), 0, 1)
-		if (a + ab * tt).distance_to(c) <= float(zone().pillar_r) + 0.15 and tt > 0.05 and tt < 0.98: return true
+		if (a + ab * tt).distance_to(c) <= float(zone().pillar_r) + COVER_PAD and tt > 0.05 and tt < COVER_TT: return true
 	return false
+
+## v0.9.1: подсказка тени — усечённый сектор ЗА колонной (раньше рисовался сектор от босса, то есть
+## и пространство ПЕРЕД колонной, где удар убивает). Угол — 2·asin((r+запас)/d), начало — d/0.98:
+## нарисованная область целиком лежит внутри той, что засчитывает behind_pillar().
+static func shadow_wedge(dist: float, pillar_r: float) -> Dictionary:
+	var half := asin(clampf((pillar_r + COVER_PAD) / maxf(dist, 0.01), 0.0, 1.0))
+	return {"angle": rad_to_deg(2.0 * half) * 0.96, "inner": clampf(dist / COVER_TT / VOID_R, 0.0, 0.98)}
 
 func _void(t) -> void:
 	busy = true
@@ -200,8 +212,9 @@ func _void(t) -> void:
 	for pl in zone().pillars:
 		var d := U.flat(pl - center()).normalized()
 		var dist := U.flat_dist(pl, center())
-		var ang := rad_to_deg(2.0 * atan2(float(zone().pillar_r), dist))
-		var sh := Tele.make(zone().fx_root, "cone", center(), 18.0, Color(0.3, 1.0, 0.9), d, ang, dist / 18.0 + 0.04)
+		var wg := shadow_wedge(dist, float(zone().pillar_r))
+		var sh := Tele.make(zone().fx_root, "cone", center(), VOID_R, Color(0.3, 1.0, 0.9), d, float(wg.angle), float(wg.inner))
+		sh.name = "PillarShadow"
 		_tele.append(sh)
 	e._model_action("roar")
 	if not await _progress(tele, dur): _end_cast(); return
