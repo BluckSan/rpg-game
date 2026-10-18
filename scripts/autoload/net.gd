@@ -450,6 +450,7 @@ func c_hello(tok: String, char_id: String, proto: int, version: String) -> void:
 	var need_mig := false   # v0.8.0: старые предметы (проценты) → плоские характеристики, сразу пишем в БД
 	for lst in ["inventory", "equipped", "stash"]:
 		for it in c.get(lst, []): if it is Dictionary and int(it.get("v", 0)) < Items.ITEM_V: need_mig = true
+	if int(c.get("skills_v", 0)) < DB.SKILLS_V: need_mig = true   # v0.9.0: умения из набора — изучены (ранг 1)
 	c = Game.normalize(c)
 	var pos := Vector3.ZERO
 	var cp = c.get("pos", [0, 0, 0])
@@ -459,7 +460,7 @@ func c_hello(tok: String, char_id: String, proto: int, version: String) -> void:
 		"tp_t": 0.0, "viol": 0, "budget": 24.0, "dirty": false, "save_t": _now(), "chat_t": 0.0, "chat_n": 0,
 		"party": 0, "iid": 0, "inv_t": 0.0, "inv_n": 0}
 	if RaidDefs.is_raid_zone(p.zone): p.zone = "starter"; c["zone"] = "starter"; c["has_pos"] = false
-	if need_mig: p.dirty = true; print("server: предметы «%s» переведены на плоские характеристики (v0.8.0)" % p.name)
+	if need_mig: p.dirty = true; print("server: герой «%s» перенесён на новый формат (предметы v0.8.0 / умения v0.9.0)" % p.name)
 	players[id] = p
 	var roster := []
 	for oid in players:
@@ -546,7 +547,7 @@ func c_save(json: String) -> void:
 	if not (c is Dictionary) or str(c.get("id", "")) != p.char_id: return
 	if str(c.get("class", "")) != str(p.data.get("class", "")): return
 	if int(c.get("level", 1)) > int(p.data.get("level", 1)) + 5: return
-	p.data = c; p.dirty = true
+	p.data = Game.normalize(c); p.dirty = true
 
 func _srv_flush(p: Dictionary, force := false) -> void:
 	if not p.dirty: return

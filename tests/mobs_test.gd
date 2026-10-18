@@ -30,6 +30,7 @@ func _ready() -> void:
 	# 1. призывы стоят на земле в трёх видах зон
 	for zn in ["starter", "global", "dungeon"]:
 		c["zone"] = zn; c["has_pos"] = false
+		DB.auto_build_skills(c)
 		Game.save_character(c); Game.current = c
 		get_tree().change_scene_to_file("res://scenes/zone.tscn")
 		await frames(8)

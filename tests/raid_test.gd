@@ -46,6 +46,7 @@ func _dungeon(did: String) -> void:
 	c["tutorial"] = {"move": true, "attack": true, "jump": true, "talents": true, "shop": true, "boss": true}
 	c["potions"] = 20
 	c["zone"] = RaidDefs.DUNGEONS[did].zone; c["has_pos"] = false
+	DB.auto_build_skills(c)
 	Game.save_character(c)
 	Game.play(c); await w(2.5)
 	var d = get_tree().current_scene

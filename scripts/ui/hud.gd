@@ -11,6 +11,7 @@ var xp_bar: ProgressBar
 var name_label: Label
 var gold_label: Label
 var talent_badge: Label
+var skill_badge: Label
 var skill_btns := []      # [0] атака, [1..3] умения
 var potion_btn: SkillButton
 var potion_label: Label
@@ -105,7 +106,13 @@ func setup(z) -> void:
 	badge_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	talent_badge.reparent(badge_bg); UIK.full(talent_badge)
 	_top_button("Герой", _open.bind("hero"), UIK.BUTTON, 1, 210, "person")
-	_top_button("Умения", _open.bind("skills"), Color(0.32, 0.25, 0.5), 3, 230, "book-cover")
+	var b_sk := _top_button("Умения", _open.bind("skills"), Color(0.32, 0.25, 0.5), 3, 230, "book-cover")
+	skill_badge = UIK.label(b_sk, "", 24, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	var sbg := UIK.panel(b_sk, Color(0.25, 0.6, 0.25), 22)
+	UIK.rect(sbg, Vector2(196, -14), Vector2(44, 44))
+	sbg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sbg.name = "SkillBadge"
+	skill_badge.reparent(sbg); UIK.full(skill_badge)
 	_top_button("Меню", _open.bind("pause"), Color(0.3, 0.3, 0.32), 2, 190, "cog")
 
 	# --- боевые кнопки (координаты от правого нижнего угла) ---
@@ -403,7 +410,8 @@ func level_up(level: int, points: int) -> void:
 	var t := UIK.label(b, "НОВЫЙ УРОВЕНЬ %d" % level, 56, UIK.ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
 	t.autowrap_mode = TextServer.AUTOWRAP_OFF
 	UIK.rect(t, Vector2(140, 20), Vector2(700, 80))
-	var sub := UIK.label(b, "Очков талантов: %d — откройте «Таланты»" % points, 26, UIK.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	var sp := DB.skill_points_free(player.data) if player != null else 0
+	var sub := UIK.label(b, "Очков талантов: %d · очков умений: %d — «Таланты» и «Умения»" % [points, sp], 26, UIK.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 	sub.autowrap_mode = TextServer.AUTOWRAP_OFF
 	UIK.rect(sub, Vector2(140, 100), Vector2(700, 50))
 	b.pivot_offset = Vector2(450, 90)
@@ -422,6 +430,7 @@ const HINTS := {
 	"attack": "Удерживайте большую кнопку атаки: три удара подряд — это комбо, последний бьёт сильнее.",
 	"jump": "«Прыжок» перепрыгивает ударные волны босса, «Кувырок» даёт миг неуязвимости.",
 	"talents": "Есть свободное очко! Нажмите «Таланты» вверху и изучите новый узел.",
+	"skills": "Есть очко умений! Откройте «Умения», изучите умение и поставьте его в любой слот.",
 	"shop": "Рядом торговец: нажмите «Торговать», чтобы купить зелья и снаряжение или продать добычу.",
 	"boss": "Красные зоны — предупреждение об атаке босса. Уходите из них или делайте кувырок!",
 }
@@ -453,6 +462,7 @@ func _update_hints(delta: float) -> void:
 	elif hint_id == "attack" and (player.combo_count >= 3 or _hint_age > 15): _mark_hint("attack")
 	elif hint_id == "jump" and (player.jumps > 0 or player.rolls > 0 or _hint_age > 12): _mark_hint("jump")
 	elif hint_id == "talents" and DB.free_points(zone.data) == 0: _mark_hint("talents")
+	elif hint_id == "skills" and DB.skill_points_free(zone.data) == 0: _mark_hint("skills")
 	elif hint_id == "shop" and not zone.near_merchant(): hint_id = ""; hint_panel.visible = false
 	elif hint_id == "boss" and _hint_age > 9: _mark_hint("boss")
 	if hint_id != "": return
@@ -460,6 +470,7 @@ func _update_hints(delta: float) -> void:
 	elif not t.get("attack", false): show_hint("attack")
 	elif not t.get("jump", false): show_hint("jump")
 	elif zone.near_merchant() and not t.get("shop", false): show_hint("shop")
+	elif DB.skill_points_free(zone.data) > 0 and not t.get("skills", false) and t.get("jump", false): show_hint("skills")
 	elif DB.free_points(zone.data) > 0 and not t.get("talents", false): show_hint("talents")
 	elif boss_panel.visible and not t.get("boss", false): show_hint("boss")
 
@@ -660,6 +671,9 @@ func _process(delta: float) -> void:
 	var free := DB.free_points(d)
 	talent_badge.get_parent().visible = free > 0
 	talent_badge.text = str(free)
+	var sfree := DB.skill_points_free(d)
+	skill_badge.get_parent().visible = sfree > 0
+	skill_badge.text = str(sfree)
 	for i in range(1, skill_btns.size()):
 		var lock: String = player.lock_reason(i)
 		var mx := player.max_cooldown(i)

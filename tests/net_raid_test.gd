@@ -56,6 +56,7 @@ func _run() -> void:
 	if c == null: _finish(); return
 	c["tutorial"] = {"move": true, "attack": true, "jump": true, "talents": true, "shop": true, "boss": true}
 	c["zone"] = "starter"; c["has_pos"] = false
+	DB.auto_build_skills(c)
 	Game.play(c)
 	var ok := await wait_until(func(): return Net.in_game and _zone() != null and _zone().player != null, 40.0)
 	check(ok, "в мире")

@@ -224,6 +224,7 @@ func _v030(z, c: Dictionary, rng: RandomNumberGenerator) -> void:
 		for cls in ["archer", "mage"]:
 			var c2 := DB.new_character("Тест", cls, CharAssets.random_look(1 if cls == "archer" else 0, rng))
 			c2["level"] = 8; c2["class_level"] = 3; c2["tutorial"] = {"move": true, "attack": true, "jump": true, "talents": true, "shop": true, "boss": true}
+			DB.auto_build_skills(c2)
 			Game.save_character(c2)
 			Game.play(c2); await w(2.5)
 			var z2 = get_tree().current_scene

@@ -379,6 +379,17 @@ func normalize(c: Dictionary) -> Dictionary:
 			if it.has("req"): it["req"] = int(it["req"])
 	c["dust"] = int(c.get("dust", 0))
 	Items.migrate(c)
+	# v0.9.0: ранги умений (целые, ≤ 5); потрачено больше, чем есть очков, — сброс (защита от подделки)
+	var sr := {}
+	var raw = c.get("skill_ranks", {})
+	if raw is Dictionary:
+		for k in raw: sr[str(k)] = clampi(int(raw[k]), 0, DB.SKILL_MAX_RANK)
+	c["skill_ranks"] = sr
+	c["skill_bonus"] = clampi(int(c.get("skill_bonus", 0)), 0, 20)
+	if c.has("skills_v"): c["skills_v"] = int(c["skills_v"])
+	if DB.CLASSES.has(str(c.get("class", ""))):
+		DB.migrate_skills(c)
+		if DB.skill_points_spent(c) > DB.skill_points_total(c): DB.reset_skills(c)
 	if not c.has("zones") or not (c["zones"] is Dictionary): c["zones"] = {}
 	var look: Dictionary = c.get("look", {})
 	for k in ["gender", "skin", "face", "hair", "hair_color", "eye_color"]:

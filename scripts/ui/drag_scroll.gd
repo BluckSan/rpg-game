@@ -29,6 +29,8 @@ func _input(ev: InputEvent) -> void:
 				dragging = true
 				_clear.call_deferred()
 	elif ev is InputEventMouseMotion and _down:
+		if sc.get_viewport().gui_is_dragging():   # перетаскивание умения в слот — не прокрутка
+			_down = false; _vel = 0.0; return
 		if not _moved and ev.position.distance_to(_start) > THRESHOLD: _moved = true
 		if _moved:
 			sc.scroll_vertical -= int(ev.relative.y)

@@ -132,6 +132,22 @@ func _ready() -> void:
 		await frames(3)
 		p.data["class_level"] = 3
 		p.recalc(true)
+		# v0.9.0: открытые умения сами в набор не встают; изучить за очко → поставить вручную
+		check((p.data["loadout"] as Array).count("") == 8 and p.lock_reason(1) == "пусто", "[%s] новое умение не в наборе само" % c["class"])
+		var s1: Dictionary = DB.CLASSES[c["class"]].skills[1]; var s2: Dictionary = DB.CLASSES[c["class"]].skills[2]
+		check(not DB.set_loadout_slot(p.data, 0, s1.id) and DB.skill_lock(p.data, s1) == "Не изучено", "[%s] неизученное умение в слот не ставится" % c["class"])
+		DB.reset_skills(p.data)
+		p.data["skill_bonus"] = 0
+		p.data["skill_bonus"] = 1 - DB.skill_points_total(p.data)   # ровно 1 очко
+		check(DB.skill_points_free(p.data) == 1 and DB.learn_skill(p.data, s1.id) == "" and DB.learn_skill(p.data, s2.id) == "Нет очков умений", "[%s] изучение за очко умений (%d)" % [c["class"], DB.skill_points_free(p.data)])
+		p.data["skill_bonus"] = int(p.data["skill_bonus"]) + 1
+		check(DB.learn_skill(p.data, s2.id) == "", "[%s] второе умение изучено" % c["class"])
+		check(DB.set_loadout_slot(p.data, 7, s1.id) and DB.set_loadout_slot(p.data, 1, s2.id), "[%s] умения в любые слоты (8 и 2)" % c["class"])
+		check(p.get_skill(8).id == s1.id and p.get_skill(2).id == s2.id, "[%s] слоты 8 и 2 заняты" % c["class"])
+		DB.set_loadout_slot(p.data, 0, s1.id)
+		p.data["skill_bonus"] = 0
+		p.data["skill_bonus"] = maxi(0, DB.skill_points_spent(p.data) - DB.skill_points_total(p.data))
+		z.hud.refresh_skill_buttons()
 		for slot in 3:
 			p.cooldowns[slot] = 0
 			p.mp = p.stats.max_mp
@@ -185,6 +201,12 @@ func _ready() -> void:
 		z2.apply_character_changes(true)
 		z2.hud.refresh_skill_buttons()
 		check(pl.visual.model != null or pl.visual.beast != null, "облик превращения %s построен" % a["name"])
+		check(not (pl.data["loadout"] as Array).has(a["skill"]["id"]), "умение пути «%s» само в набор не встало" % a["skill"]["name"])
+		pl.data["skill_bonus"] = 60
+		DB.learn_skill(pl.data, a["skill"]["id"])
+		for x in a.get("skills_extra", []): DB.learn_skill(pl.data, x.id)
+		check(DB.set_loadout_slot(pl.data, 2, a["skill"]["id"]), "умение пути изучено и поставлено в слот 3 вручную")
+		z2.hud.refresh_skill_buttons()
 		pl.cooldowns[3] = 0; pl.mp = pl.stats.max_mp
 		var e2 = _alive_enemy(z2)
 		pl.teleport(e2.global_position + Vector3(0, 0.1, -2))
@@ -283,31 +305,58 @@ func _skill_ext_tests(z, p: Player, cls: String) -> void:
 	var pool := DB.skill_pool(p.data)
 	var open := 0
 	for s in pool:
-		if DB.skill_lock(p.data, s) == "": open += 1
+		if DB.skill_unlock_block(p.data, s) == "": open += 1
 	check(pool.size() >= 7 and open == pool.size(), "[%s] умений класса: %d, открыто %d" % [cls, pool.size(), open])
+	DB.reset_skills(p.data)
+	p.data["skill_bonus"] = 0
 	var lo: Array = p.data["loadout"]
-	var uniq := {}
-	for id in lo:
-		if id != "": uniq[id] = true
-	check(lo.size() == 8 and uniq.size() == mini(8, pool.size()), "[%s] набор 8 слотов: %s" % [cls, str(lo)])
+	check(lo.size() == 8 and lo.count("") == 8, "[%s] после сброса набор пуст: %s" % [cls, str(lo)])
 	var low := p.data.duplicate(true)
 	low["level"] = 1; low["loadout"] = []
 	DB.ensure_loadout(low)
 	var hi_id: String = pool[pool.size() - 1].id
 	check(not DB.set_loadout_slot(low, 2, hi_id) and DB.skill_lock(low, pool[pool.size() - 1]) == "Уровень 12", "[%s] умение 12 ур. закрыто на 1 ур." % cls)
-	var a0: String = lo[0]; var a1: String = lo[1]
-	DB.set_loadout_slot(p.data, 0, a1)
-	check(p.data["loadout"][0] == a1 and p.data["loadout"][1] == a0, "[%s] перестановка в наборе меняет слоты местами" % cls)
-	await _layout_tests(z, p, cls)
-	# окно «Умения»
+	# окно «Умения»: изучить → поставить в слот, улучшить, обмен, снять
 	z.hud._open("skills")
 	await frames(3)
 	var w = z.hud.window
 	check(w != null and w.name == "Window_skills" and get_tree().paused, "[%s] окно «Умения» открыто" % cls)
+	var pts0 := DB.skill_points_free(p.data)
+	check(pts0 >= 3 and w.pts_lbl.text.contains(str(pts0)), "[%s] очки умений в окне: %d" % [cls, pts0])
+	w._select(hi_id); w._slot_pressed(4)
+	check(str(p.data["loadout"][4]) == "", "[%s] неизученное умение не ставится в слот" % cls)
+	w._learn()
+	check(DB.skill_rank(p.data, hi_id) == 1 and DB.skill_points_free(p.data) == pts0 - 1, "[%s] умение изучено за очко" % cls)
+	check(str(p.data["loadout"][4]) == "" and not lo.has(hi_id), "[%s] изученное умение не ставится само" % cls)
 	w._select(hi_id); w._slot_pressed(4)
 	check(p.data["loadout"][4] == hi_id, "[%s] умение назначено в слот 5 через окно" % cls)
 	check(z.hud.skill_btns.size() == 9 and z.hud.skill_btns[5].text == DB.find_skill(p.data, hi_id).name, "[%s] кнопка 5 на HUD обновлена" % cls)
+	var a0: String = pool[0].id
+	w._learn_id(a0)
+	w._learn_id(a0)
+	check(DB.skill_rank(p.data, a0) == 2, "[%s] умение улучшено до ранга 2" % cls)
+	var e1 := DB.skill_eff(p.data, pool[0])
+	check(float(e1.cd) < float(pool[0].cd) and (not pool[0].has("mult") or float(e1.mult) > float(pool[0].mult)), "[%s] ранг 2 сильнее и быстрее" % cls)
+	check(DB.learn_skill(p.data, hi_id) != "", "[%s] ранг 2 умения 12 ур. требует 16 ур." % cls)
+	check(w.drop_on_slot(a0, 0), "[%s] перетаскивание умения в слот 1" % cls)
+	check(w.drop_on_slot(a0, 4) and p.data["loadout"][4] == a0 and p.data["loadout"][0] == hi_id, "[%s] слот на слот — обмен" % cls)
+	check(w._can_drop_slot(Vector2.ZERO, {"skill": a0, "from": -1}, 3), "[%s] слот принимает перетаскивание" % cls)
+	w._drop_bg(Vector2.ZERO, {"skill": hi_id, "from": 0})
+	check(str(p.data["loadout"][0]) == "", "[%s] перетаскивание со слота наружу — снять" % cls)
+	w._reset()
+	check(DB.skill_points_free(p.data) == pts0 and (p.data["loadout"] as Array).count("") == 8, "[%s] сброс умений возвращает очки" % cls)
 	z.hud.close_window()
+	p.data["skill_bonus"] = 60
+	DB.auto_build_skills(p.data)
+	lo = p.data["loadout"]
+	var uniq := {}
+	for id in lo:
+		if id != "": uniq[id] = true
+	check(lo.size() == 8 and uniq.size() == mini(8, pool.size()), "[%s] набор 8 слотов: %s" % [cls, str(lo)])
+	var x0: String = lo[0]; var x1: String = lo[1]
+	DB.set_loadout_slot(p.data, 0, x1)
+	check(p.data["loadout"][0] == x1 and p.data["loadout"][1] == x0, "[%s] перестановка в наборе меняет слоты местами" % cls)
+	await _layout_tests(z, p, cls)
 	# каждое умение срабатывает и бьёт цель
 	var dummy := Enemy.spawn(z, "slime", 1, p.global_position + p.forward() * 3.0, z.fx_root)
 	dummy.max_hp = 999999; dummy.hp = 999999
@@ -1051,7 +1100,7 @@ func _ui_tests(z, p: Player) -> void:
 	check(h.hint_panel.visible and hid != "", "подсказка обучения на экране: %s" % hid)
 	h._hint_done()
 	check(z.data["tutorial"].get(hid, false), "подсказка отмечена как прочитанная")
-	h.show_skill_tooltip(1)
+	h.show_skill_tooltip(0)
 	await frames(3)
 	check(h.tooltip != null and is_instance_valid(h.tooltip), "подсказка к умению (долгое нажатие)")
 	h._hide_tooltip()

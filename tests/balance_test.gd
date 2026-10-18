@@ -122,4 +122,5 @@ func make_char(cls: String, lvl: int, g0: int, g1: int, boss_lvl: int) -> Dictio
 		if c["ascendancy"] == "":
 			for a in DB.ASCENDANCIES:
 				if DB.asc_block_reason(c, a) == "" and (a.get("cls", cls) == cls): c["ascendancy"] = a.id; break
+	DB.auto_build_skills(c)
 	return c

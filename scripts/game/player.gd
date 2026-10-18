@@ -103,14 +103,9 @@ func recalc(fill := false) -> void:
 	var hp_frac: float = hp / stats.max_hp if not stats.is_empty() else 1.0
 	var mp_frac: float = mp / stats.max_mp if not stats.is_empty() else 1.0
 	stats = DB.compute_stats(data)
-	var before: Array = (data.get("loadout", []) as Array).duplicate()
 	DB.ensure_loadout(data)
 	fx = stats.get("fx", {})
 	Projectile.player_fx = fx
-	for id in data["loadout"]:
-		if id != "" and not before.has(id) and not before.is_empty():
-			var sk = DB.find_skill(data, id)
-			if sk: Game.toast("Новое умение «%s» — в наборе" % sk.name, 3.0)
 	hp = stats.max_hp if fill else clampf(hp_frac * stats.max_hp, 1, stats.max_hp)
 	mp = stats.max_mp if fill else clampf(mp_frac * stats.max_mp, 0, stats.max_mp)
 
@@ -415,14 +410,14 @@ func get_skill(slot: int):
 	if slot == 0: return cls.skills[0]
 	var lo: Array = data.get("loadout", [])
 	if slot - 1 >= lo.size(): return null
-	return DB.find_skill(data, str(lo[slot - 1]))
+	var s = DB.find_skill(data, str(lo[slot - 1]))
+	return DB.skill_eff(data, s) if s != null else null
 
 ## "" если доступно, иначе короткая причина для кнопки.
 func lock_reason(slot: int) -> String:
 	if slot == 0: return ""
 	var s = get_skill(slot)
 	if s == null:
-		if slot == 3 and data["ascendancy"] == "": return "ур. %d+" % DB.ASC_LEVEL
 		return "пусто"
 	var r := DB.skill_lock(data, s)
 	if r == "": return ""
@@ -452,7 +447,7 @@ func try_use(slot: int) -> bool:
 	if lock_reason(slot) != "":
 		if slot > 0:
 			var sk = get_skill(slot)
-			if sk == null: Game.toast("Слот пуст — выберите умение в окне «Умения»" if not (slot == 3 and data["ascendancy"] == "") else "Умение пути откроется после превращения (дерево талантов)")
+			if sk == null: Game.toast("Слот пуст — изучите умение и поставьте его в слот в окне «Умения»")
 			else: Game.toast("Умение «%s»: %s" % [sk.name, DB.skill_lock(data, sk)])
 		return false
 	var s = get_skill(slot)

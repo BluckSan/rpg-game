@@ -426,38 +426,100 @@ func find_skill(c: Dictionary, id: String):
 		if s.id == id: return s
 	return null
 
-## "" — умение открыто, иначе причина
-func skill_lock(c: Dictionary, s: Dictionary) -> String:
+# ---------- v0.9.0: изучение и улучшение умений за очки; набор — только вручную, любой слот ----------
+const SKILL_MAX_RANK := 5
+const SKILLS_V := 9
+## Очков умений: 1 на старте, +1 за уровень, +1 за каждые 3 уровня мастерства (+ компенсация при переносе)
+func skill_points_total(c: Dictionary) -> int:
+	return 1 + (int(c["level"]) - 1) + (int(c["class_level"]) - 1) / 3 + int(c.get("skill_bonus", 0))
+func skill_points_spent(c: Dictionary) -> int:
+	var n := 0
+	for k in c.get("skill_ranks", {}): n += int(c["skill_ranks"][k])
+	return n
+func skill_points_free(c: Dictionary) -> int:
+	return skill_points_total(c) - skill_points_spent(c)
+func skill_rank(c: Dictionary, id: String) -> int:
+	return int(c.get("skill_ranks", {}).get(id, 0))
+func skill_base_level(s: Dictionary) -> int:
+	return maxi(1, int(s.get("lvl", 1)))
+## Требуемый уровень героя для ранга r
+func skill_rank_level(s: Dictionary, r: int) -> int:
+	return skill_base_level(s) + 4 * (r - 1)
+
+## Требование открыть умение (уровень/мастерство); "" — доступно для изучения
+func skill_unlock_block(c: Dictionary, s: Dictionary) -> String:
 	if s.has("unlock") and int(c["class_level"]) < int(s.unlock): return "Мастерство %d" % int(s.unlock)
 	if s.has("lvl") and int(c["level"]) < int(s.lvl): return "Уровень %d" % int(s.lvl)
 	return ""
 
-## Привести набор в порядок: убрать недоступные, умение пути — в слот, новые открытые — в пустые слоты
-func ensure_loadout(c: Dictionary) -> void:
+## "" — умение можно применять/ставить в набор (открыто и изучено), иначе причина
+func skill_lock(c: Dictionary, s: Dictionary) -> String:
+	var u := skill_unlock_block(c, s)
+	if u != "": return u
+	if skill_rank(c, s.id) <= 0: return "Не изучено"
+	return ""
+
+## "" — можно изучить/улучшить (следующий ранг), иначе причина
+func skill_learn_block(c: Dictionary, s: Dictionary) -> String:
+	var u := skill_unlock_block(c, s)
+	if u != "": return u
+	var r := skill_rank(c, s.id)
+	if r >= SKILL_MAX_RANK: return "Максимальный ранг"
+	if int(c["level"]) < skill_rank_level(s, r + 1): return "Ранг %d — с %d уровня" % [r + 1, skill_rank_level(s, r + 1)]
+	if skill_points_free(c) <= 0: return "Нет очков умений"
+	return ""
+
+func learn_skill(c: Dictionary, id: String) -> String:
+	var s = find_skill(c, id)
+	if s == null: return "Нет умения"
+	var why := skill_learn_block(c, s)
+	if why != "": return why
+	if not c.has("skill_ranks"): c["skill_ranks"] = {}
+	c["skill_ranks"][id] = skill_rank(c, id) + 1
+	return ""
+
+## Сброс умений: все очки возвращаются, набор очищается
+func reset_skills(c: Dictionary) -> void:
+	c["skill_ranks"] = {}
+	c["loadout"] = ["", "", "", "", "", "", "", ""]
+
+## Умение с учётом ранга: сила +12%/ранг, перезарядка −4%/ранг, мана +5%/ранг, сила поддержки +10%/ранг
+func skill_eff(c: Dictionary, s: Dictionary) -> Dictionary:
+	var r := maxi(1, skill_rank(c, s.id))
+	var e := s.duplicate()
+	e["rank"] = r
+	var k := float(r - 1)
+	if r == 1: return e
+	var muls := {"mult": 1.0 + 0.12 * k, "cd": 1.0 - 0.04 * k, "mana": 1.0 + 0.05 * k, "pow": 1.0 + 0.1 * k}
+	for key in muls:
+		if e.has(key): e[key] = float(e[key]) * muls[key]
+	return e
+
+## Перенос старых героев (до 0.9.0): умения, стоявшие в наборе, — изучены (ранг 1) бесплатно
+func migrate_skills(c: Dictionary) -> void:
+	if int(c.get("skills_v", 0)) >= SKILLS_V: return
+	c["skills_v"] = SKILLS_V
+	if not c.has("skill_ranks"): c["skill_ranks"] = {}
 	var lo: Array = c.get("loadout", [])
-	var cls: Dictionary = CLASSES[c["class"]]
-	if lo.is_empty():
-		lo = [cls.skills[1].id, cls.skills[2].id, "", "", "", "", "", ""]
+	var granted := 0
+	for id in lo:
+		var s = find_skill(c, str(id))
+		if s != null and skill_unlock_block(c, s) == "" and skill_rank(c, s.id) == 0:
+			c["skill_ranks"][s.id] = 1; granted += 1
+	c["skill_bonus"] = int(c.get("skill_bonus", 0)) + granted
+	c.erase("auto_slotted")
+
+## Набор: 8 слотов, любое изученное умение в любой слот; ничего не ставится само
+func ensure_loadout(c: Dictionary) -> void:
+	migrate_skills(c)
+	var lo: Array = c.get("loadout", [])
 	while lo.size() < LOADOUT_SLOTS: lo.append("")
 	lo.resize(LOADOUT_SLOTS)
+	var seen := {}
 	for i in lo.size():
 		var s = find_skill(c, str(lo[i]))
-		if s == null: lo[i] = ""
-	var a := get_asc(c.get("ascendancy", ""))
-	if not a.is_empty() and not lo.has(a.skill.id):
-		# умение пути — в третий слот (кнопка 3), прежнее умение оттуда — в свободный слот
-		if lo[2] != "":
-			var free := lo.find("")
-			if free >= 0: lo[free] = lo[2]
-		lo[2] = a.skill.id
-	var auto: Array = c.get("auto_slotted", [])
-	for s in skill_pool(c):
-		if skill_lock(c, s) == "" and not lo.has(s.id) and not auto.has(s.id):
-			var free := lo.find("")
-			if free < 0: break
-			lo[free] = s.id
-			auto.append(s.id)
-	c["auto_slotted"] = auto
+		if s == null or skill_lock(c, s) != "" or seen.has(str(lo[i])): lo[i] = ""
+		else: seen[str(lo[i])] = true
 	c["loadout"] = lo
 
 func set_loadout_slot(c: Dictionary, slot: int, id: String) -> bool:
@@ -472,6 +534,30 @@ func set_loadout_slot(c: Dictionary, slot: int, id: String) -> bool:
 	lo[slot] = id
 	c["loadout"] = lo
 	return true
+
+## Для тестов и ботов: изучить всё доступное (по рангу 1, затем улучшать по кругу) и заполнить набор
+func auto_build_skills(c: Dictionary, prefer: Array = []) -> void:
+	ensure_loadout(c)
+	var pool := skill_pool(c)
+	var order: Array = []
+	for id in prefer: for s in pool: if s.id == id: order.append(s)
+	for s in pool: if not order.has(s): order.append(s)
+	var guard := 0
+	while skill_points_free(c) > 0 and guard < 200:
+		guard += 1
+		var any := false
+		for s in order:
+			if skill_points_free(c) <= 0: break
+			if skill_learn_block(c, s) == "" and (skill_rank(c, s.id) == 0 or guard > 1):
+				learn_skill(c, s.id); any = true
+		if not any: break
+	var lo: Array = c["loadout"]
+	for s in order:
+		if skill_lock(c, s) == "" and not lo.has(s.id):
+			var f := lo.find("")
+			if f < 0: break
+			lo[f] = s.id
+	c["loadout"] = lo
 
 # ---------------- Персонаж ----------------
 static func xp_to_next(level: int) -> int:
@@ -488,6 +574,7 @@ func new_character(char_name: String, class_id: String, look: Dictionary) -> Dic
 		"gold": 0, "potions": 3, "inventory": [], "equipped": [starter_weapon(class_id)], "stash": [], "dust": 0,
 		"zone": "starter", "has_pos": false, "pos": [0, 0, 0], "zones": {},
 		"created": Time.get_unix_time_from_system(), "play_time": 0.0, "kills": 0,
+		"skills_v": SKILLS_V, "skill_ranks": {}, "loadout": ["", "", "", "", "", "", "", ""],
 	}
 
 func get_equipped(c: Dictionary, slot: int):

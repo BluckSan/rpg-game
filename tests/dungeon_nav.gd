@@ -180,6 +180,7 @@ func _class_run(cls: String) -> void:
 	c["tutorial"] = {"move": true, "attack": true, "jump": true, "talents": true, "shop": true, "boss": true}
 	DB.set_zone_flag(c, "starter", "boss_troll_killed")
 	c["zone"] = "dungeon"; c["has_pos"] = false
+	DB.auto_build_skills(c)
 	Game.save_character(c)
 	Game.play(c); await w(2.0)
 	var d = get_tree().current_scene
