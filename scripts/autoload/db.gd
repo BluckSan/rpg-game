@@ -343,7 +343,10 @@ func refund_block(c: Dictionary, id: int) -> String:
 		for l in tree_nodes[cur]["links"]:
 			if rest.has(l) and not seen.has(l):
 				seen[l] = true; q.append(l)
-	if seen.size() < rest.size(): return "Узел связывает другие изученные"
+	if seen.size() < rest.size():
+		var cut := []
+		for r in rest: if not seen.has(r) and tree_nodes.has(int(r)): cut.append(str(tree_nodes[int(r)]["name"]))
+		return "на нём держатся: %s — сначала верните их" % ", ".join(cut.slice(0, 3))
 	var tmp2 := c.duplicate(true)
 	tmp2["talents"] = rest
 	return _req_broken(tmp2, asc)
@@ -372,6 +375,35 @@ func reset_talents(c: Dictionary) -> void:
 	c["ranks"] = {}
 	c["ascendancy"] = ""
 	c["tree_v"] = TREE_VERSION
+	prune_skills(c)   # v0.9.1: умения отменённого пути — разучены, очки умений возвращаются, слоты освобождаются
+
+## Вернуть узел целиком (все ранги): проверка — как при снятии последнего ранга (связность и требования)
+func refund_node_block(c: Dictionary, id: int) -> String:
+	if not has_talent(c, id): return "Не изучено"
+	var tmp := c.duplicate(true)
+	if not tmp.has("ranks"): tmp["ranks"] = {}
+	tmp["ranks"][str(id)] = 1
+	return refund_block(tmp, id)
+
+func refund_node(c: Dictionary, id: int) -> bool:
+	if refund_node_block(c, id) != "": return false
+	c["talents"].erase(id)
+	c.get("ranks", {}).erase(str(id))
+	return true
+
+## Умения, ставшие недоступными (сброс пути, уровень): ранги снимаются, очки возвращаются, слоты пустеют
+func prune_skills(c: Dictionary) -> int:
+	var n := 0
+	var sr: Dictionary = c.get("skill_ranks", {})
+	for id in sr.keys():
+		var s = find_skill(c, str(id))
+		if s == null or skill_unlock_block(c, s) != "":
+			sr.erase(id); n += 1
+	c["skill_ranks"] = sr
+	var lo: Array = c.get("loadout", [])
+	for i in lo.size():
+		if str(lo[i]) != "" and int(sr.get(str(lo[i]), 0)) <= 0: lo[i] = ""
+	return n
 
 ## Миграция сохранений со старым деревом: очки возвращаются, путь превращения сохраняется
 func migrate_talents(c: Dictionary) -> int:
@@ -511,6 +543,35 @@ func learn_skill(c: Dictionary, id: String) -> String:
 func reset_skills(c: Dictionary) -> void:
 	c["skill_ranks"] = {}
 	c["loadout"] = ["", "", "", "", "", "", "", ""]
+
+## v0.9.1: вернуть один ранг умения (очко возвращается). Ранг 0 — умение разучено и снято со слота
+func skill_refund_block(c: Dictionary, id: String) -> String:
+	if find_skill(c, id) == null: return "Нет умения"
+	if skill_rank(c, id) <= 0: return "Не изучено"
+	return ""
+
+func refund_skill(c: Dictionary, id: String) -> String:
+	var why := skill_refund_block(c, id)
+	if why != "": return why
+	var r := skill_rank(c, id) - 1
+	if r <= 0:
+		(c["skill_ranks"] as Dictionary).erase(id)
+		var lo: Array = c.get("loadout", [])
+		for i in lo.size(): if str(lo[i]) == id: lo[i] = ""
+	else: c["skill_ranks"][id] = r
+	return ""
+
+## Онлайн: те же операции на серверной копии героя (проверка на сервере). "" — принято
+func char_op(c: Dictionary, op: String, arg: String) -> String:
+	match op:
+		"t_alloc": return "" if allocate(c, int(arg)) else alloc_block(c, int(arg))
+		"t_refund": return "" if refund(c, int(arg)) else refund_block(c, int(arg))
+		"t_refund_node": return "" if refund_node(c, int(arg)) else refund_node_block(c, int(arg))
+		"t_reset": reset_talents(c); return ""
+		"s_learn": return learn_skill(c, arg)
+		"s_refund": return refund_skill(c, arg)
+		"s_reset": reset_skills(c); return ""
+	return "Неизвестная операция"
 
 ## Умение с учётом ранга: сила +12%/ранг, перезарядка −4%/ранг, мана +5%/ранг, сила поддержки +10%/ранг
 func skill_eff(c: Dictionary, s: Dictionary) -> Dictionary:

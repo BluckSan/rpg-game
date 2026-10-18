@@ -552,7 +552,14 @@ func c_save(json: String) -> void:
 	if not (c is Dictionary) or str(c.get("id", "")) != p.char_id: return
 	if str(c.get("class", "")) != str(p.data.get("class", "")): return
 	if int(c.get("level", 1)) > int(p.data.get("level", 1)) + 5: return
-	p.data = Game.normalize(c); p.dirty = true
+	c = Game.normalize(c)
+	# v0.9.1: таланты сверх очков — не принимаются (остаются серверные); материалы и ремесло — только через сервер
+	if DB.free_points(c) < 0:
+		for k in ["talents", "ranks", "ascendancy"]: c[k] = p.data.get(k, c[k])
+	c["mats"] = p.data.get("mats", {})
+	if int(c.get("craft_n", 0)) < int(p.data.get("craft_n", 0)):   # сохранение «до ремесла» — золото и вещи с сервера
+		c["gold"] = p.data.get("gold", c["gold"]); c["inventory"] = p.data.get("inventory", c["inventory"]); c["craft_n"] = p.data.craft_n
+	p.data = c; p.dirty = true; p.erase("st_cache")
 
 func _srv_flush(p: Dictionary, force := false) -> void:
 	if not p.dirty: return
@@ -1458,3 +1465,69 @@ func s_pick_ok(did: int, t: String, n: int, it: Dictionary) -> void:
 	var tmp := Loot.spawn(z, z.player.global_position, t, n, it)
 	tmp.grant()
 var picks_ok := 0
+
+# ---------- v0.9.1: таланты, умения и ремесло — с проверкой на сервере ----------
+## Клиент уже применил операцию у себя; сервер повторяет её на своей копии героя. Отказ — сервер
+## присылает свои таланты/умения/материалы (s_char_fix), и клиент откатывается к ним.
+func char_op(op: String, arg: String) -> void:
+	if in_game and _connected(): c_char_op.rpc_id(1, op.left(20), arg.left(40))
+func craft(set_id: String, piece: int) -> void:
+	if in_game and _connected(): c_craft.rpc_id(1, set_id.left(20), piece)
+var char_ops := {"ok": 0, "rejected": 0}
+
+func _srv_fix_pub(c: Dictionary) -> Dictionary:
+	return {"talents": c.get("talents", []), "ranks": c.get("ranks", {}), "ascendancy": c.get("ascendancy", ""), "skill_ranks": c.get("skill_ranks", {}),
+		"loadout": c.get("loadout", []), "mats": c.get("mats", {}), "gold": int(c.get("gold", 0)), "inventory": c.get("inventory", [])}
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_char_op(op: String, arg: String) -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null: return
+	var why := DB.char_op(p.data, op, arg)
+	if why != "":
+		char_ops.rejected += 1
+		s_notice.rpc_id(id, "Сервер отклонил: %s" % why)
+		s_char_fix.rpc_id(id, _srv_fix_pub(p.data))
+		return
+	char_ops.ok += 1
+	p.dirty = true; p.erase("st_cache")
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_craft(set_id: String, piece: int) -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null: return
+	var why := Items.craft_block(p.data, set_id, piece)
+	if why != "":
+		s_notice.rpc_id(id, "Ремесло: %s" % why)
+		s_char_fix.rpc_id(id, _srv_fix_pub(p.data))
+		return
+	var it := Items.craft(p.data, set_id, piece)
+	p.data["craft_n"] = int(p.data.get("craft_n", 0)) + 1
+	p.dirty = true
+	s_craft_ok.rpc_id(id, it, p.data["mats"], int(p.data["gold"]), int(p.data.craft_n))
+
+@rpc("authority", "call_remote", "reliable")
+func s_char_fix(d: Dictionary) -> void:
+	var c: Dictionary = Game.current
+	for k in d: c[k] = d[k]
+	Game.normalize(c)
+	char_fixes += 1
+	var z = get_tree().current_scene
+	if z and z.has_method("apply_character_changes"): z.apply_character_changes(false)
+	if z and "hud" in z and z.hud and z.hud.window and z.hud.window.has_method("refresh"): z.hud.window.refresh()
+var char_fixes := 0
+
+signal crafted(item: Dictionary)
+@rpc("authority", "call_remote", "reliable")
+func s_craft_ok(it: Dictionary, mats: Dictionary, gold: int, n: int) -> void:
+	var c: Dictionary = Game.current
+	c["mats"] = mats; c["gold"] = gold; c["craft_n"] = n
+	c["inventory"].append(it)
+	Game.normalize(c)
+	var z = get_tree().current_scene
+	if z and z.has_method("save"): z.save()
+	crafted.emit(it)

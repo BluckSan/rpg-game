@@ -13,6 +13,7 @@ var d_icon: TextureRect
 var d_title: Label
 var d_body: RichTextLabel
 var pts_lbl: Label
+var refund_btn: Button
 var learn_btn: Button
 var place_btn: Button
 var remove_btn: Button
@@ -34,7 +35,7 @@ func setup(z) -> void:
 	var hint := UIK.label(self, ("Изучите умение за очко, затем перетащите его на любой слот внизу." if Game.desktop else "Изучите умение за очко, затем нажмите «В слот» и выберите любой слот внизу.") + " Новые умения сами в набор не встают.", 21, UIK.MUTED)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	UIK.place(hint, 0.53, 0.9, 0.86, 0.98)
-	var rs := UIK.button(self, "Сбросить", _reset, UIK.BUTTON, 24)
+	var rs := UIK.button(self, "Сбросить все", _reset, UIK.BUTTON, 24)
 	rs.name = "ResetSkills"
 	UIK.place(rs, 0.87, 0.905, 0.98, 0.975)
 	var lp := UIK.panel(self)
@@ -48,7 +49,7 @@ func setup(z) -> void:
 	d_title = UIK.label(dp, "Выберите умение", 34, UIK.ACCENT)
 	UIK.place(d_title, 0.18, 0.84, 0.97, 0.96)
 	d_body = UIK.rich(dp, "", 24)
-	UIK.place(d_body, 0.05, 0.22, 0.95, 0.8)
+	UIK.place(d_body, 0.05, 0.31, 0.95, 0.8)
 	learn_btn = UIK.button(dp, "Изучить", _learn, UIK.GREEN, 26)
 	learn_btn.name = "Learn"
 	UIK.place(learn_btn, 0.04, 0.04, 0.36, 0.18)
@@ -58,6 +59,9 @@ func setup(z) -> void:
 	remove_btn = UIK.button(dp, "Снять", _remove_sel, UIK.BUTTON, 26)
 	remove_btn.name = "Remove"
 	UIK.place(remove_btn, 0.68, 0.04, 0.96, 0.18)
+	refund_btn = UIK.button(dp, "Вернуть ранг", func(): _refund_id(sel_id), Color(0.45, 0.22, 0.16), 24)
+	refund_btn.name = "RefundSkill"
+	UIK.place(refund_btn, 0.68, 0.19, 0.96, 0.29)
 	var sp := UIK.panel(self)
 	UIK.place(sp, 0.02, 0.03, 0.86, 0.25)
 	slots_row = HBoxContainer.new(); slots_row.add_theme_constant_override("separation", 8)
@@ -125,6 +129,12 @@ func refresh() -> void:
 		up.custom_minimum_size.x = 80
 		up.disabled = DB.skill_learn_block(data, s) != ""
 		up.tooltip_text = "Изучить" if r == 0 else "Улучшить до ранга %d" % (r + 1)
+		# v0.9.1: вернуть один ранг (очко возвращается; ранг 0 — умение разучено и снято со слота)
+		var dn := UIK.button(row, "−", _refund_id.bind(s.id), Color(0.45, 0.22, 0.16), 30)
+		dn.name = "Down_" + s.id
+		dn.custom_minimum_size.x = 80
+		dn.disabled = r <= 0
+		dn.tooltip_text = "Вернуть ранг (очко умений вернётся)" if r > 1 else "Разучить (очко вернётся, умение снимется со слота)"
 	UIK.clear(slots_row)
 	var basic: Dictionary = DB.CLASSES[data["class"]].skills[0]
 	_slot_tile(-1, basic)
@@ -245,6 +255,7 @@ func _learn_id(id: String) -> void:
 	var why := DB.learn_skill(data, id)
 	if why != "":
 		Game.toast(why, 1.8); return
+	Net.char_op("s_learn", id)
 	sel_id = id
 	var s = DB.find_skill(data, id)
 	Game.sfx("level")
@@ -253,8 +264,28 @@ func _learn_id(id: String) -> void:
 	zone.player.recalc()
 	_apply()
 
+func _refund_id(id: String) -> void:
+	if DragScroll.dragging or id == "": return
+	var s = DB.find_skill(data, id)
+	var why := DB.refund_skill(data, id)
+	if why != "": Game.toast(why, 1.6); return
+	Net.char_op("s_refund", id)
+	sel_id = id
+	var r := DB.skill_rank(data, id)
+	Game.toast(("«%s»: ранг %d, очко возвращено" % [s.name, r]) if r > 0 else "«%s» разучено — очко возвращено, слот освобождён" % s.name, 2.0)
+	zone.player.recalc()
+	_apply()
+
+var _reset_armed := 0.0
 func _reset() -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	if now - _reset_armed > 3.0:
+		_reset_armed = now
+		Game.toast("Нажмите «Сбросить все» ещё раз: все очки умений вернутся, набор очистится", 3.0)
+		return
+	_reset_armed = 0.0
 	DB.reset_skills(data)
+	Net.char_op("s_reset", "")
 	sel_id = ""; placing = false
 	Game.toast("Умения сброшены, очки возвращены", 2.0)
 	zone.player.recalc()
@@ -265,6 +296,8 @@ func _show_detail() -> void:
 	learn_btn.visible = s != null
 	place_btn.visible = s != null
 	remove_btn.visible = s != null and (data["loadout"] as Array).has(sel_id)
+	refund_btn.visible = s != null and DB.skill_rank(data, sel_id) > 0
+	if refund_btn.visible: refund_btn.text = "Вернуть ранг" if DB.skill_rank(data, sel_id) > 1 else "Разучить"
 	if s == null:
 		d_title.text = "Выберите умение"
 		d_body.text = "Очки умений: +1 за уровень героя и +1 за каждые 3 уровня мастерства.\nИзучите умение (ранг 1), улучшайте до ранга 5: +12% силы и −4% перезарядки за ранг.\nНабор: 8 слотов + основная атака. Любое изученное умение — в любой слот."

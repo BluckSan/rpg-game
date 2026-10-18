@@ -20,6 +20,7 @@ var _pinch := 0.0
 var _press_pos := Vector2.ZERO
 var _dragged := false
 var refund_btn: Button
+var refund_node_btn: Button
 var reset_btn: Button
 var search: LineEdit
 var filter := "all"
@@ -60,10 +61,13 @@ func setup(z) -> void:
 	info_body.mouse_filter = Control.MOUSE_FILTER_PASS
 	learn_btn = UIK.button(info, "Изучить", _learn, UIK.GREEN, 28)
 	learn_btn.name = "Learn"
-	UIK.place(learn_btn, 0.05, 0.03, 0.62, 0.19)
+	UIK.place(learn_btn, 0.03, 0.03, 0.40, 0.19)
 	refund_btn = UIK.button(info, "−1 ранг", _refund, Color(0.45, 0.25, 0.18), 24)
 	refund_btn.name = "Refund"
-	UIK.place(refund_btn, 0.65, 0.03, 0.95, 0.19)
+	UIK.place(refund_btn, 0.42, 0.03, 0.68, 0.19)
+	refund_node_btn = UIK.button(info, "Вернуть узел", _refund_node, Color(0.5, 0.22, 0.16), 22)
+	refund_node_btn.name = "RefundNode"
+	UIK.place(refund_node_btn, 0.70, 0.03, 0.97, 0.19)
 	UIK.place(UIK.label(side, "Пути превращения", 30, UIK.ACCENT, HORIZONTAL_ALIGNMENT_CENTER), 0, 0.415, 1, 0.465)
 	var ap := Control.new(); side.add_child(ap)
 	UIK.place(ap, 0.02, 0.135, 0.98, 0.415)
@@ -444,6 +448,8 @@ func _update_info() -> void:
 	learn_btn.disabled = blk != ""
 	refund_btn.visible = has and n["type"] != "start"
 	refund_btn.disabled = DB.refund_block(data, selected) != ""
+	refund_node_btn.visible = refund_btn.visible and DB.rank(data, selected) > 1
+	refund_node_btn.disabled = DB.refund_node_block(data, selected) != ""
 	UIK.place(info_body, 0.05, 0.22 if (learn_btn.visible or refund_btn.visible) else 0.04, 0.95, 0.78)
 	if blk == "": learn_btn.text = ("+1 ранг (%d/%d)" % [DB.rank(data, selected) + 1, int(n["max_rank"])]) if has else "Изучить"
 	else: learn_btn.text = blk
@@ -502,12 +508,29 @@ func _ascend(a: Dictionary) -> void:
 
 func _learn() -> void:
 	if DB.allocate(data, selected):
+		Net.char_op("t_alloc", str(selected))
 		zone.apply_character_changes(false)
 	refresh()
 
+## v0.9.1: возврат ранга / узла — бесплатно; узел, на котором держатся другие изученные, вернуть нельзя
+## (сначала верните их — причина видна в описании). Онлайн операцию повторяет и проверяет сервер.
 func _refund() -> void:
+	var why := DB.refund_block(data, selected)
+	if why != "": Game.toast("Нельзя вернуть: " + why, 2.2); return
 	if DB.refund(data, selected):
+		Net.char_op("t_refund", str(selected))
 		zone.apply_character_changes(false)
+		Game.toast("Очко таланта возвращено", 1.4)
+	refresh()
+
+func _refund_node() -> void:
+	var why := DB.refund_node_block(data, selected)
+	if why != "": Game.toast("Нельзя вернуть: " + why, 2.2); return
+	var r := DB.rank(data, selected)
+	if DB.refund_node(data, selected):
+		Net.char_op("t_refund_node", str(selected))
+		zone.apply_character_changes(false)
+		Game.toast("Узел возвращён: +%d очк." % r, 1.6)
 	refresh()
 
 func _process(delta: float) -> void:
@@ -526,6 +549,8 @@ func _reset() -> void:
 	reset_btn.text = "Сброс"
 	var had: bool = data["ascendancy"] != ""
 	DB.reset_talents(data)
+	Net.char_op("t_reset", "")
+	zone.hud.refresh_skill_buttons()
 	zone.apply_character_changes(had)
 	Game.toast("Таланты сброшены")
 	refresh()
