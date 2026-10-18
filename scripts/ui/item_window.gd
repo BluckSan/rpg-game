@@ -338,8 +338,12 @@ func _update_detail() -> void:
 					tip_price.text = "Продажа: +%d" % DB.sell_price(it)
 					_act("Продать", func(): sell_selected([str(it.uid)]), true, UIK.GOLD)
 				"stash": _act("В сундук", func(): stash_selected([str(it.uid)]), data["stash"].size() < Items.STASH_SIZE, UIK.BLUE)
-				_: _act("Разобрать +%d" % Items.dust_value(it), func(): dismantle_selected([str(it.uid)]), true, UIK.PURPLE)
-		"eq": _act("Снять", _primary, int(it.slot) != 0, UIK.BUTTON)
+				_:
+					_act("Разобрать +%d" % Items.dust_value(it), func(): dismantle_selected([str(it.uid)]), true, UIK.PURPLE)
+					_upgrade_btn(it)
+		"eq":
+			_act("Снять", _primary, int(it.slot) != 0, UIK.BUTTON)
+			_upgrade_btn(it)
 		"stock":
 			tip_price.text = "Цена: %d" % DB.buy_price(it)
 			_act("Купить", _primary, int(data["gold"]) >= DB.buy_price(it))
@@ -349,6 +353,38 @@ func _update_detail() -> void:
 		"stash":
 			_act("Забрать", func(): take_from_stash([str(it.uid)]), data["inventory"].size() < Items.INVENTORY_SIZE, UIK.GREEN)
 			_act(why if why != "" else "Надеть", func(): _equip(it), why == "", UIK.BUTTON)
+
+## v0.9.2: улучшение +1…+10 (онлайн бросок и списание — на сервере)
+func _upgrade_btn(it: Dictionary) -> void:
+	if Items.up_level(it) >= Items.UP_MAX: return
+	var cost := Items.upgrade_cost(it)
+	var why := Items.upgrade_block(data, it)
+	var txt := "+%d: %d зол." % [int(cost.to), int(cost.gold)]
+	if int(cost.n) > 0: txt += " · %s ×%d" % [Items.MATS[cost.mat].name, int(cost.n)]
+	if int(cost.fail) > 0: txt += " · риск %d%%" % int(cost.fail)
+	var b := _act(txt, func(): upgrade_item(str(it.uid)), why == "", UIK.GOLD)
+	b.name = "UpgradeBtn"; b.tooltip_text = why if why != "" else "Улучшить: характеристики +%d%%" % int(round(Items.UP_STEP * 100))
+
+var _up_wait := false
+func upgrade_item(uid: String) -> void:
+	if _up_wait: return
+	if Net.in_game:
+		_up_wait = true
+		Net.inv("upgrade", [uid], false)
+		var res: Array = ["", {}]
+		for i in 20:
+			res = await Net.inv_result
+			if res[0] == "upgrade": break
+		_up_wait = false
+		_up_result(res[1] if res.size() > 1 else {})
+	else:
+		_up_result(Net.inv("upgrade", [uid]))
+
+func _up_result(r: Dictionary) -> void:
+	if str(r.get("err", "")) != "": Game.toast(str(r.err), 1.6)
+	elif r.get("failed", false): Game.toast("Улучшение не удалось — предмет цел, цена списана", 2.0)
+	else: Game.toast("Улучшено до +%d!" % int(r.get("up", 0)), 1.6); _coin_fx(); _changed()
+	if is_inside_tree(): refresh()
 
 func _still_there() -> bool:
 	match focus_src:
@@ -378,19 +414,19 @@ func _primary() -> void:
 		"eq":
 			if int(focus_item.slot) == 0: err = "Без оружия никак!"
 			else:
-				err = Items.unequip(data, focus_item)
+				err = str(Net.inv("unequip", [str(focus_item.uid)]).err)
 				if err == "": _changed(); focus_item = null
 		"stock":
-			err = DB.shop_buy(data, data["shop"]["stock"].find(focus_item))
+			err = str(Net.inv("buy", [str(focus_item.uid)]).err)
 			if err == "": focus_item = null; _coin_fx()
 		"buyback":
-			err = DB.shop_buyback(data, data["buyback"].find(focus_item))
+			err = str(Net.inv("buyback", [str(focus_item.uid)]).err)
 			if err == "": focus_item = null; _coin_fx()
 	if err != "": Game.toast(err, 1.6)
 	refresh()
 
 func _equip(it: Dictionary, do_refresh := true) -> String:
-	var err := Items.equip(data, it)
+	var err := str(Net.inv("equip", [str(it.uid)]).err)
 	if err == "":
 		focus_item = null
 		_changed()
@@ -406,26 +442,26 @@ func _uids_or_sel(uids) -> Array:
 	return uids if uids is Array else inv_grid.uids()
 
 func sell_selected(uids = null) -> int:
-	var g := Items.sell_many(data, _uids_or_sel(uids))
+	var g := int(Net.inv("sell", _uids_or_sel(uids)).get("n", 0))
 	if g > 0: _coin_fx()
 	inv_grid.selected.clear(); refresh()
 	return g
 
 func dismantle_selected(uids = null) -> int:
-	var d := Items.dismantle_many(data, _uids_or_sel(uids))
+	var d := int(Net.inv("dismantle", _uids_or_sel(uids)).get("n", 0))
 	if d > 0: Game.toast("Разобрано: +%d эфирной пыли" % d, 1.4)
 	inv_grid.selected.clear(); refresh()
 	return d
 
 func stash_selected(uids = null) -> int:
 	var lst := _uids_or_sel(uids)
-	var n := Items.to_stash(data, lst)
+	var n := int(Net.inv("to_stash", lst).get("n", 0))
 	if n < lst.size(): Game.toast("Сундук полон (%d/%d)" % [data["stash"].size(), Items.STASH_SIZE], 1.6)
 	inv_grid.selected.clear(); refresh()
 	return n
 
 func take_from_stash(uids: Array) -> int:
-	var n := Items.from_stash(data, uids)
+	var n := int(Net.inv("from_stash", uids).get("n", 0))
 	if n < uids.size(): Game.toast("Инвентарь полон", 1.6)
 	if side_grid: side_grid.selected.clear()
 	refresh()
@@ -463,8 +499,7 @@ func restock() -> void:
 	var price := DB.shop_restock_price(data["level"])
 	if int(data["gold"]) < price:
 		Game.toast("Не хватает золота", 1.5); return
-	data["gold"] = int(data["gold"]) - price
-	data["shop"]["stock"] = DB.shop_stock(int(data["level"]), data["class"])
+	Net.inv("restock")
 	focus_item = null
 	refresh()
 
@@ -472,8 +507,7 @@ func restock_dust() -> void:
 	var p := restock_dust_price()
 	if int(data.get("dust", 0)) < p:
 		Game.toast("Не хватает эфирной пыли", 1.5); return
-	data["dust"] = int(data["dust"]) - p
-	data["shop"]["stock"] = DB.shop_stock(int(data["level"]), data["class"])
+	Net.inv("restock_dust")
 	focus_item = null
 	refresh()
 
@@ -496,7 +530,7 @@ func _on_action() -> void:
 
 func buy_potion() -> bool:
 	var g: int = data["gold"]
-	var err := DB.shop_buy_potion(data)
+	var err := str(Net.inv("potion_buy", [1]).err)
 	if err != "": Game.toast(err, 1.5)
 	else: _coin_fx()
 	refresh()

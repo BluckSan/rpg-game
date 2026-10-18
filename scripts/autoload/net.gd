@@ -457,6 +457,7 @@ func c_hello(tok: String, char_id: String, proto: int, version: String) -> void:
 		for it in c.get(lst, []): if it is Dictionary and int(it.get("v", 0)) < Items.ITEM_V: need_mig = true
 	if int(c.get("skills_v", 0)) < DB.SKILLS_V: need_mig = true   # v0.9.0: умения из набора — изучены (ранг 1)
 	c = Game.normalize(c)
+	DB.shop_ensure(c)   # v0.9.2: товары лавки — серверные
 	var pos := Vector3.ZERO
 	var cp = c.get("pos", [0, 0, 0])
 	if cp is Array and cp.size() == 3: pos = Vector3(float(cp[0]), float(cp[1]), float(cp[2]))
@@ -556,10 +557,17 @@ func c_save(json: String) -> void:
 	# v0.9.1: таланты сверх очков — не принимаются (остаются серверные); материалы и ремесло — только через сервер
 	if DB.free_points(c) < 0:
 		for k in ["talents", "ranks", "ascendancy"]: c[k] = p.data.get(k, c[k])
-	c["mats"] = p.data.get("mats", {})
-	if int(c.get("craft_n", 0)) < int(p.data.get("craft_n", 0)):   # сохранение «до ремесла» — золото и вещи с сервера
-		c["gold"] = p.data.get("gold", c["gold"]); c["inventory"] = p.data.get("inventory", c["inventory"]); c["craft_n"] = p.data.craft_n
+	# v0.9.2: вещи, золото, зелья, пыль, материалы, лавка — только серверные (клиентским не доверяем)
+	var mismatch := not InvOps.same(c, p.data)
+	for k in InvOps.KEYS:
+		if p.data.has(k): c[k] = p.data[k]
+	if p.data.has("_rev"): c["_rev"] = p.data["_rev"]
+	var lvl_changed := int(c.get("level", 1)) != int(p.data.get("level", 1))
 	p.data = c; p.dirty = true; p.erase("st_cache")
+	if lvl_changed: DB.shop_ensure(c)
+	if mismatch or lvl_changed:
+		inv_stats.resync += 1
+		s_inv.rpc_id(multiplayer.get_remote_sender_id(), "sync", InvOps.pub(c), {"err": ""})
 
 func _srv_flush(p: Dictionary, force := false) -> void:
 	if not p.dirty: return
@@ -1534,3 +1542,45 @@ func s_craft_ok(it: Dictionary, mats: Dictionary, gold: int, n: int) -> void:
 	var z = get_tree().current_scene
 	if z and z.has_method("save"): z.save()
 	crafted.emit(it)
+
+# ---------- v0.9.2: инвентарь и золото — на сервере ----------
+signal inv_result(op: String, r: Dictionary)
+var inv_stats := {"ok": 0, "rejected": 0, "resync": 0}
+var inv_syncs := 0
+
+## Клиент: операция с вещами. Офлайн/не в сети — применяется сразу; онлайн — ещё и на сервере (сервер прав).
+## local=false — не применять у себя (улучшение: бросок делает сервер, ответ — inv_result)
+func inv(op: String, args: Array = [], local := true) -> Dictionary:
+	var r := {"err": ""}
+	if local or not (in_game and _connected()): r = InvOps.apply(Game.current, op, args)
+	if in_game and _connected(): c_inv.rpc_id(1, op.left(20), args.slice(0, 120))
+	return r
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_inv(op: String, args: Array) -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null: return
+	var now := _now()
+	if now - float(p.get("invop_t", 0.0)) > 1.0: p["invop_t"] = now; p["invop_n"] = 0
+	p["invop_n"] = int(p.get("invop_n", 0)) + 1
+	if int(p.invop_n) > 30: return   # не больше 30 операций в секунду
+	var r := InvOps.apply(p.data, op, args)
+	if str(r.get("err", "")) == "": inv_stats.ok += 1
+	else: inv_stats.rejected += 1
+	p.dirty = true; p.erase("st_cache")
+	s_inv.rpc_id(id, op, InvOps.pub(p.data), r)
+
+@rpc("authority", "call_remote", "reliable")
+func s_inv(op: String, state: Dictionary, r: Dictionary) -> void:
+	var c: Dictionary = Game.current
+	if c.is_empty(): return
+	for k in state: c[k] = state[k]
+	Game.normalize(c)
+	inv_syncs += 1
+	var z = get_tree().current_scene
+	if z and z.has_method("apply_character_changes"): z.apply_character_changes(false)
+	if z and "hud" in z and z.hud and z.hud.window and z.hud.window.has_method("refresh"): z.hud.window.refresh()
+	inv_result.emit(op, r)
+

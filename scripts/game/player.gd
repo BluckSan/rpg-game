@@ -476,7 +476,7 @@ func use_potion() -> void:
 	if hp >= stats.max_hp - 1:
 		Game.toast("Здоровье полное")
 		return
-	data["potions"] -= 1
+	Net.inv("potion_use")   # v0.9.2: онлайн зелья считает сервер
 	heal(stats.max_hp * 0.45)
 	visual.play_action("drink")
 	zone().fx("burst", global_position + Vector3.UP, 1.5, Color(1, 0.2, 0.3), 0.5)

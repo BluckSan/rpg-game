@@ -8,9 +8,11 @@ const SLOT_NAMES := ["Оружие", "Броня", "Шлем", "Кольцо", "
 const INVENTORY_SIZE := 40
 const STASH_SIZE := 100
 const SET_RARITY := 4
+const SET_AFFIXES := 4
+const SET_Q_MIN := 0.25
 const CLASS_NAMES := {"warrior": "Воин", "archer": "Лучник", "mage": "Маг"}
 ## v0.8.0: версия формата предметов (8 — плоские характеристики вместо процентов)
-const ITEM_V := 8
+const ITEM_V := 9   # v0.9.2: части комплектов — 4 характеристики уровня «Редкий»+ (миграция migrate_item_v9)
 ## Множитель аффиксов по редкости: обычный, магический, редкий, уникальный, комплект
 const RARITY_MULT := [1.0, 1.08, 1.18, 1.35, 1.25]
 
@@ -128,6 +130,65 @@ static func craft(c: Dictionary, set_id: String, piece: int) -> Dictionary:
 	c["inventory"].append(it)
 	return it
 
+# ---------- v0.9.2: улучшение предметов (+1…+10) за золото, с +6 — материалы боссов ----------
+const UP_MAX := 10
+const UP_STEP := 0.035                       # +3.5% к базе и характеристикам за уровень (+10 = +35%)
+const UP_FAIL := [0, 0, 0, 0, 0, 0, 10, 15, 20, 25, 30]   # % неудачи для перехода на уровень N (предмет не ломается)
+const UP_RAR := [1.0, 1.4, 2.0, 3.2, 2.8]
+
+static func up_level(it: Dictionary) -> int: return clampi(int(it.get("up", 0)), 0, UP_MAX)
+
+## Цена перехода на следующий уровень: золото растёт круто (×1.6 за уровень), с +6 — материал боссов
+static func upgrade_cost(it: Dictionary) -> Dictionary:
+	var nxt := up_level(it) + 1
+	var gold := int(round(12.0 * float(int(it.get("ilvl", 1)) + 4) * float(UP_RAR[clampi(int(it.get("rarity", 0)), 0, 4)]) * pow(1.6, nxt - 1)))
+	var mat := mat_of_set(str(it.get("set", ""))) if nxt >= 6 else ""
+	return {"to": nxt, "gold": gold, "mat": mat, "n": (nxt - 5) if nxt >= 6 else 0, "fail": int(UP_FAIL[mini(nxt, UP_MAX)])}
+
+static func upgrade_block(c: Dictionary, it: Dictionary) -> String:
+	if it.is_empty(): return "Нет предмета"
+	if up_level(it) >= UP_MAX: return "Улучшено до предела (+%d)" % UP_MAX
+	if int(it.get("slot", 0)) != 0 and float(it.get("base", 0)) <= 0 and (it.get("mods", []) as Array).is_empty(): return "Нечего улучшать"
+	var cost := upgrade_cost(it)
+	if int(c.get("gold", 0)) < int(cost.gold): return "Нужно %d золота" % int(cost.gold)
+	if int(cost.n) > 0:
+		var have := int((c.get("mats", {}) as Dictionary).get(cost.mat, 0))
+		if have < int(cost.n): return "Нужно: %s ×%d (есть %d)" % [MATS[cost.mat].name, int(cost.n), have]
+	return ""
+
+## Пересчитать базу и характеристики от исходных (base0/mods0) по уровню улучшения
+static func upgrade_apply(it: Dictionary) -> void:
+	if not it.has("base0"):
+		it["base0"] = float(it.get("base", 0.0)); it["mods0"] = (it.get("mods", []) as Array).duplicate(true)
+		it["name0"] = str(it.get("name", ""))
+	# миграция могла добавить характеристики — исходные пополняются ими
+	var m0: Array = it["mods0"]
+	while m0.size() < (it.mods as Array).size(): m0.append((it.mods[m0.size()] as Array).duplicate())
+	var k := 1.0 + UP_STEP * up_level(it)
+	it["base"] = round(float(it.base0) * k) if float(it.base0) > 0 else 0.0
+	var mods := []
+	for m in m0: mods.append([m[0], round_stat(float(m[1]) * k)])
+	it["mods"] = mods
+	it["name"] = str(it.name0) + (" +%d" % up_level(it) if up_level(it) > 0 else "")
+
+## Улучшить: списать цену; roll — бросок 0..100 (сервер бросает сам). {ok, err, up, failed}
+static func upgrade(c: Dictionary, uid: String, roll := -1.0) -> Dictionary:
+	var it = find_uid(c.get("inventory", []), uid)
+	if it == null: it = find_uid(c.get("equipped", []), uid)
+	if it == null: return {"ok": false, "err": "Нет предмета"}
+	var err := upgrade_block(c, it)
+	if err != "": return {"ok": false, "err": err}
+	var cost := upgrade_cost(it)
+	c["gold"] = int(c["gold"]) - int(cost.gold)
+	if int(cost.n) > 0: c["mats"][cost.mat] = int(c["mats"][cost.mat]) - int(cost.n)
+	if roll < 0.0: roll = randf() * 100.0
+	if roll < float(cost.fail):
+		return {"ok": true, "failed": true, "up": up_level(it), "err": ""}
+	upgrade_apply(it)   # запомнить исходные
+	it["up"] = int(cost.to)
+	upgrade_apply(it)
+	return {"ok": true, "failed": false, "up": int(it.up), "err": ""}
+
 static func tier_of(ilvl: int) -> int: return clampi(ilvl / 9, 0, 2)
 static func req_level(ilvl: int) -> int: return clampi(ilvl, 1, 60)
 
@@ -184,8 +245,10 @@ static func round_stat(v: float) -> float:
 	return round(v) if absf(v) >= 5 else round(v * 10) / 10.0
 
 ## v0.8.0: аффиксы — плоские числа, растут с уровнем предмета и редкостью (никаких процентов)
-static func _affixes(it: Dictionary, n: int, _mult := 1.0) -> void:
+static func _affixes(it: Dictionary, n: int, _mult := 1.0, q_min := 0.0) -> void:
 	var used := []
+	for m in it.mods:
+		for k in DB.AFFIXES.size(): if DB.AFFIXES[k][0] == str(m[0]): used.append(k)
 	var rm: float = RARITY_MULT[clampi(int(it.get("rarity", 0)), 0, RARITY_MULT.size() - 1)]
 	var lv := float(int(it.ilvl) + 4)
 	for i in n:
@@ -195,7 +258,7 @@ static func _affixes(it: Dictionary, n: int, _mult := 1.0) -> void:
 			k = randi() % DB.AFFIXES.size(); guard += 1
 		used.append(k)
 		var a = DB.AFFIXES[k]
-		it.mods.append([a[0], round_stat(randf_range(a[1], a[2]) * lv * rm)])
+		it.mods.append([a[0], round_stat(lerpf(a[1], a[2], randf_range(q_min, 1.0)) * lv * rm)])
 	it["v"] = ITEM_V
 
 ## Комплекты, подходящие уровню предмета (самый высокий доступный тир, иногда — предыдущий)
@@ -226,7 +289,9 @@ static func roll_set(ilvl: int, own_cls: String, set_id := "", piece := -1) -> D
 	var it := {"uid": "%x%x" % [Time.get_ticks_usec(), randi()], "ilvl": ilvl, "slot": int(td.slot), "type": t, "cls": td.cls if sd.cls != "" else "",
 		"req": req_level(ilvl), "mods": [], "rarity": SET_RARITY, "set": set_id, "v": ITEM_V}
 	it.base = round(_base(t, ilvl) * 1.15)
-	_affixes(it, 2, 1.2)
+	# v0.9.2: 4 характеристики с качеством броска от 25% (×1.25) — не хуже «Редкого» (3–4 × 1.18),
+	# чуть ниже «Уникального» (5 × 1.35); плюс бонусы комплекта. Раньше было 2 — слабее «Магического».
+	_affixes(it, SET_AFFIXES, 1.0, SET_Q_MIN)
 	it.name = "%s «%s»" % [td.names[tier_of(ilvl)], sd.name]
 	return it
 
@@ -329,6 +394,8 @@ static func tooltip(c: Dictionary, it: Dictionary, compare := true) -> String:
 	s += "[color=#aaaaaa]%s · %s · ур. предмета %d[/color]\n" % [SLOT_NAMES[int(it.slot)], DB.RARITY_NAMES[clampi(int(it.rarity), 0, 4)], int(it.ilvl)]
 	var req := int(it.get("req", 1))
 	s += "[color=#%s]Требуется уровень %d[/color]\n" % ["ff5555" if req > int(c["level"]) else "cccccc", req]
+	if up_level(it) > 0: s += "[color=#ffd966]Улучшение +%d: характеристики +%d%%[/color]\n" % [up_level(it), int(round(UP_STEP * 100.0 * up_level(it)))]
+	if int(it.get("rarity", 0)) == SET_RARITY: s += "[color=#88cc88]Часть комплекта: 4 характеристики (как «Редкий» и выше) + бонусы комплекта[/color]\n"
 	var cls: String = it.get("cls", "")
 	if cls != "":
 		s += "[color=#%s]Класс: %s%s[/color]\n" % ["ff5555" if cls != c["class"] else "cccccc", CLASS_NAMES.get(cls, cls), "" if cls == c["class"] else " (не ваш класс)"]
@@ -487,8 +554,8 @@ static func migrate(c: Dictionary) -> void:
 	if not c.has("stash"): c["stash"] = []
 	if not c.has("dust"): c["dust"] = 0
 	for lname in ["inventory", "equipped", "stash", "buyback"]:
-		for it in c.get(lname, []): _fix(it, c["class"], int(c["level"])); migrate_item_v8(it)
-	if c.has("shop"): for it in c["shop"].get("stock", []): _fix(it, c["class"], 99); migrate_item_v8(it)
+		for it in c.get(lname, []): _fix(it, c["class"], int(c["level"])); migrate_item_v8(it); migrate_item_v9(it)
+	if c.has("shop"): for it in c["shop"].get("stock", []): _fix(it, c["class"], 99); migrate_item_v8(it); migrate_item_v9(it)
 	for it in (c["equipped"] as Array).duplicate():
 		if int(it.get("req", 1)) > int(c["level"]) or (it.get("cls", "") != "" and it.cls != c["class"]):
 			c["equipped"].erase(it)
@@ -526,7 +593,7 @@ static func _new_range(stat: String) -> Array:
 
 ## Детерминированно: качество старого броска (0..1) сохраняется, значение — по новой формуле
 static func migrate_item_v8(it: Dictionary) -> void:
-	if int(it.get("v", 0)) >= ITEM_V: return
+	if int(it.get("v", 0)) >= 8: return
 	var ilvl := int(it.get("ilvl", 1))
 	var rar := clampi(int(it.get("rarity", 0)), 0, 4)
 	var u := str(it.get("unique", ""))
@@ -552,4 +619,26 @@ static func migrate_item_v8(it: Dictionary) -> void:
 	var mods := []
 	for ns in order: mods.append([ns, round_stat(out[ns])])
 	it["mods"] = mods
-	it["v"] = ITEM_V
+	it["v"] = 8
+
+## v0.9.2: старые части комплектов (2 характеристики) — добираются до 4, слабые броски — до нижней границы.
+## Детерминированно (зерно — uid), чтобы клиент и сервер получили одно и то же.
+static func migrate_item_v9(it: Dictionary) -> void:
+	if int(it.get("v", 0)) >= 9: return
+	it["v"] = 9
+	if int(it.get("rarity", 0)) != SET_RARITY or str(it.get("set", "")) == "": return
+	var rng := RandomNumberGenerator.new(); rng.seed = hash(str(it.get("uid", "")))
+	var lv := float(int(it.get("ilvl", 1)) + 4); var rm: float = RARITY_MULT[SET_RARITY]
+	var used := []
+	for m in it.mods:
+		var r := _new_range(str(m[0]))
+		m[1] = round_stat(maxf(float(m[1]), lerpf(r[0], r[1], SET_Q_MIN) * lv * rm))
+		used.append(str(m[0]))
+	var guard := 0
+	while (it.mods as Array).size() < SET_AFFIXES and guard < 50:
+		guard += 1
+		var a = DB.AFFIXES[rng.randi() % DB.AFFIXES.size()]
+		if used.has(a[0]): continue
+		used.append(a[0])
+		it.mods.append([a[0], round_stat(lerpf(a[1], a[2], rng.randf_range(SET_Q_MIN, 1.0)) * lv * rm)])
+	if it.has("up"): upgrade_apply(it)
