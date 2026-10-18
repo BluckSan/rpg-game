@@ -27,6 +27,7 @@ static func execute(p, s: Dictionary, target) -> bool:
 	var origin: Vector3 = pos + Vector3.UP * 1.3 + p.forward() * 0.6
 	var c: Color = s.color
 	match s.kind:
+		"support": return Support.cast(p, s, target)   # v0.9.0
 		# ---------- воин ----------
 		"ground_slam":
 			p.visual.play_action("slam")

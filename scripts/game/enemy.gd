@@ -34,6 +34,8 @@ var rank := "normal"   # normal | elite | rare | boss (мир)
 var speed_mult := 1.0
 var hits_taken := 0
 var curse_timer := 0.0
+var buffs := {}             # v0.9.0: ослабления от поддержки {kind: {v, t, dur, icon, col, name, good}}
+var taunt_target: Node3D = null
 var ai := "melee"          # melee | ranged | charger | caster | swarm | exploder | healer (DB.ENEMIES[kind].ai)
 var affixes: Array = []     # аффиксы элит/редких (AFFIXES)
 var armor_mult := 1.0       # «Каменнокожий»
@@ -170,7 +172,8 @@ func make_rank(r: String, title := "") -> void:
 func _damage() -> float:
 	var pl := 1
 	if zone and zone.player: pl = int(zone.player.data["level"])
-	return def.dmg * Combat.enemy_dmg_mult(level) * damage_mult * Combat.enemy_dmg_factor(level, pl)
+	var wk: float = 1.0 - float(buffs.weaken.v) if buffs.has("weaken") else 1.0
+	return def.dmg * Combat.enemy_dmg_mult(level) * damage_mult * Combat.enemy_dmg_factor(level, pl) * wk
 
 func _build_model() -> void:
 	match kind:
@@ -229,6 +232,7 @@ func take_damage(dmg: float, crit: bool, elem := "phys") -> float:
 		zone.float_text(global_position + Vector3.UP * 4.5, "Неуязвим", Color(0.8, 0.8, 0.8))
 		return 0.0
 	if curse_timer > 0: dmg *= 1.3
+	if buffs.has("mark"): dmg *= 1.0 + float(buffs.mark.v)
 	var p = zone.player if zone else null
 	if elem != "true" and p != null and "stats" in p and p.stats is Dictionary and not p.stats.is_empty():
 		dmg *= Combat.player_vs_enemy(self, elem, int(p.data["level"]), float(p.stats.get("pen", 0.0)), float(p.stats.get("resred", 0.0)), float(p.stats.get("pen_flat", 0.0)))
@@ -256,6 +260,22 @@ func knockback(dir: Vector3, force: float) -> void:
 		_squash = create_tween()
 		_squash.tween_property(model, "scale", Vector3(base.x * 1.06, base.y * 0.95, base.z * 1.06), 0.05)
 		_squash.tween_property(model, "scale", base, 0.12)
+
+## v0.9.0: метка (+получаемый урон), ослабление (−наносимый урон), замедление, провокация
+func add_debuff(k: String, v: float, dur: float) -> void:
+	var cur: Dictionary = buffs.get(k, {})
+	var nv := maxf(v, float(cur.get("v", 0.0)))
+	buffs[k] = {"id": k, "v": nv, "t": maxf(dur, float(cur.get("t", 0.0))), "dur": dur, "icon": Support.debuff_icon(k), "col": Support.debuff_color(k),
+		"name": Support.debuff_name(k), "good": false}
+	if k == "slow": slow(1.0 - nv, dur)
+	if k == "taunt": _aggro = true
+
+func _tick_debuffs(delta: float) -> void:
+	for k in buffs.keys():
+		buffs[k].t = float(buffs[k].t) - delta
+		if buffs[k].t <= 0.0:
+			buffs.erase(k)
+			if k == "taunt": taunt_target = null
 
 func slow(factor: float, t: float) -> void:
 	_slow_factor = factor; _slow_timer = t
@@ -286,6 +306,7 @@ func _die() -> void:
 	tw.tween_callback(queue_free)
 
 func _choose_target() -> Node3D:
+	if buffs.has("taunt") and taunt_target != null and is_instance_valid(taunt_target) and not ("dead" in taunt_target and taunt_target.dead): return taunt_target
 	var best: Node3D = null
 	var best_d: float = def.aggro * (2.2 if _aggro else 1.0)
 	var p: Player = zone.player
@@ -303,6 +324,7 @@ func _process(delta: float) -> void:
 	if not alive: return
 	if _attack_timer > 0: _attack_timer -= delta
 	if curse_timer > 0: curse_timer -= delta
+	if not buffs.is_empty(): _tick_debuffs(delta)
 	if not _dots.is_empty():
 		for d in _dots.duplicate():
 			d[2] -= delta

@@ -80,6 +80,7 @@ func hit(pid: int, eid: int, amount: float, skill: bool) -> float:
 	if skill and eid == boss_id and cast.get("interrupt", false):
 		_interrupt(pid)
 	if e.get("invuln", false) or (eid == boss_id and t < shield_until): return 0.0
+	amount *= 1.0 + _dbf(e, "mark")   # v0.9.0: метка поддержки (потолок Support.MARK_CAP)
 	e.hp = maxf(0.0, float(e.hp) - amount)
 	p.dealt = float(p.dealt) + amount
 	e.threat[pid] = float(e.threat.get(pid, 0.0)) + amount * float(p.threat_k)
@@ -176,6 +177,8 @@ func _alive_players(arena_only := false) -> Array:
 	return out
 
 func _target(e: Dictionary):
+	var tn = e.get("taunt")   # v0.9.0: провокация — враг бьёт провокатора
+	if tn != null and t < float(tn[1]) and players.has(int(tn[0])) and players[int(tn[0])].alive: return int(tn[0])
 	var arena_only: bool = e.role != "trash"
 	var best = null; var bt := -1.0
 	for pid in _alive_players(arena_only):
@@ -209,13 +212,13 @@ func _enemy_ai(e: Dictionary, dt: float) -> void:
 	if dist > 0.05: e.yaw = atan2(to.x, to.z)
 	var reach: float = float(e.range) + (1.6 if is_boss else 0.6)
 	if dist > reach * 0.9 and e.role != "naiad":
-		var step: float = minf(dist - reach * 0.8, float(e.speed) * dt)
+		var step: float = minf(dist - reach * 0.8, float(e.speed) * dt * (1.0 - _dbf(e, "slow")))
 		e.pos = RaidDefs.clamp_pos(e.pos + to.normalized() * step)
 	e.atk_t = float(e.atk_t) - dt
 	if e.atk_t <= 0.0 and dist <= reach + 0.5:
 		e.atk_t = float(e.interval) * (0.6 if enraged and is_boss else 1.0)
 		_emit(0, {"t": "atk", "id": e.id, "p": tp, "rg": e.ranged})
-		_hurt(tp, float(e.frac) * (2.0 if enraged and is_boss else 1.0), e.pos, false, e.name)
+		_hurt(tp, float(e.frac) * (2.0 if enraged and is_boss else 1.0) * (1.0 - _dbf(e, "weaken")), e.pos, false, e.name)
 
 func _hurt(pid: int, frac: float, src: Vector3, lethal := false, what := "") -> void:
 	if not players.has(pid): return
@@ -643,3 +646,56 @@ func _star_nova() -> void:
 	_start_cast("Сверхновая", 8.0, "Все в щит обелиска (зелёный круг)!", "nova", false)
 	_warn("СВЕРХНОВАЯ! Встаньте в щит обелиска")
 	_note("nova")
+
+
+# ---------------- v0.9.0: поддержка — ослабления врагов и провокация (решает сервер) ----------------
+var support_log := {"mark": 0, "weaken": 0, "slow": 0, "taunt": 0}   # для тестов
+var mark_bonus_dealt := 0.0
+
+func _dbf(e: Dictionary, k: String) -> float:
+	var d = e.get("dbf", {}).get(k)
+	if d == null or t >= float(d[1]): return 0.0
+	return float(d[0])
+
+## eff — Support.resolve(умение); eid — выбранный враг (0 — по области center/radius)
+func apply_support(pid: int, eff: Dictionary, eid: int, center: Vector3) -> int:
+	if not players.has(pid) or not players[pid].alive: return 0
+	var list: Array = []
+	var tgt := str(eff.get("tgt", ""))
+	if tgt == "enemy":
+		var e = enemies.get(eid)
+		if e == null:   # без выбранной цели — ближайший к точке
+			var bd := 6.0
+			for id in enemies:
+				var o = enemies[id]
+				if o.alive and not o.get("hidden", false) and U.flat_dist(o.pos, center) < bd: bd = U.flat_dist(o.pos, center); e = o
+		if e != null: list.append(e)
+	else:
+		var c: Vector3 = players[pid].pos if tgt == "self_area" else Vector3(center.x, 0, center.z)
+		if U.flat_dist(c, players[pid].pos) > 30.0: return 0
+		for id in enemies:
+			var o = enemies[id]
+			if o.alive and not o.get("hidden", false) and U.flat_dist(o.pos, c) < float(eff.get("radius", 4.0)) + 1.0: list.append(o)
+	for e in list:
+		if U.flat_dist(e.pos, players[pid].pos) > 34.0: continue
+		if not e.has("dbf"): e.dbf = {}
+		if eff.has("debuff"):
+			var d: Dictionary = eff.debuff
+			var cur = e.dbf.get(d.kind)
+			var v: float = maxf(float(d.v), float(cur[0]) if cur != null and t < float(cur[1]) else 0.0)
+			e.dbf[d.kind] = [v, t + float(d.dur), float(d.dur)]
+			support_log[d.kind] = int(support_log[d.kind]) + 1
+		if eff.has("taunt"):
+			e.taunt = [pid, t + float(eff.taunt)]
+			e.dbf["taunt"] = [1.0, t + float(eff.taunt), float(eff.taunt)]
+			e.aggro = true
+			support_log.taunt = int(support_log.taunt) + 1
+		_emit(0, {"t": "dbf", "id": e.id, "l": _dbf_pub(e)})
+	return list.size()
+
+func _dbf_pub(e: Dictionary) -> Dictionary:
+	var out := {}
+	for k in e.get("dbf", {}):
+		var d: Array = e.dbf[k]
+		if t < float(d[1]): out[k] = [float(d[0]), float(d[1]) - t, float(d[2])]
+	return out

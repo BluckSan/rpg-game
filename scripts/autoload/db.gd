@@ -54,7 +54,7 @@ const TREE_VERSION := 2
 var CLASSES := {
 	"warrior": {
 		"name": "Воин", "weapon": "Ржавый меч", "color": Color(0.85,0.3,0.2),
-		"desc": "Мастер ближнего боя. Много здоровья и брони.\nПути развития: Берсерк, Паладин, Друид.",
+		"desc": "Мастер ближнего боя. Много здоровья и брони.\nПути развития: Берсерк, Паладин, Друид; поддержка — Знаменосец.",
 		"hp": 140.0, "hp_lvl": 14.0, "mp": 40.0, "mp_lvl": 3.0, "dmg": 12.0, "dmg_lvl": 2.2,
 		"range": 2.6, "interval": 0.75, "ranged": false, "spell": false, "pen": 15.0,
 		"skills": [
@@ -69,7 +69,7 @@ var CLASSES := {
 		]},
 	"archer": {
 		"name": "Лучник", "weapon": "Кривой лук", "color": Color(0.3,0.7,0.3),
-		"desc": "Стреляет издалека, быстрый и ловкий. Высокий шанс крита.\nПути развития: Тень, Друид, Берсерк.",
+		"desc": "Стреляет издалека, быстрый и ловкий. Высокий шанс крита.\nПути развития: Тень, Друид, Берсерк; поддержка — Ловчий.",
 		"hp": 100.0, "hp_lvl": 10.0, "mp": 60.0, "mp_lvl": 4.0, "dmg": 10.0, "dmg_lvl": 2.0,
 		"range": 14.0, "interval": 0.6, "ranged": true, "spell": false,
 		"skills": [
@@ -84,7 +84,7 @@ var CLASSES := {
 		]},
 	"mage": {
 		"name": "Маг", "weapon": "Посох ученика", "color": Color(0.3,0.45,0.95),
-		"desc": "Повелевает стихиями и тьмой. Мощные заклинания, мало здоровья.\nПути развития: Стихийник, Некромант, Паладин.",
+		"desc": "Повелевает стихиями и тьмой. Мощные заклинания, мало здоровья.\nПути развития: Стихийник, Некромант, Паладин; поддержка — Хранитель чар.",
 		"hp": 85.0, "hp_lvl": 8.0, "mp": 120.0, "mp_lvl": 8.0, "dmg": 11.0, "dmg_lvl": 2.4,
 		"range": 13.0, "interval": 0.8, "ranged": true, "spell": true,
 		"skills": [
@@ -131,6 +131,34 @@ var ASCENDANCIES := [
 	 "mods": [["hp%", 30], ["dmg%", 15], ["regen", 3]],
 	 "skill": {"id": "asc_roar", "name": "Рёв зверя", "desc": "Оглушает врагов вокруг и лечит", "kind": "beast_roar", "mult": 2.0, "cd": 14.0, "mana": 20.0, "radius": 6.0, "range": 0.0, "color": Color(0.5,0.9,0.3)}, "skills_extra": [{"id": "asc_maul", "name": "Размах когтей", "desc": "Сокрушительный удар лапами перед собой", "kind": "maul", "mult": 3.0, "cd": 8.0, "mana": 15.0, "radius": 4.0, "range": 4.0, "color": Color(0.6,0.85,0.35), "lvl": 10},
 		{"id": "asc_regrow", "name": "Восстановление", "desc": "Восстанавливает 40% здоровья за 6 с", "kind": "regrowth", "mult": 0.0, "cd": 20.0, "mana": 20.0, "radius": 0.0, "range": 0.0, "color": Color(0.4,1,0.5), "lvl": 12}]},
+	# ---------- v0.9.0: поддержка (только для своего класса) ----------
+	{"id": "herald", "name": "Знаменосец", "cls": "warrior", "support": true, "color": Color(0.95,0.45,0.2),
+	 "desc": "Поддержка воина: знамёна, кличи, ауры брони и урона, провокация.\n+15% здоровья, +20% брони; урона — меньше, чем у боевых путей.",
+	 "mods": [["hp%", 15], ["armor%", 20]],
+	 "skill": {"id": "sp_banner", "name": "Боевое знамя", "desc": "Знамя: группа в радиусе 12 м получает +15% урона на 10 с", "kind": "support", "mult": 0.0, "cd": 18.0, "mana": 25.0, "radius": 12.0, "range": 0.0, "color": Color(1,0.35,0.2), "pow": 1.0, "sup": {"tgt": "aura", "buff": {"mods": [["dmg%", 15.0]], "dur": 10.0}}}, "skills_extra": [{"id": "sp_guard_banner", "name": "Знамя стойкости", "desc": "Группа в радиусе 12 м: +25% брони и +5% снижения урона на 10 с", "kind": "support", "mult": 0.0, "cd": 20.0, "mana": 25.0, "radius": 12.0, "range": 0.0, "color": Color(0.9,0.75,0.3), "pow": 1.0, "sup": {"tgt": "aura", "buff": {"mods": [["armor%", 25.0], ["dr%", 5.0]], "dur": 10.0}}, "lvl": 10},
+		{"id": "sp_rally", "name": "Клич сплочения", "desc": "Лечит группу рядом на 12% здоровья и даёт +10% скорости атаки на 6 с", "kind": "support", "mult": 0.0, "cd": 16.0, "mana": 22.0, "radius": 10.0, "range": 0.0, "color": Color(1,0.55,0.35), "pow": 1.0, "sup": {"tgt": "aura", "heal": 0.12, "buff": {"mods": [["as%", 10.0]], "dur": 6.0}}, "lvl": 10},
+		{"id": "sp_taunt", "name": "Вызов", "desc": "Враги в радиусе 7 м атакуют только вас 4 с; вы получаете +8% снижения урона", "kind": "support", "mult": 0.0, "cd": 12.0, "mana": 15.0, "radius": 7.0, "range": 0.0, "color": Color(1,0.7,0.25), "pow": 1.0, "sup": {"tgt": "self_area", "taunt": 4.0, "buff": {"mods": [["dr%", 8.0]], "dur": 4.0}}, "lvl": 11},
+		{"id": "sp_bulwark", "name": "Заслон", "desc": "Щит союзнику (рамка группы или клик): поглощает 20% его здоровья, 8 с", "kind": "support", "mult": 0.0, "cd": 14.0, "mana": 20.0, "radius": 0.0, "range": 16.0, "color": Color(0.95,0.85,0.5), "pow": 1.0, "sup": {"tgt": "ally", "shield": 0.2, "shield_dur": 8.0}, "lvl": 12},
+		{"id": "sp_crush_roar", "name": "Сокрушающий рёв", "desc": "Враги вокруг (6 м) наносят на 20% меньше урона 8 с", "kind": "support", "mult": 0.0, "cd": 18.0, "mana": 20.0, "radius": 6.0, "range": 0.0, "color": Color(0.8,0.4,0.2), "pow": 1.0, "sup": {"tgt": "self_area", "debuff": {"kind": "weaken", "v": 0.2, "dur": 8.0}}, "lvl": 13},
+		{"id": "sp_warhorn", "name": "Рог войны", "desc": "Группа рядом: +10% скорости бега и +8% сокращения перезарядки на 10 с", "kind": "support", "mult": 0.0, "cd": 24.0, "mana": 25.0, "radius": 12.0, "range": 0.0, "color": Color(1,0.6,0.15), "pow": 1.0, "sup": {"tgt": "aura", "buff": {"mods": [["ms%", 10.0], ["cdr%", 8.0]], "dur": 10.0}}, "lvl": 14}]},
+	{"id": "arcanist", "name": "Хранитель чар", "cls": "mage", "support": true, "color": Color(0.4,0.7,1),
+	 "desc": "Поддержка мага: щиты, ауры маны и перезарядки, порчи на врагов.\n+20% маны, +10% сокращения перезарядки.",
+	 "mods": [["mp%", 20], ["cdr%", 10]],
+	 "skill": {"id": "sp_ward", "name": "Чародейский щит", "desc": "Щит союзнику (или себе): поглощает 25% здоровья, 8 с", "kind": "support", "mult": 0.0, "cd": 10.0, "mana": 22.0, "radius": 0.0, "range": 18.0, "color": Color(0.45,0.75,1), "pow": 1.0, "sup": {"tgt": "ally", "shield": 0.25, "shield_dur": 8.0}}, "skills_extra": [{"id": "sp_clarity", "name": "Аура ясности", "desc": "Группа в радиусе 12 м: +4 маны/с и +10% сокращения перезарядки на 10 с", "kind": "support", "mult": 0.0, "cd": 20.0, "mana": 20.0, "radius": 12.0, "range": 0.0, "color": Color(0.4,0.6,1), "pow": 1.0, "sup": {"tgt": "aura", "buff": {"mods": [["mpregen", 4.0], ["cdr%", 10.0]], "dur": 10.0}}, "lvl": 10},
+		{"id": "sp_dome", "name": "Купол", "desc": "Щит всей группе рядом: 12% здоровья, 8 с", "kind": "support", "mult": 0.0, "cd": 22.0, "mana": 30.0, "radius": 10.0, "range": 0.0, "color": Color(0.6,0.85,1), "pow": 1.0, "sup": {"tgt": "aura", "shield": 0.12, "shield_dur": 8.0}, "lvl": 10},
+		{"id": "sp_hex_weak", "name": "Порча слабости", "desc": "Враги в области (5 м) наносят на 25% меньше урона 8 с", "kind": "support", "mult": 0.0, "cd": 15.0, "mana": 20.0, "radius": 5.0, "range": 16.0, "color": Color(0.65,0.4,1), "pow": 1.0, "sup": {"tgt": "enemy_area", "debuff": {"kind": "weaken", "v": 0.25, "dur": 8.0}}, "lvl": 11},
+		{"id": "sp_frailty", "name": "Знак хрупкости", "desc": "Цель получает на 20% больше урона 8 с", "kind": "support", "mult": 0.0, "cd": 12.0, "mana": 16.0, "radius": 0.0, "range": 18.0, "color": Color(0.85,0.35,0.9), "pow": 1.0, "sup": {"tgt": "enemy", "debuff": {"kind": "mark", "v": 0.2, "dur": 8.0}}, "lvl": 12},
+		{"id": "sp_slow_time", "name": "Вязкое время", "desc": "Враги в области (6 м) замедлены на 50% на 5 с", "kind": "support", "mult": 0.0, "cd": 16.0, "mana": 20.0, "radius": 6.0, "range": 16.0, "color": Color(0.5,0.9,1), "pow": 1.0, "sup": {"tgt": "enemy_area", "debuff": {"kind": "slow", "v": 0.5, "dur": 5.0}}, "lvl": 13},
+		{"id": "sp_replenish", "name": "Восполнение", "desc": "Союзнику: +30% маны и +10% здоровья", "kind": "support", "mult": 0.0, "cd": 18.0, "mana": 15.0, "radius": 0.0, "range": 18.0, "color": Color(0.35,0.55,1), "pow": 1.0, "sup": {"tgt": "ally", "mana": 0.3, "heal": 0.1}, "lvl": 14}]},
+	{"id": "hunter", "name": "Ловчий", "cls": "archer", "support": true, "color": Color(0.45,0.9,0.4),
+	 "desc": "Поддержка лучника: метки, ускорение, лечение.\n+10% скорости бега, +3 регенерации здоровья; −10% собственного урона.",
+	 "mods": [["ms%", 10], ["regen", 3], ["dmg%", -10]],
+	 "skill": {"id": "sp_hunter_mark", "name": "Метка охотника", "desc": "Цель получает на 15% больше урона от всей группы 8 с", "kind": "support", "mult": 0.0, "cd": 12.0, "mana": 14.0, "radius": 0.0, "range": 22.0, "color": Color(1,0.4,0.3), "pow": 1.0, "sup": {"tgt": "enemy", "debuff": {"kind": "mark", "v": 0.15, "dur": 8.0}}}, "skills_extra": [{"id": "sp_tailwind", "name": "Попутный ветер", "desc": "Группа в радиусе 12 м: +10% скорости атаки и +10% бега на 8 с", "kind": "support", "mult": 0.0, "cd": 20.0, "mana": 22.0, "radius": 12.0, "range": 0.0, "color": Color(0.6,1,0.7), "pow": 1.0, "sup": {"tgt": "aura", "buff": {"mods": [["as%", 10.0], ["ms%", 10.0]], "dur": 8.0}}, "lvl": 10},
+		{"id": "sp_mend", "name": "Целебная стрела", "desc": "Лечит союзника (или себя) на 25% здоровья", "kind": "support", "mult": 0.0, "cd": 8.0, "mana": 16.0, "radius": 0.0, "range": 22.0, "color": Color(0.4,1,0.5), "pow": 1.0, "sup": {"tgt": "ally", "heal": 0.25}, "lvl": 10},
+		{"id": "sp_dew", "name": "Роса", "desc": "Группа рядом восстанавливает 15% здоровья за 6 с", "kind": "support", "mult": 0.0, "cd": 18.0, "mana": 20.0, "radius": 10.0, "range": 0.0, "color": Color(0.5,1,0.6), "pow": 1.0, "sup": {"tgt": "aura", "hot": 0.15}, "lvl": 11},
+		{"id": "sp_mark_volley", "name": "Залп меток", "desc": "Враги в области (5 м) получают на 12% больше урона 8 с", "kind": "support", "mult": 0.0, "cd": 16.0, "mana": 18.0, "radius": 5.0, "range": 20.0, "color": Color(1,0.55,0.35), "pow": 1.0, "sup": {"tgt": "enemy_area", "debuff": {"kind": "mark", "v": 0.12, "dur": 8.0}}, "lvl": 12},
+		{"id": "sp_leaf_cloak", "name": "Плащ листвы", "desc": "Союзнику: щит 18% здоровья и +15% бега на 6 с", "kind": "support", "mult": 0.0, "cd": 14.0, "mana": 18.0, "radius": 0.0, "range": 22.0, "color": Color(0.45,0.85,0.35), "pow": 1.0, "sup": {"tgt": "ally", "shield": 0.18, "shield_dur": 6.0, "buff": {"mods": [["ms%", 15.0]], "dur": 6.0}}, "lvl": 13},
+		{"id": "sp_focus", "name": "Сосредоточение", "desc": "Группа рядом: +5% шанса крита на 8 с", "kind": "support", "mult": 0.0, "cd": 22.0, "mana": 22.0, "radius": 12.0, "range": 0.0, "color": Color(1,0.9,0.4), "pow": 1.0, "sup": {"tgt": "aura", "buff": {"mods": [["crit", 5.0]], "dur": 8.0}}, "lvl": 14}]},
 ]
 
 var ENEMIES := {
@@ -394,6 +422,7 @@ func get_asc(id: String) -> Dictionary:
 ## Возвращает "" если можно превратиться, иначе причину.
 func asc_block_reason(c: Dictionary, a: Dictionary) -> String:
 	if c["ascendancy"] != "": return "Путь уже выбран (сброс талантов отменит его)"
+	if a.has("cls") and str(a.cls) != str(c["class"]): return "Только для класса «%s»" % CLASSES[a.cls].name
 	if int(c["level"]) < ASC_LEVEL: return "Нужен %d уровень" % ASC_LEVEL
 	var key := keystone_of(a["id"])
 	if key.is_empty() or not has_talent(c, key["id"]): return "Изучите «%s»" % key.get("name", "?")
@@ -590,11 +619,13 @@ func describe_mod(m: Array) -> String:
 	return ("+" if v >= 0 else "") + vs + " " + STAT_NAMES.get(stat, stat)
 
 ## Итоговые характеристики: класс + уровень + таланты + путь + снаряжение.
-func compute_stats(c: Dictionary) -> Dictionary:
+## extra — временные модификаторы (баффы поддержки v0.9.0): идут через те же потолки
+func compute_stats(c: Dictionary, extra: Array = []) -> Dictionary:
 	var raw := {}
 	var add := func(mods):
 		for m in mods:
 			raw[m[0]] = raw.get(m[0], 0.0) + float(m[1])
+	add.call(extra)
 	var fx := {}
 	for id in c["talents"]:
 		if tree_nodes.has(int(id)):

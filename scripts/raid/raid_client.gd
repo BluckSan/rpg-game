@@ -102,6 +102,9 @@ func handle(ev: Dictionary) -> void:
 			zone.builder.set_gate(bool(ev.gate))
 		"spawn":
 			for e in ev.e: _spawn(e)
+		"dbf":
+			var de = ents.get(int(ev.id))
+			if de and is_instance_valid(de): de.net_debuffs(ev.l)
 		"die":
 			var e = ents.get(int(ev.id))
 			if e and is_instance_valid(e):

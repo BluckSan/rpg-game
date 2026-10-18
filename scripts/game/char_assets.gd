@@ -53,6 +53,10 @@ const ASC_LOOK := {
 	"elementalist": {"hue": 0.55, "sat": 1.4, "val": 1.0, "emis": Color(0.3, 0.7, 1.0), "emis_k": 0.5, "eye": Color(0.5, 0.9, 1), "glow": 3.0, "fx": "orbs", "fx_color": Color(0.4, 0.8, 1)},
 	"necromancer": {"hue": 0.27, "sat": 0.8, "val": 0.32, "skin_mul": Color(0.78, 0.86, 0.78), "eye": Color(0.45, 1, 0.5), "glow": 4.0, "hood": true, "fx": "smoke", "fx_color": Color(0.3, 0.9, 0.4)},
 	"shadow": {"hue": 0.45, "sat": 0.3, "val": 0.22, "skin_mul": Color(0.62, 0.58, 0.7), "eye": Color(0.75, 0.35, 1), "glow": 4.0, "hood": true, "fx": "smoke", "fx_color": Color(0.45, 0.2, 0.7)},
+	# v0.9.0: пути поддержки
+	"herald": {"hue": 0.02, "sat": 1.0, "val": 0.8, "metal": 0.45, "rough": 0.6, "eye": Color(1, 0.6, 0.3), "glow": 2.0, "fx": "halo", "fx_color": Color(1, 0.5, 0.25)},
+	"arcanist": {"hue": 0.58, "sat": 1.1, "val": 1.1, "emis": Color(0.3, 0.6, 1.0), "emis_k": 0.35, "eye": Color(0.5, 0.8, 1), "glow": 2.5, "fx": "orbs", "fx_color": Color(0.45, 0.7, 1)},
+	"hunter": {"hue": 0.3, "sat": 0.9, "val": 0.7, "eye": Color(0.6, 1, 0.5), "glow": 2.0, "hood": true, "fx": "embers", "fx_color": Color(0.5, 1, 0.45)},
 }
 
 static var _scenes := {}

@@ -107,6 +107,9 @@ func _ready() -> void:
 		raid.setup(self, builder.did)
 	party_ui = PartyUI.new(); party_ui.zone = self
 	add_child(party_ui)
+	target_ctl = TargetCtl.new()
+	add_child(target_ctl)
+	target_ctl.setup(self)
 
 	cam_rig = CameraRig.new()
 	add_child(cam_rig)

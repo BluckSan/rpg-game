@@ -188,6 +188,9 @@ func _ready() -> void:
 	var z2 = get_tree().current_scene
 	var pl: Player = z2.player
 	for a in DB.ASCENDANCIES:
+		if str(a.get("cls", pl.data["class"])) != str(pl.data["class"]):   # пути поддержки — только своего класса
+			check(DB.asc_block_reason(pl.data, a).begins_with("Только для класса"), "путь «%s» закрыт другим классам" % a["name"])
+			continue
 		DB.reset_talents(pl.data)
 		pl.data["level"] = 40
 		var key := DB.keystone_of(a["id"])
@@ -467,7 +470,7 @@ func _talent_v2_tests(z, p: Player) -> void:
 				var n: Dictionary = DB.tree_nodes[id]
 				if n["type"] == "keystone" and n["req_asc"] == a["id"]: keys += 1
 		if keys == 3: asc_ok += 1
-	check(asc_ok == 6, "дерево: у каждого пути 3 ветви с ключевыми пассивами (%d/6)" % asc_ok)
+	check(asc_ok == DB.ASCENDANCIES.size() and asc_ok == 9, "дерево: у каждого пути 3 ветви с ключевыми пассивами (%d/9)" % asc_ok)
 	var mods := 0
 	for id in DB.tree_order: if DB.tree_nodes[id]["type"] == "mod": mods += 1
 	check(mods >= 9 and DB.tree_order.size() >= 250, "узлов %d, модификаторов умений %d" % [DB.tree_order.size(), mods])

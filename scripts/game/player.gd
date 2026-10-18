@@ -24,6 +24,8 @@ var hot_timer := 0.0      # лечение со временем
 var hot_rate := 0.0
 var rage_timer := 0.0
 var shield_timer := 0.0
+var buffs := {}               # v0.9.0: баффы поддержки {id: {name, icon, col, t, dur, mods, good}}
+var shield_hp := 0.0          # поглощение урона (щиты поддержки)
 var move_input := Vector2.ZERO
 var attack_held := false
 var _dash_vel := Vector3.ZERO
@@ -102,7 +104,7 @@ func rebuild_visual() -> void:
 func recalc(fill := false) -> void:
 	var hp_frac: float = hp / stats.max_hp if not stats.is_empty() else 1.0
 	var mp_frac: float = mp / stats.max_mp if not stats.is_empty() else 1.0
-	stats = DB.compute_stats(data)
+	stats = DB.compute_stats(data, buff_mods())
 	DB.ensure_loadout(data)
 	fx = stats.get("fx", {})
 	Projectile.player_fx = fx
@@ -130,6 +132,7 @@ func _physics_process(delta: float) -> void:
 			_aura_t = 1.0
 			_aura_tick()
 	if shield_timer > 0: shield_timer -= delta
+	if not buffs.is_empty(): _tick_buffs(delta)
 	if cry_timer > 0: cry_timer -= delta
 	if haste_timer > 0: haste_timer -= delta
 	if hot_timer > 0:
@@ -297,6 +300,7 @@ func respawn(p: Vector3) -> void:
 	Net.notify_teleport()
 	teleport(p)
 	dead = false
+	buffs.clear(); shield_hp = 0.0
 	visual.set_dead(false)
 	recalc(true)
 
@@ -309,6 +313,13 @@ func take_damage(dmg: float, _from: Vector3) -> void:
 		return
 	var dr: float = stats.dr + (0.5 if shield_timer > 0 else 0.0) + (0.12 if cry_timer > 0 else 0.0)
 	var final := dmg * (1.0 - clampf(dr, 0, 0.85))
+	if shield_hp > 0.0 and dmg < stats.max_hp * 3.0:   # щит поддержки (смертельные механики не держит)
+		var ab := minf(shield_hp, final)
+		shield_hp -= ab; final -= ab
+		absorbed += ab
+		if final <= 0.0:
+			zone().float_text(global_position + Vector3.UP * 2.2, "Поглощено", Color(0.6, 0.85, 1.0))
+			return
 	if fx.has("mana_guard") and dmg < stats.max_hp * 3.0:   # смертельные механики боссов мана не держит
 		var part := minf(final * clampf(float(fx["mana_guard"]) / 100.0, 0, 0.8), mp)
 		mp -= part; final -= part
@@ -377,6 +388,33 @@ func _on_hit_fx(e, dmg: float, crit: bool) -> void:
 					o.take_damage(stats.damage * stats.dmg_mult * 0.8, false, "shadow")
 			procs += 1
 	_proc_lock = false
+
+# ---------------- v0.9.0: баффы поддержки ----------------
+var absorbed := 0.0      # для тестов: сколько урона приняли щиты
+func buff_mods() -> Array:
+	var out := []
+	for k in buffs: out.append_array(buffs[k].get("mods", []))
+	return out
+
+func add_buff(b: Dictionary) -> void:
+	var had: bool = buffs.has(b.id) and not (buffs[b.id].get("mods", []) as Array).is_empty()
+	buffs[b.id] = b
+	if had or not (b.get("mods", []) as Array).is_empty(): recalc()
+
+func _tick_buffs(delta: float) -> void:
+	var changed := false
+	for k in buffs.keys():
+		var b: Dictionary = buffs[k]
+		b.t = float(b.t) - delta
+		if b.t <= 0.0:
+			if b.get("shield", false): shield_hp = 0.0
+			if not (b.get("mods", []) as Array).is_empty(): changed = true
+			buffs.erase(k)
+	if changed: recalc()
+
+func clear_buffs() -> void:
+	buffs.clear(); shield_hp = 0.0
+	recalc()
 
 func heal(a: float) -> void:
 	if not dead: hp = minf(stats.max_hp, hp + a)
@@ -463,6 +501,10 @@ func try_use(slot: int) -> bool:
 	return true
 
 func find_target(rng: float):
+	var tc = zone().target_ctl if "target_ctl" in zone() else null
+	if tc != null:
+		var sel = tc.enemy_in_range(global_position, rng)   # v0.9.0: выбранная цель — в приоритете
+		if sel != null: return sel
 	var best = null
 	var best_score := INF
 	var f := forward()

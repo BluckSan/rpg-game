@@ -5,6 +5,12 @@ class_name RemotePlayer
 
 var visual: CharVisual
 var label: Label3D
+var peer_id := 0
+var pname := ""
+var level := 1
+var cls := "warrior"
+var hp_frac := 1.0
+var buffs := {}             # v0.9.0: показ баффов (от сервера, через рамки группы)
 var _init_done := false
 
 static func create(zone_scene: Node, r: Dictionary) -> RemotePlayer:
@@ -18,6 +24,7 @@ static func create(zone_scene: Node, r: Dictionary) -> RemotePlayer:
 	var look: Dictionary = (r.look as Dictionary).duplicate(true) if r.look is Dictionary else {}
 	for k in ["gender", "skin", "face", "hair", "hair_color", "eye_color"]: look[k] = int(look.get(k, 0))
 	n.visual.build(CharAssets.normalize_look(look), r["class"], r.asc)
+	n.pname = str(r.name); n.level = int(r.level); n.cls = str(r["class"])
 	n.label = Label3D.new()
 	n.label.text = "%s · %d" % [r.name, r.level]
 	n.label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -34,6 +41,7 @@ func step(delta: float, pos: Vector3, yaw: float, hp: float) -> void:
 	if global_position.distance_to(pos) > 12.0: global_position = pos   # телепорт / рывок
 	else: global_position = global_position.lerp(pos, minf(1.0, delta * 10.0))
 	rotation.y = lerp_angle(rotation.y, yaw, minf(1.0, delta * 12.0))
+	hp_frac = hp
 	if visual: visual.set_dead(hp <= 0.0)
 
 func act(kind: String, anim: String, speed: float) -> void:

@@ -14,7 +14,7 @@ signal chat_received(from: String, text: String)
 signal roster_changed
 signal party_changed
 
-const PROTOCOL := 3   # v0.8.0: группы и подземелья
+const PROTOCOL := 4   # v0.9.0: поддержка, баффы, выбор цели (v0.8.0 — 3)
 const DEFAULT_HOST := "146.0.76.20"
 const AUTH_PORT := 7780
 const GAME_PORT := 7777
@@ -277,15 +277,18 @@ func _process(delta: float) -> void:
 	if _send_t <= 0.0 and _connected():
 		_send_t = 1.0 / SEND_HZ
 		var p: Node3D = z.player
-		var hp := 1.0
-		if "hp" in p and "stats" in p and p.stats: hp = clampf(float(p.hp) / maxf(1.0, float(p.stats.max_hp)), 0.0, 1.0)
-		c_state.rpc_id(1, str(Game.current.get("zone", "")), p.global_position, p.rotation.y, hp)
+		var hp := 1.0; var mpf := 1.0
+		if "hp" in p and "stats" in p and p.stats:
+			hp = clampf(float(p.hp) / maxf(1.0, float(p.stats.max_hp)), 0.0, 1.0)
+			mpf = clampf(float(p.mp) / maxf(1.0, float(p.stats.max_mp)), 0.0, 1.0)
+		c_state.rpc_id(1, str(Game.current.get("zone", "")), p.global_position, p.rotation.y, hp, mpf)
 	# удалённые игроки — сглаживание
 	for id in remotes:
 		var r: Dictionary = remotes[id]
 		var same: bool = r.zone == zone_key()
 		if same and (r.node == null or not is_instance_valid(r.node)):
 			r.node = RemotePlayer.create(z, r)
+			r.node.peer_id = id
 		elif not same and r.node and is_instance_valid(r.node):
 			r.node.queue_free(); r.node = null
 		if r.node and is_instance_valid(r.node): r.node.step(delta, r.pos, r.yaw, r.hp)
@@ -479,7 +482,7 @@ func _authed(id: int):
 	return p if p != null and p.authed else null
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
-func c_state(zone_id: String, pos: Vector3, yaw: float, hp: float) -> void:
+func c_state(zone_id: String, pos: Vector3, yaw: float, hp: float, mpf: float) -> void:
 	if not is_server: return
 	var id := multiplayer.get_remote_sender_id()
 	var p = _authed(id)
@@ -502,7 +505,7 @@ func c_state(zone_id: String, pos: Vector3, yaw: float, hp: float) -> void:
 		if int(p.viol) > 40:
 			print("server: %s отключён — постоянные рывки сквозь проверку скорости" % p.name)
 			_peer.disconnect_peer(id)
-	p.yaw = yaw; p.hp = clampf(hp, 0.0, 1.0); p.t = now
+	p.yaw = yaw; p.hp = clampf(hp, 0.0, 1.0); p.mp = clampf(mpf, 0.0, 1.0) if is_finite(mpf) else 1.0; p.t = now
 
 ## Рывок/телепорт/возрождение: короткое окно, когда сервер принимает скачок позиции (не чаще раза в 0,4 с)
 @rpc("any_peer", "call_remote", "reliable")
@@ -677,8 +680,20 @@ func _srv_party_state(pid: int) -> Dictionary:
 		var p = players.get(m)
 		if p == null: continue
 		mem.append({"id": m, "name": p.name, "cls": str(p.data.get("class", "warrior")), "lvl": int(p.data.get("level", 1)),
-			"hp": float(p.hp), "zone": str(p.zone), "iid": int(p.iid)})
+			"hp": float(p.hp), "mp": float(p.get("mp", 1.0)), "zone": str(p.zone), "iid": int(p.iid), "tg": p.get("target", ["", 0]),
+			"bf": _srv_buff_pub(p)})
 	return {"id": pid, "leader": pt.leader, "members": mem}
+
+## Баффы игрока для рамок группы: [[id, иконка, цвет, осталось, длительность, бафф?]]
+func _srv_buff_pub(p: Dictionary) -> Array:
+	var out := []
+	var now := _now()
+	var bf: Dictionary = p.get("buffs", {})
+	for k in bf.keys():
+		var b: Dictionary = bf[k]
+		if float(b.until) <= now: bf.erase(k); continue
+		out.append([k, str(b.icon), (b.col as Color).to_html(false), float(b.until) - now, float(b.dur), bool(b.get("good", true))])
+	return out
 
 func _srv_party_send(pid: int) -> void:
 	var st := _srv_party_state(pid)
@@ -881,3 +896,109 @@ func _srv_raids_tick(delta: float) -> void:
 			var l = sim.mlog[int(inst.log_n)]
 			inst.log_n = int(inst.log_n) + 1
 			print("server: #%d %s [%.1f] %s" % [iid, inst.did, l[0], l[1]])
+
+
+# =====================================================================
+# v0.9.0: выбор цели (синхронизация) и поддержка (баффы, лечение, щиты, ослабления)
+# =====================================================================
+var _tg_sent := ["", 0]
+func send_target(k: String, id: int) -> void:
+	if not in_game or not _connected(): return
+	if _tg_sent[0] == k and int(_tg_sent[1]) == id: return
+	_tg_sent = [k, id]
+	c_target.rpc_id(1, k, id)
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_target(k: String, id: int) -> void:
+	if not is_server: return
+	var p = _authed(multiplayer.get_remote_sender_id())
+	if p == null or not (k in ["", "p", "e"]): return
+	p.target = [k, id]
+
+## Данные участника группы по peer id (для рамки цели: мана, баффы) — {} если не в группе
+func party_member(id: int) -> Dictionary:
+	for m in party.get("members", []):
+		if int(m.id) == id: return m
+	return {}
+
+## Клиент: применить умение поддержки (ally — peer союзника или 0; eid — враг подземелья или 0)
+func support_cast(sid: String, ally: int, eid: int, pos: Vector3) -> void:
+	if in_game and _connected(): c_support.rpc_id(1, sid, ally, eid, pos)
+
+## Сервер: характеристики героя по серверным данным (кэш 5 с) — величина поддержки не от клиента
+func _srv_stats(p: Dictionary) -> Dictionary:
+	if not p.has("st_cache") or _now() - float(p.get("st_t", 0.0)) > 5.0:
+		p.st_cache = DB.compute_stats(p.data); p.st_t = _now()
+	return p.st_cache
+
+func _srv_same_group(a: int, b: int) -> bool:
+	if not players.has(a) or not players.has(b): return false
+	var pa = players[a]; var pb = players[b]
+	return int(pa.party) != 0 and int(pa.party) == int(pb.party) and _srv_zone_key(pa) == _srv_zone_key(pb)
+
+var support_stats := {"casts": 0, "rejected": 0, "sent": 0}   # для тестов и журнала
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_support(sid: String, ally: int, eid: int, pos: Vector3) -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null or not pos.is_finite() or float(p.hp) <= 0.0: return
+	var s = DB.find_skill(p.data, sid.left(40))
+	if s == null or not Support.is_support(s) or DB.skill_lock(p.data, s) != "":
+		support_stats.rejected += 1; return
+	var now := _now()
+	if not p.has("sup_cd"): p.sup_cd = {}
+	var e := DB.skill_eff(p.data, s)
+	var st := _srv_stats(p)
+	if now < float(p.sup_cd.get(sid, 0.0)) - 0.6:   # перезарядка на сервере (допуск на задержку сети)
+		support_stats.rejected += 1; return
+	p.sup_cd[sid] = now + float(e.cd) * (1.0 - float(st.get("cdr", 0.0)))
+	var eff: Dictionary = Support.resolve(e)
+	var tgt := str(eff.tgt)
+	var tg: Array = p.get("target", ["", 0])
+	if ally == 0 and str(tg[0]) == "p": ally = int(tg[1])
+	if eid == 0 and str(tg[0]) == "e": eid = int(tg[1])
+	var recips: Array = []
+	match tgt:
+		"self": recips = [id]
+		"ally":
+			if ally != 0 and ally != id and _srv_same_group(id, ally) and (players[ally].pos as Vector3).distance_to(p.pos) <= float(eff.range) + 6.0:
+				recips = [ally]
+			else: recips = [id]
+		"aura":
+			recips = [id]
+			var pt = parties.get(int(p.party))
+			if pt != null:
+				for m in pt.members:
+					if m != id and _srv_same_group(id, m) and (players[m].pos as Vector3).distance_to(p.pos) <= float(eff.radius) + 3.0: recips.append(m)
+		_:
+			if eff.has("buff") or eff.has("shield"): recips = [id]
+	var ally_eff: Dictionary = eff.duplicate(); ally_eff.erase("debuff"); ally_eff.erase("taunt")
+	var payload := {"id": sid, "n": str(s.name), "c": (s.color as Color).to_html(false), "eff": ally_eff, "src": str(p.name)}
+	var dur := float(Support.make_buff(s, ally_eff).dur)
+	for r in recips:
+		if not players.has(r): continue
+		if dur > 0.0:
+			if not players[r].has("buffs"): players[r].buffs = {}
+			players[r].buffs[sid] = {"until": now + dur, "icon": str(UIK.SKILL_ICONS.get(sid, "aura")), "col": s.color, "dur": dur, "good": true}
+		s_support.rpc_id(r, payload)
+		support_stats.sent += 1
+	# враги подземелья: метка, ослабление, замедление, провокация — в серверной RaidSim
+	if (eff.has("debuff") or eff.has("taunt")) and int(p.iid) != 0:
+		var inst = instances.get(int(p.iid))
+		if inst != null and str(p.zone) == inst.zone: inst.sim.apply_support(id, eff, eid, pos)
+	support_stats.casts += 1
+	if int(p.party) != 0: _srv_party_send(int(p.party))
+
+## Клиент: сервер применил поддержку к моему герою
+@rpc("authority", "call_remote", "reliable")
+func s_support(payload: Dictionary) -> void:
+	var z = get_tree().current_scene
+	if z == null or not ("player" in z) or z.player == null: return
+	var s := {"id": str(payload.id), "name": str(payload.n), "color": Color.html(str(payload.c))}
+	Support.apply_to_player(z.player, s, payload.eff, str(payload.src))
+	support_received += 1
+	if str(payload.src) != str(Game.current.get("name", "")):
+		Game.toast("%s: «%s»" % [payload.src, payload.n], 1.6)
+var support_received := 0

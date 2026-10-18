@@ -146,8 +146,8 @@ static func resist_text(kind: String, rank := "normal", is_boss := false) -> Str
 ## Учитывает урон, крит, скорость, умения (×1.5 к базовой атаке), броню/сопротивления/уровни,
 ## урон врага, броню героя, регенерацию, похищение жизни и 5 зелий (по 40%);
 ## уворот от телеграфов: вблизи проходит 50% урона босса, издалека — 35%.
-static func sim_fight(c: Dictionary, kind: String, level: int, rank := "normal") -> Dictionary:
-	var st: Dictionary = DB.compute_stats(c)
+static func sim_fight(c: Dictionary, kind: String, level: int, rank := "normal", extra: Array = []) -> Dictionary:
+	var st: Dictionary = DB.compute_stats(c, extra)
 	var cls: Dictionary = DB.CLASSES[c["class"]]
 	var def: Dictionary = DB.ENEMIES[kind]
 	var plv := int(c["level"])

@@ -9,6 +9,8 @@ var owner_player
 var mult := 0.6
 var life := 25.0
 var hp := 50.0
+var max_hp := 50.0
+var buffs := {}               # v0.9.0: баффы поддержки (урон, броня)
 var attack_timer := 0.0
 var model: Node3D
 var max_ground_err := 0.0       # для тестов: наибольшее отклонение ног от земли
@@ -22,6 +24,7 @@ static func spawn(z, pos: Vector3, owner_p, m: float, lifetime: float) -> Minion
 	var mn := Minion.new()
 	mn.zone = z; mn.owner_player = owner_p; mn.mult = m; mn.life = lifetime
 	mn.hp = owner_p.stats.max_hp * 0.5
+	mn.max_hp = mn.hp
 	mn.collision_layer = 0
 	mn.collision_mask = 1
 	mn.motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
@@ -62,7 +65,24 @@ func snap_to_ground() -> void:
 func ground_error() -> float:
 	return absf(global_position.y - floor_y())
 
+func add_buff(b: Dictionary) -> void:
+	buffs[b.id] = b.duplicate()
+
+## Множители от баффов: урон (dmg%) и защита (armor%/dr%)
+func buff_mult(stat: String) -> float:
+	var v := 0.0
+	for k in buffs:
+		for m in buffs[k].get("mods", []):
+			if m[0] == stat: v += float(m[1])
+	return v / 100.0
+
+func _tick_buffs(delta: float) -> void:
+	for k in buffs.keys():
+		buffs[k].t = float(buffs[k].t) - delta
+		if buffs[k].t <= 0.0: buffs.erase(k)
+
 func take_damage(d: float) -> void:
+	d *= 1.0 - clampf(buff_mult("dr%") + buff_mult("armor%") * 0.3, 0.0, 0.5)
 	hp -= d
 	if hp <= 0: _die()
 
@@ -98,6 +118,7 @@ func _move(motion: Vector3) -> void:
 
 func _physics_process(delta: float) -> void:
 	life -= delta
+	if not buffs.is_empty(): _tick_buffs(delta)
 	if life <= 0 or not is_instance_valid(owner_player):
 		_die()
 		return
@@ -123,7 +144,7 @@ func _physics_process(delta: float) -> void:
 			rotation.y = atan2(dir.x, dir.z)
 	elif t != null and attack_timer <= 0:
 		attack_timer = 1.0
-		owner_player.hit(t, mult, true)
+		owner_player.hit(t, mult * (1.0 + buff_mult("dmg%")), true)
 		(model as MobModel).play_action("attack", 1.3)
 	snap_to_ground()
 	max_ground_err = maxf(max_ground_err, ground_error())

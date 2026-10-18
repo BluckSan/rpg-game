@@ -451,7 +451,7 @@ func _update_info() -> void:
 
 func _build_asc_list() -> void:
 	UIK.clear(asc_list)
-	var order: Array = DB.ASCENDANCIES.duplicate()
+	var order: Array = DB.ASCENDANCIES.filter(func(x): return str(x.get("cls", data["class"])) == str(data["class"]))   # пути поддержки — только своего класса
 	order.sort_custom(func(x, y): return _asc_rank(x) < _asc_rank(y))
 	for a in order:
 		var current: bool = data["ascendancy"] == a["id"]
@@ -464,7 +464,7 @@ func _build_asc_list() -> void:
 		var h := HBoxContainer.new(); row.add_child(h)
 		var stripe := ColorRect.new(); stripe.color = a["color"]; stripe.custom_minimum_size.x = 10; h.add_child(stripe)
 		var status: String = ("Выбран. Умение: " + a["skill"]["name"]) if current else ("Доступен!" if reason == "" else reason)
-		var lbl := UIK.rich(h, "[b]%s[/b]  [font_size=20](%d очк.)[/font_size]\n[font_size=20]%s[/font_size]" % [a["name"], pts, status], 26)
+		var lbl := UIK.rich(h, "[b]%s[/b]%s  [font_size=20](%d очк.)[/font_size]\n[font_size=20]%s[/font_size]" % [a["name"], "  [color=#7fe07f][font_size=20]поддержка[/font_size][/color]" if a.get("support", false) else "", pts, status], 26)
 		lbl.fit_content = true
 		UIK.expand(lbl, 2.5)
 		lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -480,14 +480,16 @@ func _build_asc_list() -> void:
 func _asc_rank(a: Dictionary) -> int:
 	if data["ascendancy"] == a["id"]: return 0
 	if DB.asc_block_reason(data, a) == "": return 1
-	if a.has("class") and a["class"] == data["class"]: return 2
+	if a.has("cls") and a["cls"] == data["class"]: return 2
 	return 3 + DB.ASCENDANCIES.find(a)
 
 func _asc_info(a: Dictionary) -> void:
 	selected = -1
 	info_title.text = a["name"]
-	info_body.text = "%s\n\nУмение: %s — %s\nТребуется: %d ур., ключевой талант региона и %d очков в нём." % [
-		a["desc"], a["skill"]["name"], a["skill"]["desc"], DB.ASC_LEVEL, DB.ASC_REGION_POINTS]
+	var sk := "Умение: %s — %s" % [a["skill"]["name"], a["skill"]["desc"]]
+	for x in a.get("skills_extra", []): sk += "\n• %s (%d ур.) — %s" % [x.name, int(x.get("lvl", 1)), x.desc]
+	info_body.text = "%s\n\n%s\nТребуется: %d ур., ключевой талант региона и %d очков в нём.\nУмения пути изучаются за очки умений и ставятся в любой слот вручную." % [
+		a["desc"], sk, DB.ASC_LEVEL, DB.ASC_REGION_POINTS]
 	learn_btn.visible = false
 	UIK.place(info_body, 0.05, 0.04, 0.95, 0.78)
 	canvas.queue_redraw()
@@ -495,7 +497,7 @@ func _asc_info(a: Dictionary) -> void:
 func _ascend(a: Dictionary) -> void:
 	data["ascendancy"] = a["id"]
 	zone.apply_character_changes(true)
-	Game.toast("Вы стали: %s! Новое умение: %s" % [a["name"], a["skill"]["name"]], 4.0)
+	Game.toast("Вы стали: %s! Новые умения пути — изучите их в окне «Умения»" % a["name"], 4.0)
 	refresh()
 
 func _learn() -> void:

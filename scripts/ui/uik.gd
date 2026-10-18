@@ -292,7 +292,14 @@ const SKILL_ICONS := {"w_attack": "broadsword", "w_spin": "spinning-sword", "w_d
 	"m_chain": "lightning-branches", "m_blink": "teleport", "m_wall": "fire-zone", "m_shield": "magic-shield", "m_lance": "ice-spear",
 	"asc_bloodspin": "bloody-sword", "asc_quake": "quake-stomp", "asc_hammer": "thor-hammer", "asc_consecrate": "holy-symbol",
 	"asc_storm": "lightning-storm", "asc_prison": "ice-cube", "asc_bones": "bone-knife", "asc_curse": "cursed-star",
-	"asc_knives": "thrown-daggers", "asc_vanish": "invisible", "asc_maul": "claw-slashes", "asc_regrow": "regeneration"}
+	"asc_knives": "thrown-daggers", "asc_vanish": "invisible", "asc_maul": "claw-slashes", "asc_regrow": "regeneration",
+	# v0.9.0: поддержка
+	"sp_banner": "swords-emblem", "sp_guard_banner": "checked-shield", "sp_rally": "heart-beats", "sp_taunt": "shouting",
+	"sp_bulwark": "visored-helm", "sp_crush_roar": "wolf-howl", "sp_warhorn": "lightning-frequency",
+	"sp_ward": "magic-shield", "sp_clarity": "crystal-ball", "sp_dome": "aura", "sp_hex_weak": "cursed-star", "sp_frailty": "broken-skull",
+	"sp_slow_time": "hourglass", "sp_replenish": "drop",
+	"sp_hunter_mark": "bullseye", "sp_tailwind": "supersonic-arrow", "sp_mend": "heart-bottle", "sp_dew": "regeneration",
+	"sp_mark_volley": "magnifying-glass", "sp_leaf_cloak": "invisible", "sp_focus": "gem-pendant"}
 const WEAPON_ICONS := {"warrior": "broadsword", "archer": "pocket-bow", "mage": "wizard-staff"}
 const SLOT_ICONS := ["broadsword", "breastplate", "visored-helm", "ring", "item:gloves", "boot-kick", "gem-pendant", "item:belt"]
 const SLOT_ITEM_ICONS := ["item:sword", "item:plate", "item:helm", "item:ring", "item:gloves", "item:boots", "item:amulet", "item:belt"]

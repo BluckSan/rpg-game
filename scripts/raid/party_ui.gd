@@ -61,6 +61,8 @@ func _process(delta: float) -> void:
 	_t -= delta
 	if _t > 0.0: return
 	_t = 0.25
+	if not _pending_blockers.is_empty() and zone and zone.hud:
+		zone.hud.blockers.append_array(_pending_blockers); _pending_blockers.clear()
 	_frames()
 	if Net.in_game:
 		btn.text = "Группа" + (" (%d)" % (Net.party.members.size()) if Net.in_party() else "") + (" !" if not Net.party_invites.is_empty() else "")
@@ -86,11 +88,43 @@ func _frames() -> void:
 		var zk := str(m.zone)
 		zl.text = "погиб" if hpf <= 0.0 else (DB.ZONES[zk].name if DB.ZONES.has(zk) else zk)
 		zl.add_theme_color_override("font_color", Color(1, 0.4, 0.35) if hpf <= 0.0 else UIK.MUTED)
+		# v0.9.0: баффы (свои — локально, чужие — от сервера), выделение выбранного союзника
+		f.set_meta("pid", int(m.id))
+		if zone and zone.hud and zone.player:
+			var bl: Array = zone.hud._player_buffs() if me else zone.hud.party_buffs(m)
+			zone.hud._fill_buffs(f.get_node("Buffs"), bl)
+		var tc = zone.target_ctl if zone else null
+		var sel: bool = tc != null and tc.has_target() and ((me and tc.target == zone.player) or (tc.target is RemotePlayer and int(tc.target.peer_id) == int(m.id)))
+		f.self_modulate = Color(0.6, 1.4, 0.6) if sel else Color.WHITE
+
+var _pending_blockers := []
+func _frame_input(ev: InputEvent, f: Control) -> void:
+	if not (ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and not ev.pressed): return
+	select_member(int(f.get_meta("pid", 0)))
+	get_viewport().set_input_as_handled()
+
+## Выбрать участника группы целью (рамка группы): свой герой или другой игрок в этой же зоне
+func select_member(pid: int) -> bool:
+	var tc = zone.target_ctl if zone else null
+	if tc == null: return false
+	if pid == Net.my_id or pid == 0:
+		tc.select(zone.player); return true
+	var r = Net.remotes.get(pid)
+	if r == null or r.node == null or not is_instance_valid(r.node):
+		Game.toast("Союзник не рядом — выбрать нельзя", 1.4); return false
+	tc.select(r.node)
+	return true
 
 func _frame() -> Control:
 	var p := UIK.panel(frames, Color(0.05, 0.05, 0.07, 0.78), 8)
-	p.custom_minimum_size = Vector2(330, 70)
-	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.custom_minimum_size = Vector2(330, 104)
+	p.mouse_filter = Control.MOUSE_FILTER_STOP   # v0.9.0: нажатие по рамке — выбрать союзника целью
+	p.gui_input.connect(_frame_input.bind(p))
+	if zone and zone.hud: zone.hud.blockers.append(p)
+	else: _pending_blockers.append(p)
+	var bx := HBoxContainer.new(); bx.name = "Buffs"; bx.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bx.add_theme_constant_override("separation", 4)
+	p.add_child(bx); UIK.rect(bx, Vector2(10, 64), Vector2(312, 36))
 	var nl := UIK.label(p, "", 21); nl.name = "Name"; nl.autowrap_mode = TextServer.AUTOWRAP_OFF
 	nl.clip_text = true
 	UIK.rect(nl, Vector2(10, 2), Vector2(312, 30))

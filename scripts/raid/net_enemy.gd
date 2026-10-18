@@ -92,9 +92,18 @@ func net_attack(ranged: bool, target_pos: Vector3) -> void:
 
 func _die() -> void: pass   # погибает только по команде сервера
 
+## v0.9.0: ослабления от сервера (метка, ослабление, замедление, провокация): {вид: [величина, осталось]}
+func net_debuffs(l: Dictionary) -> void:
+	buffs.clear()
+	for k in l:
+		var d: Array = l[k]
+		buffs[k] = {"id": k, "v": float(d[0]), "t": float(d[1]), "dur": maxf(float(d[1]), float(d[2]) if d.size() > 2 else float(d[1])),
+			"icon": Support.debuff_icon(k), "col": Support.debuff_color(k), "name": Support.debuff_name(k), "good": false}
+
 func _process(delta: float) -> void:
 	if not alive: return
 	if curse_timer > 0: curse_timer -= delta
+	if not buffs.is_empty(): _tick_debuffs(delta)
 	if not _dots.is_empty():
 		for dd in _dots.duplicate():
 			dd[2] -= delta

@@ -34,6 +34,14 @@ var window: Control
 var bar_pool := []
 var top_buttons := []
 var blockers := []          # элементы, нажатия на которые не уходят в джойстик/камеру
+var target_btn: SkillButton   # v0.9.0: «Цель» — следующий враг (телефон; на ПК — Tab)
+var target_frame: Panel       # рамка цели вверху: имя, уровень, здоровье, мана, баффы/ослабления
+var tf_name: Label
+var tf_hp: ProgressBar
+var tf_mp: ProgressBar
+var tf_buffs: HBoxContainer
+var self_buffs: HBoxContainer # баффы своего героя (под полосой маны)
+var boss_buffs: HBoxContainer # ослабления на боссе
 var hint_panel: Control
 var hint_label: Label
 var hint_id := ""
@@ -81,6 +89,11 @@ func setup(z) -> void:
 	UIK.icon_rect(gold_box, "two-coins", 30, Color(1, 0.82, 0.3))
 	gold_label = UIK.label(gold_box, "", 24, Color(1, 0.85, 0.4))
 	gold_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	self_buffs = HBoxContainer.new(); self_buffs.name = "SelfBuffs"
+	self_buffs.add_theme_constant_override("separation", 4)
+	self_buffs.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	status.add_child(self_buffs); UIK.rect(self_buffs, Vector2(300, 162), Vector2(330, 36))
+	_build_target_frame()
 
 	xp_bar = UIK.bar(root, Color(0.85, 0.62, 0.15))
 	xp_bar.anchor_left = 0.27; xp_bar.anchor_right = 0.73; xp_bar.anchor_top = 1; xp_bar.anchor_bottom = 1
@@ -127,6 +140,8 @@ func setup(z) -> void:
 	potion_label.visible = false
 	jump_btn = _skill_button("Прыжок", Vector2(-660, -250), 128, Color(0.22, 0.45, 0.7), "jump-across")
 	roll_btn = _skill_button("Кувырок", Vector2(-670, -40), 128, Color(0.3, 0.5, 0.3), "dodging")
+	target_btn = _skill_button("Цель", Vector2(-700, -400), 96, Color(0.55, 0.2, 0.2), "bullseye")
+	target_btn.name = "TargetBtn"
 	add_to_group("hud_listeners")
 	apply_skill_layout()
 
@@ -183,6 +198,11 @@ func setup(z) -> void:
 	boss_res.add_theme_font_size_override("normal_font_size", 21)
 	boss_panel.add_child(boss_res); UIK.rect(boss_res, Vector2(24, 114), Vector2(752, 34))
 	boss_panel.visible = false
+	boss_buffs = HBoxContainer.new(); boss_buffs.name = "BossBuffs"
+	boss_buffs.add_theme_constant_override("separation", 4)
+	boss_buffs.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	boss_panel.add_child(boss_buffs); UIK.rect(boss_buffs, Vector2(24, 152), Vector2(752, 36))
+	boss_panel.offset_bottom = 306
 	boss_bar.move_to_front()
 	refresh_skill_buttons()
 	if zone.data.has("talent_refund"):
@@ -237,6 +257,7 @@ func apply_skill_layout() -> void:
 		for i in range(1, skill_btns.size()):
 			_place(skill_btns[i], Vector2(x0 + (i - 1) * (sz + gap), -24 - sz / 2), sz, 0.5)
 		_place(roll_btn, Vector2(-380, -90), 112)
+		_place(target_btn, Vector2(x0 - (sz + gap) - 20, -24 - sz / 2), 96, 0.5)
 		_place(jump_btn, Vector2(-380, -230), 112)
 		_place(potion_btn, Vector2(-120, -390), 104)
 	else:
@@ -248,6 +269,7 @@ func apply_skill_layout() -> void:
 		var nodes: Array = [roll_btn, jump_btn, skill_btns[5], skill_btns[6], skill_btns[7], skill_btns[8], potion_btn]
 		for k in outer.size():
 			_place(nodes[k], ac + Vector2.from_angle(deg_to_rad(outer[k])) * 440.0, 108)
+		_place(target_btn, ac + Vector2.from_angle(deg_to_rad(202.0)) * 600.0, 100)
 
 func _skill_button(t: String, offset: Vector2, sz: float, c: Color, ic: String) -> SkillButton:
 	var sb := SkillButton.new()
@@ -266,8 +288,9 @@ func refresh_key_hints() -> void:
 	skill_btns[0].key_hint = Controls.key_hint("attack")
 	for i in range(1, skill_btns.size()): skill_btns[i].key_hint = Controls.key_hint("skill_%d" % i)
 	potion_btn.key_hint = Controls.key_hint("potion")
+	target_btn.key_hint = Controls.key_hint("target_next")
 	_key_e = " [%s]" % Controls.key_hint("interact")
-	for b in skill_btns + [potion_btn]: b.queue_redraw()
+	for b in skill_btns + [potion_btn, target_btn]: b.queue_redraw()
 	var help = root.find_child("KeyHelp", false, false)
 	if help:
 		var K := func(a): return Controls.key_hint(a)
@@ -278,7 +301,7 @@ func refresh_key_hints() -> void:
 func refresh_skill_buttons() -> void:
 	for i in range(1, skill_btns.size()):
 		var s = player.get_skill(i)
-		skill_btns[i].text = s.name if s != null else ("Путь" if i == 3 and zone.data["ascendancy"] == "" else "Пусто")
+		skill_btns[i].text = s.name if s != null else "Пусто"
 		skill_btns[i].icon = UIK.icon(UIK.SKILL_ICONS.get(s.id, "magic-swirl")) if s != null else UIK.icon("aura")
 		var sc: Color = s.color if s != null else Color(0.4, 0.4, 0.4)
 		skill_btns[i].color = Color(sc.r * 0.55, sc.g * 0.55, sc.b * 0.55, 1)
@@ -551,6 +574,11 @@ func _touch_down(idx: int, p: Vector2) -> void:
 		roll_btn.set_held(true)
 		press_roll()
 		return
+	if target_btn.visible and target_btn.hit(p):
+		touches[idx] = {"role": "target"}
+		target_btn.set_held(true)
+		if zone.target_ctl: zone.target_ctl.cycle()
+		return
 	if potion_btn.hit(p):
 		touches[idx] = {"role": "potion"}
 		potion_btn.set_held(true)
@@ -559,6 +587,9 @@ func _touch_down(idx: int, p: Vector2) -> void:
 	if Game.desktop and idx == -1:
 		# ЛКМ по миру — атака (удержание — серия ударов)
 		if window == null and not _over_ui(p):
+			# v0.9.0: клик по врагу/союзнику — выбор цели; по пустой земле — сброс цели (и обычная атака)
+			var picked = zone.target_ctl.tap(p) if zone.target_ctl else null
+			if picked != null and not (picked is Enemy): return   # союзник выбран — без атаки
 			touches[idx] = {"role": "skill", "slot": 0}
 			_hold_time[0] = 0.0
 			skill_btns[0].set_held(true)
@@ -569,7 +600,7 @@ func _touch_down(idx: int, p: Vector2) -> void:
 		touches[idx] = {"role": "joy", "origin": p}
 		_set_joy(p, Vector2.ZERO)
 		return
-	touches[idx] = {"role": "cam", "pos": p}
+	touches[idx] = {"role": "cam", "pos": p, "start": p, "t0": Time.get_ticks_msec(), "moved": false}
 
 func _over_ui(p: Vector2) -> bool:
 	for c in [pickup_box, boss_panel, hint_panel, minimap]:
@@ -591,6 +622,7 @@ func _touch_move(idx: int, p: Vector2, rel: Vector2) -> void:
 			player.move_input = Vector2(v.x, -v.y) / JOY_R
 		"cam":
 			t["pos"] = p
+			if p.distance_to(t.get("start", p)) > 18.0: t["moved"] = true
 			var cams := []
 			for k in touches:
 				if touches[k]["role"] == "cam": cams.append(touches[k]["pos"])
@@ -616,6 +648,12 @@ func _touch_up(idx: int) -> void:
 			if t["slot"] == 0: player.attack_held = false
 		"potion":
 			potion_btn.set_held(false)
+		"target":
+			target_btn.set_held(false)
+		"cam":
+			# короткое касание без сдвига — выбор цели (или сброс по пустой земле)
+			if not t.get("moved", true) and Time.get_ticks_msec() - int(t.get("t0", 0)) < 450 and zone.target_ctl and touches.size() == 1:
+				zone.target_ctl.tap(t["pos"])
 		"jump":
 			jump_btn.set_held(false)
 		"roll":
@@ -679,6 +717,8 @@ func _process(delta: float) -> void:
 		var mx := player.max_cooldown(i)
 		skill_btns[i].set_state(clampf(player.cooldowns[i] / mx, 0, 1) if mx > 0 else 0.0, player.cooldowns[i], lock)
 	_update_enemy_bars()
+	_update_target_frame()
+	_fill_buffs(self_buffs, _player_buffs())
 
 func _set_bar(b: ProgressBar, v: float, mx: float, t: String) -> void:
 	b.max_value = mx; b.value = v
@@ -730,6 +770,7 @@ func _update_enemy_bars() -> void:
 	for i in range(used, bar_pool.size()): bar_pool[i].visible = false
 	boss_panel.visible = boss != null
 	if boss != null:
+		_fill_buffs(boss_buffs, boss.buffs.values())
 		_set_bar(boss_bar, boss.hp, boss.max_hp, "%d / %d" % [ceili(boss.hp), roundi(boss.max_hp)])
 		var rec := Combat.boss_rec(boss.kind, boss.level)
 		var rec_c := "ff6655" if int(zone.data["level"]) < rec else "bbffaa"
@@ -835,3 +876,100 @@ func _objective() -> String:
 		if e.alive and e.def.boss: boss_alive = true
 	if boss_alive: return "Цель: победить Древнего тролля в руинах (рек. ур. %d+, череп на карте)" % Combat.boss_rec("troll", 9)
 	return "Цель: портал в Земли Эфира (замок на карте)"
+
+
+# ---------------- v0.9.0: рамка цели и значки баффов ----------------
+func _build_target_frame() -> void:
+	target_frame = UIK.panel(root, Color(0.06, 0.05, 0.08, 0.88))
+	target_frame.name = "TargetFrame"
+	target_frame.anchor_left = 0.5; target_frame.anchor_right = 0.5
+	target_frame.offset_left = -330; target_frame.offset_right = 330; target_frame.offset_top = 10; target_frame.offset_bottom = 112
+	target_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tf_name = UIK.label(target_frame, "", 24, UIK.ACCENT)
+	tf_name.autowrap_mode = TextServer.AUTOWRAP_OFF; tf_name.clip_text = true
+	UIK.rect(tf_name, Vector2(16, 2), Vector2(560, 32))
+	tf_hp = UIK.bar(target_frame, Color(0.75, 0.15, 0.12)); UIK.rect(tf_hp, Vector2(16, 36), Vector2(400, 28))
+	tf_hp.get_node("Text").add_theme_font_size_override("font_size", 17)
+	tf_mp = UIK.bar(target_frame, Color(0.2, 0.4, 0.95)); UIK.rect(tf_mp, Vector2(16, 68), Vector2(400, 14))
+	tf_mp.get_node("Text").visible = false
+	tf_buffs = HBoxContainer.new(); tf_buffs.name = "Buffs"
+	tf_buffs.add_theme_constant_override("separation", 4)
+	tf_buffs.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	target_frame.add_child(tf_buffs); UIK.rect(tf_buffs, Vector2(426, 36), Vector2(224, 40))
+	var x := UIK.button(target_frame, "×", func(): if zone.target_ctl: zone.target_ctl.clear(), Color(0.35, 0.2, 0.2), 24)
+	x.name = "Clear"
+	x.custom_minimum_size = Vector2(56, 40); UIK.rect(x, Vector2(596, 2), Vector2(56, 40))
+	blockers.append(x)
+	target_frame.visible = false
+
+func _player_buffs() -> Array:
+	var out: Array = player.buffs.values()
+	if player.shield_hp > 0.0:
+		out = out.duplicate()
+		out.append({"id": "_shield", "icon": "magic-shield", "col": Color(0.6, 0.85, 1.0), "t": -1.0, "dur": 0.0, "good": true, "name": "Щит: %d" % roundi(player.shield_hp)})
+	return out
+
+## Значки: [{icon, col, t (осталось; <0 — без таймера), good, name}]
+func _fill_buffs(box: HBoxContainer, list: Array) -> void:
+	if box == null: return
+	while box.get_child_count() < mini(list.size(), 8):
+		var ic := TextureRect.new()
+		ic.custom_minimum_size = Vector2(34, 34)
+		ic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		ic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var bg := ColorRect.new(); bg.name = "Bg"; bg.show_behind_parent = true; bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		ic.add_child(bg); UIK.full(bg)
+		var tl := UIK.label(ic, "", 14, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT); tl.name = "T"
+		tl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		tl.add_theme_color_override("font_outline_color", Color.BLACK); tl.add_theme_constant_override("outline_size", 4)
+		UIK.rect(tl, Vector2(-6, 16), Vector2(40, 20))
+		box.add_child(ic)
+	for i in box.get_child_count():
+		var ic: TextureRect = box.get_child(i)
+		ic.visible = i < list.size()
+		if not ic.visible: continue
+		var b: Dictionary = list[i]
+		ic.texture = UIK.icon(str(b.get("icon", "aura")))
+		ic.modulate = b.get("col", Color.WHITE)
+		(ic.get_node("Bg") as ColorRect).color = Color(0.1, 0.35, 0.12, 0.85) if b.get("good", true) else Color(0.45, 0.08, 0.08, 0.85)
+		var tt := float(b.get("t", -1.0))
+		(ic.get_node("T") as Label).text = ("%d" % ceili(tt)) if tt >= 0.0 else ""
+		ic.tooltip_text = str(b.get("name", ""))
+
+## Баффы удалённого игрока — из состояния группы (сервер)
+static func party_buffs(m: Dictionary) -> Array:
+	var out := []
+	for b in m.get("bf", []):
+		out.append({"id": str(b[0]), "icon": str(b[1]), "col": Color.html(str(b[2])), "t": float(b[3]), "dur": float(b[4]), "good": bool(b[5])})
+	return out
+
+func _update_target_frame() -> void:
+	var tc = zone.target_ctl
+	var t = tc.target if tc and tc.has_target() else null
+	target_frame.visible = t != null
+	if t == null: return
+	var nm := ""; var lvl := 0; var hpv := 1.0; var hpm := 1.0; var mpf := -1.0; var bl: Array = []
+	var col := UIK.ACCENT
+	if t is Enemy:
+		nm = t.display_name; lvl = t.level; hpv = t.hp; hpm = t.max_hp
+		bl = t.buffs.values()
+		if t.curse_timer > 0: bl = bl.duplicate(); bl.append({"icon": "cursed-star", "col": Color(0.6, 0.3, 0.9), "t": t.curse_timer, "good": false, "name": "Проклятие"})
+		col = Color(1, 0.45, 0.4)
+	elif t is Player:
+		nm = str(zone.data["name"]) + " (вы)"; lvl = int(zone.data["level"]); hpv = t.hp; hpm = t.stats.max_hp
+		mpf = t.mp / maxf(1.0, t.stats.max_mp); bl = _player_buffs(); col = Color(0.5, 1, 0.55)
+	elif t is RemotePlayer:
+		nm = t.pname; lvl = t.level; hpv = t.hp_frac; hpm = 1.0
+		var m := Net.party_member(int(t.peer_id))
+		if not m.is_empty(): mpf = float(m.get("mp", 1.0)); bl = party_buffs(m)
+		col = Color(0.5, 0.85, 1.0)
+	elif t is Minion:
+		nm = "Скелет (призванный)"; lvl = int(zone.data["level"]); hpv = t.hp; hpm = t.max_hp
+		bl = t.buffs.values(); col = Color(0.6, 1, 0.6)
+	tf_name.text = "%s · ур. %d" % [nm, lvl]
+	tf_name.add_theme_color_override("font_color", col)
+	_set_bar(tf_hp, hpv, hpm, ("%d / %d" % [ceili(hpv), roundi(hpm)]) if hpm > 1.0 else "%d%%" % roundi(hpv * 100.0))
+	tf_mp.visible = mpf >= 0.0
+	if mpf >= 0.0: tf_mp.max_value = 1.0; tf_mp.value = mpf
+	_fill_buffs(tf_buffs, bl)
