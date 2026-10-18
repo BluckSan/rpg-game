@@ -453,7 +453,7 @@ func c_hello(tok: String, char_id: String, proto: int, version: String) -> void:
 	var p := {"authed": true, "acc": int(d.account_id), "user": str(d.username), "char_id": char_id, "name": str(c.get("name", "?")),
 		"data": c, "zone": str(c.get("zone", "starter")), "pos": pos, "yaw": 0.0, "hp": 1.0, "t": _now(), "tp_until": _now() + 5.0,
 		"tp_t": 0.0, "viol": 0, "budget": 24.0, "dirty": false, "save_t": _now(), "chat_t": 0.0, "chat_n": 0,
-		"party": 0, "iid": 0, "inv_t": 0.0}
+		"party": 0, "iid": 0, "inv_t": 0.0, "inv_n": 0}
 	if RaidDefs.is_raid_zone(p.zone): p.zone = "starter"; c["zone"] = "starter"; c["has_pos"] = false
 	players[id] = p
 	var roster := []
@@ -686,8 +686,11 @@ func c_party_invite(pname: String) -> void:
 	var p = _authed(id)
 	if p == null: return
 	var now := _now()
-	if now - float(p.inv_t) < 1.0: return
-	p.inv_t = now
+	# антиспам: не больше 6 приглашений за 3 с (лидер может пригласить всю группу разом)
+	if now - float(p.inv_t) > 3.0:
+		p.inv_t = now; p.inv_n = 0
+	p.inv_n = int(p.inv_n) + 1
+	if int(p.inv_n) > 6: return
 	var tid := _srv_find(pname.left(40))
 	if tid == 0 or tid == id: s_notice.rpc_id(id, "Игрок «%s» не в сети" % pname.left(40)); return
 	if int(players[tid].party) != 0: s_notice.rpc_id(id, "%s уже в группе" % players[tid].name); return
