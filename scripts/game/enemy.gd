@@ -78,7 +78,7 @@ static func spawn(z, k: String, lvl: int, pos: Vector3, parent: Node) -> Enemy:
 	e.level = lvl
 	e.ai = String(e.def.get("ai", "ranged" if e.def.ranged else "melee"))
 	e.radius = e.def.radius
-	e.max_hp = e.def.hp * (1 + (lvl - 1) * 0.22)
+	e.max_hp = e.def.hp * Combat.enemy_hp_mult(lvl)
 	e.hp = e.max_hp
 	e.home = pos
 	e._wander_target = pos
@@ -170,7 +170,7 @@ func make_rank(r: String, title := "") -> void:
 func _damage() -> float:
 	var pl := 1
 	if zone and zone.player: pl = int(zone.player.data["level"])
-	return def.dmg * (1 + (level - 1) * 0.18) * damage_mult * Combat.enemy_dmg_factor(level, pl)
+	return def.dmg * Combat.enemy_dmg_mult(level) * damage_mult * Combat.enemy_dmg_factor(level, pl)
 
 func _build_model() -> void:
 	match kind:
@@ -231,7 +231,7 @@ func take_damage(dmg: float, crit: bool, elem := "phys") -> float:
 	if curse_timer > 0: dmg *= 1.3
 	var p = zone.player if zone else null
 	if elem != "true" and p != null and "stats" in p and p.stats is Dictionary and not p.stats.is_empty():
-		dmg *= Combat.player_vs_enemy(self, elem, int(p.data["level"]), float(p.stats.get("pen", 0.0)), float(p.stats.get("resred", 0.0)))
+		dmg *= Combat.player_vs_enemy(self, elem, int(p.data["level"]), float(p.stats.get("pen", 0.0)), float(p.stats.get("resred", 0.0)), float(p.stats.get("pen_flat", 0.0)))
 	hp -= dmg
 	hits_taken += 1
 	_flash = 0.12

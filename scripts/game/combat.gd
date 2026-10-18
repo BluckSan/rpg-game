@@ -9,7 +9,7 @@ class_name Combat
 const ARMOR_K := 8.0
 const RES_CAP := 75.0
 const RES_MIN := -50.0
-const PEN_CAP := 60.0
+const PEN_CAP := 40.0
 
 const ELEM_NAMES := {"phys": "физ.", "fire": "огонь", "ice": "лёд", "lightning": "молния", "poison": "яд",
 	"shadow": "тьма", "holy": "свет", "arcane": "эфир"}
@@ -87,23 +87,33 @@ static func enemy_resist(kind: String, elem: String, rank: String, is_boss: bool
 	if v > 0: v += float(RANK_RES.get(r, 0.0))
 	return clampf(v, RES_MIN, RES_CAP)
 
-static func armor_factor(armor: float, att_level: int, pen_pct: float) -> float:
-	var a := armor * (1.0 - clampf(pen_pct, 0, PEN_CAP) / 100.0)
+## v0.8.0: pen_flat — плоское пробивание со снаряжения (вычитается из брони цели до процентов)
+static func armor_factor(armor: float, att_level: int, pen_pct: float, pen_flat := 0.0) -> float:
+	var a := maxf(0.0, armor - pen_flat) * (1.0 - clampf(pen_pct, 0, PEN_CAP) / 100.0)
 	return 1.0 - a / (a + ARMOR_K * maxi(1, att_level))
 
 static func resist_factor(res: float, res_red: float) -> float:
 	var r := res - res_red if res > 0 else res
 	return 1.0 - clampf(r, RES_MIN, RES_CAP) / 100.0
 
-## Урон по цели выше вас: −15% за каждый уровень сверх +2 (не ниже 10%)
+## v0.8.0: урон по цели выше вас: −12% за каждый уровень разницы (не ниже 10%)
 static func level_factor(att_level: int, def_level: int) -> float:
 	var d := def_level - att_level
-	return maxf(0.1, 1.0 - 0.15 * (d - 2)) if d > 2 else 1.0
+	return maxf(0.1, 1.0 - 0.12 * d) if d > 0 else 1.0
 
-## Урон врага по герою ниже его уровня: +12% за уровень сверх +2
+## v0.8.0: урон врага по герою ниже его уровня: +10% за каждый уровень разницы
 static func enemy_dmg_factor(enemy_level: int, player_level: int) -> float:
 	var d := enemy_level - player_level
-	return 1.0 + 0.12 * (d - 2) if d > 2 else 1.0
+	return 1.0 + 0.1 * d if d > 0 else 1.0
+
+## v0.8.0: рост здоровья и урона врагов с уровнем (слегка ускоряется — под рост снаряжения)
+static func enemy_hp_mult(level: int) -> float:
+	return (1.0 + (level - 1) * 0.22) * (1.0 + (level - 1) * 0.035)
+static func enemy_dmg_mult(level: int) -> float:
+	return (1.0 + (level - 1) * 0.18) * (1.0 + (level - 1) * 0.02)
+## Похищение жизни: за удар не больше 1.5% здоровья (в секунду — не больше 3%)
+const LEECH_HIT_CAP := 0.015
+const LEECH_SEC_CAP := 0.03
 
 ## Опыт и добыча с врагов, которые намного ниже героя
 static func reward_factor(player_level: int, enemy_level: int) -> float:
@@ -111,10 +121,10 @@ static func reward_factor(player_level: int, enemy_level: int) -> float:
 	return maxf(0.2, 1.0 - (diff - 4) * 0.2) if diff > 4 else 1.0
 
 ## Полный множитель урона героя по врагу e
-static func player_vs_enemy(e, elem: String, att_level: int, pen: float, res_red: float) -> float:
+static func player_vs_enemy(e, elem: String, att_level: int, pen: float, res_red: float, pen_flat := 0.0) -> float:
 	var f := level_factor(att_level, e.level)
 	if elem == "phys":
-		f *= armor_factor(enemy_armor(e.kind, e.level, e.rank, e.def.boss) * (float(e.armor_mult) if "armor_mult" in e else 1.0), att_level, pen)
+		f *= armor_factor(enemy_armor(e.kind, e.level, e.rank, e.def.boss) * (float(e.armor_mult) if "armor_mult" in e else 1.0), att_level, pen, pen_flat)
 	else:
 		var rb: float = float(e.res_bonus) if "res_bonus" in e else 0.0
 		f *= resist_factor(clampf(enemy_resist(e.kind, elem, e.rank, e.def.boss) + rb, RES_MIN, RES_CAP), res_red)
@@ -147,13 +157,13 @@ static func sim_fight(c: Dictionary, kind: String, level: int, rank := "normal")
 	var dps: float = hit / float(cls.interval) * st.attack_speed * 1.5
 	var fake := {"kind": kind, "level": level, "rank": rank, "def": def}
 	var f := level_factor(plv, level)
-	if elem == "phys": f *= armor_factor(enemy_armor(kind, level, rank, def.boss), plv, st.get("pen", 0.0))
+	if elem == "phys": f *= armor_factor(enemy_armor(kind, level, rank, def.boss), plv, st.get("pen", 0.0), st.get("pen_flat", 0.0))
 	else: f *= resist_factor(enemy_resist(kind, elem, rank, def.boss), st.get("resred", 0.0))
 	dps *= f
-	var ehp: float = def.hp * (1 + (level - 1) * 0.22)
-	var edmg: float = def.dmg * (1 + (level - 1) * 0.18) * enemy_dmg_factor(level, plv) / float(def.interval)
+	var ehp: float = def.hp * enemy_hp_mult(level)
+	var edmg: float = def.dmg * enemy_dmg_mult(level) * enemy_dmg_factor(level, plv) / float(def.interval)
 	edmg *= (1.0 - clampf(st.dr, 0, 0.85)) * ((0.35 if cls.ranged else 0.5) if def.boss else 1.0)   # телеграфы боссов: уворот; дальний бой — больше
-	var net: float = maxf(0.01, edmg - st.regen - dps * st.leech)
+	var net: float = maxf(0.01, edmg - st.regen - minf(dps * st.leech, st.max_hp * LEECH_SEC_CAP))
 	var survive: float = st.max_hp * (1.0 + 5 * 0.4) / net   # 5 зелий из лавки
 	var ttk: float = ehp / maxf(0.01, dps)
 	fake.clear()

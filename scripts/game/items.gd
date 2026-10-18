@@ -9,6 +9,10 @@ const INVENTORY_SIZE := 40
 const STASH_SIZE := 100
 const SET_RARITY := 4
 const CLASS_NAMES := {"warrior": "Воин", "archer": "Лучник", "mage": "Маг"}
+## v0.8.0: версия формата предметов (8 — плоские характеристики вместо процентов)
+const ITEM_V := 8
+## Множитель аффиксов по редкости: обычный, магический, редкий, уникальный, комплект
+const RARITY_MULT := [1.0, 1.08, 1.18, 1.35, 1.25]
 
 ## Типы: слот, класс ("" — для всех), названия по тирам, база (урон/броня = a + ilvl·b)
 const TYPES := {
@@ -99,7 +103,7 @@ static func roll(ilvl: int, own_cls: String, rarity_bonus := 0.0, mix := true, s
 	var t: String = types_for(slot, cls_pick).pick_random()
 	var d: Dictionary = TYPES[t]
 	var it := {"uid": "%x%x" % [Time.get_ticks_usec(), randi()], "ilvl": ilvl, "slot": slot, "type": t, "cls": d.cls,
-		"req": req_level(ilvl), "mods": []}
+		"req": req_level(ilvl), "mods": [], "v": ITEM_V}
 	var r := randf() - rarity_bonus
 	it.rarity = 3 if r < 0.02 else (2 if r < 0.14 else (1 if r < 0.45 else 0))
 	it.base = _base(t, ilvl)
@@ -119,9 +123,14 @@ static func roll(ilvl: int, own_cls: String, rarity_bonus := 0.0, mix := true, s
 		it.name = bn
 	return it
 
-static func _affixes(it: Dictionary, n: int, mult: float) -> void:
+static func round_stat(v: float) -> float:
+	return round(v) if absf(v) >= 5 else round(v * 10) / 10.0
+
+## v0.8.0: аффиксы — плоские числа, растут с уровнем предмета и редкостью (никаких процентов)
+static func _affixes(it: Dictionary, n: int, _mult := 1.0) -> void:
 	var used := []
-	var scale := 1.0 + int(it.ilvl) * 0.08
+	var rm: float = RARITY_MULT[clampi(int(it.get("rarity", 0)), 0, RARITY_MULT.size() - 1)]
+	var lv := float(int(it.ilvl) + 4)
 	for i in n:
 		var k := randi() % DB.AFFIXES.size()
 		var guard := 0
@@ -129,9 +138,8 @@ static func _affixes(it: Dictionary, n: int, mult: float) -> void:
 			k = randi() % DB.AFFIXES.size(); guard += 1
 		used.append(k)
 		var a = DB.AFFIXES[k]
-		var v: float = randf_range(a[1], a[2]) * scale * mult
-		v = round(v) if v >= 5 else round(v * 10) / 10.0
-		it.mods.append([a[0], v])
+		it.mods.append([a[0], round_stat(randf_range(a[1], a[2]) * lv * rm)])
+	it["v"] = ITEM_V
 
 ## Комплекты, подходящие уровню предмета (самый высокий доступный тир, иногда — предыдущий)
 static func sets_for_level(ilvl: int, cls := "*") -> Array:
@@ -159,7 +167,7 @@ static func roll_set(ilvl: int, own_cls: String, set_id := "", piece := -1) -> D
 	var t: String = pieces[piece if piece >= 0 else randi() % pieces.size()]
 	var td: Dictionary = TYPES[t]
 	var it := {"uid": "%x%x" % [Time.get_ticks_usec(), randi()], "ilvl": ilvl, "slot": int(td.slot), "type": t, "cls": td.cls if sd.cls != "" else "",
-		"req": req_level(ilvl), "mods": [], "rarity": SET_RARITY, "set": set_id}
+		"req": req_level(ilvl), "mods": [], "rarity": SET_RARITY, "set": set_id, "v": ITEM_V}
 	it.base = round(_base(t, ilvl) * 1.15)
 	_affixes(it, 2, 1.2)
 	it.name = "%s «%s»" % [td.names[tier_of(ilvl)], sd.name]
@@ -278,7 +286,7 @@ static func tooltip(c: Dictionary, it: Dictionary, compare := true) -> String:
 	var mine := {}
 	for m in it.mods:
 		mine[m[0]] = true
-		s += DB.describe_mod(m) + (_delta(float(m[1]), float(cur_mods.get(m[0], 0.0)), cur != null) if cur else "") + "\n"
+		s += DB.describe_mod(m) + _hint(c, m) + (_delta(float(m[1]), float(cur_mods.get(m[0], 0.0)), cur != null) if cur else "") + "\n"
 	if cur:
 		for k in cur_mods:
 			if not mine.has(k): s += "[color=#ff6666]%s (пропадёт)[/color]\n" % DB.describe_mod([k, cur_mods[k]])
@@ -306,6 +314,19 @@ static func tooltip(c: Dictionary, it: Dictionary, compare := true) -> String:
 			else: txt = sd.b6.desc
 			s += "[color=#%s](%d) %s%s[/color]\n" % ["66ff88" if on else "777777", tier, txt, " — активно" if on else ""]
 	return s.strip_edges()
+
+## v0.8.0: что даёт плоская характеристика на текущем уровне героя
+static func _hint(c: Dictionary, m: Array) -> String:
+	var v := float(m[1]); var rpp := DB.rating_per_pct(int(c.get("level", 1)))
+	var t := ""
+	match str(m[0]):
+		"crit_r": t = "≈%.1f%% крит." % (v / rpp)
+		"haste_r": t = "≈%.1f%% скорости" % (v / rpp)
+		"vit": t = "+%d здоровья" % roundi(v * 6.0)
+		"str": t = "+%d здоровья" % roundi(v * 2.0) + (", +%.0f урона" % (v * 0.5) if c.get("class", "") == "warrior" else "")
+		"dex": t = "≈%.1f%% крит." % (v * 0.5 / rpp) + (", +%.0f урона" % (v * 0.5) if c.get("class", "") == "archer" else "")
+		"int": t = "+%d маны" % roundi(v * 2.0) + (", +%.0f урона" % (v * 0.5) if c.get("class", "") == "mage" else "")
+	return "" if t == "" else " [color=#8899aa](%s)[/color]" % t
 
 static func _delta(v: float, old: float, show: bool) -> String:
 	if not show: return ""
@@ -409,8 +430,8 @@ static func migrate(c: Dictionary) -> void:
 	if not c.has("stash"): c["stash"] = []
 	if not c.has("dust"): c["dust"] = 0
 	for lname in ["inventory", "equipped", "stash", "buyback"]:
-		for it in c.get(lname, []): _fix(it, c["class"], int(c["level"]))
-	if c.has("shop"): for it in c["shop"].get("stock", []): _fix(it, c["class"], 99)
+		for it in c.get(lname, []): _fix(it, c["class"], int(c["level"])); migrate_item_v8(it)
+	if c.has("shop"): for it in c["shop"].get("stock", []): _fix(it, c["class"], 99); migrate_item_v8(it)
 	for it in (c["equipped"] as Array).duplicate():
 		if int(it.get("req", 1)) > int(c["level"]) or (it.get("cls", "") != "" and it.cls != c["class"]):
 			c["equipped"].erase(it)
@@ -431,3 +452,47 @@ static func _fix(it: Dictionary, cls: String, old_cap := 99) -> void:
 			2: it["type"] = "hood" if "капюш" in nm else "helm"; it["cls"] = ""
 			_: it["type"] = "ring"; it["cls"] = ""
 	if not it.has("cls"): it["cls"] = ""
+
+# ---------- v0.8.0: перевод процентных характеристик в плоские ----------
+## Старая таблица аффиксов (до 0.8.0): значение = U(lo, hi) · (1 + ур.·0.08) · множитель (уник. 1.5, компл. 1.2)
+const OLD_AFFIXES := {"hp": [10, 40], "mp": [10, 35], "dmg%": [4, 15], "as%": [3, 10], "ms%": [2, 8], "crit": [1, 5],
+	"critdmg%": [8, 25], "armor": [8, 30], "regen": [0.5, 2.5], "spell%": [5, 16], "leech%": [0.3, 1.5], "cdr%": [2, 6],
+	"pen%": [4, 12], "resred": [3, 10]}
+## Во что превращается старая характеристика
+const V8_MAP := {"dmg%": "dmg", "spell%": "int", "as%": "haste_r", "cdr%": "haste_r", "crit": "crit_r", "critdmg%": "dex",
+	"ms%": "vit", "leech%": "hp", "pen%": "pen", "resred": "pen", "hp%": "vit", "mp%": "mp", "armor%": "armor", "dr%": "armor",
+	"hp": "hp", "mp": "mp", "armor": "armor", "regen": "regen", "mpregen": "mpregen", "dmg": "dmg"}
+
+static func _new_range(stat: String) -> Array:
+	for a in DB.AFFIXES: if a[0] == stat: return [float(a[1]), float(a[2])]
+	return [0.5, 0.8]
+
+## Детерминированно: качество старого броска (0..1) сохраняется, значение — по новой формуле
+static func migrate_item_v8(it: Dictionary) -> void:
+	if int(it.get("v", 0)) >= ITEM_V: return
+	var ilvl := int(it.get("ilvl", 1))
+	var rar := clampi(int(it.get("rarity", 0)), 0, 4)
+	var u := str(it.get("unique", ""))
+	if u.begins_with("warden_") and DB.WARDEN_UNIQUES.has(u.trim_prefix("warden_")):
+		var fresh := DB.warden_unique(u.trim_prefix("warden_"), ilvl)
+		it["mods"] = fresh.mods; it["v"] = ITEM_V; return
+	var old_mult := 1.5 if rar == 3 else (1.2 if rar == SET_RARITY else 1.0)
+	var lvk := 1.0 + ilvl * 0.08
+	var out := {}; var order := []
+	for m in it.get("mods", []):
+		if not (m is Array) or m.size() < 2: continue
+		var st := str(m[0]); var v := float(m[1])
+		var q := 0.6
+		if OLD_AFFIXES.has(st):
+			var lo: float = OLD_AFFIXES[st][0] * lvk * old_mult; var hi: float = OLD_AFFIXES[st][1] * lvk * old_mult
+			q = clampf((v - lo) / maxf(0.001, hi - lo), 0.0, 1.0)
+		var ns: String = V8_MAP.get(st, st)
+		if not DB.STAT_NAMES.has(ns): continue
+		var r := _new_range(ns)
+		var nv: float = lerpf(r[0], r[1], q) * (ilvl + 4) * float(RARITY_MULT[rar])
+		if not out.has(ns): order.append(ns)
+		out[ns] = float(out.get(ns, 0.0)) + nv
+	var mods := []
+	for ns in order: mods.append([ns, round_stat(out[ns])])
+	it["mods"] = mods
+	it["v"] = ITEM_V

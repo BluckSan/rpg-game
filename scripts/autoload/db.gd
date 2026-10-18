@@ -24,7 +24,19 @@ const STAT_NAMES := {
 	"armor": "к броне", "armor%": "% к броне", "regen": "здоровья в сек.", "mpregen": "маны в сек.",
 	"leech%": "% похищения жизни", "cdr%": "% сокращения перезарядки", "dr%": "% снижения получаемого урона",
 	"pen%": "% пробивания брони", "resred": "% снижения сопротивлений цели",
+	# v0.8.0: плоские характеристики снаряжения (растут с уровнем предмета)
+	"str": "к силе", "dex": "к ловкости", "int": "к интеллекту", "vit": "к выносливости",
+	"crit_r": "к рейтингу крит. удара", "haste_r": "к рейтингу скорости", "pen": "к пробиванию брони",
 }
+## v0.8.0: потолки суммарных процентных бонусов (таланты + путь + комплекты + мастерство)
+const PCT_CAPS := {"dmg%": 100.0, "spell%": 100.0, "as%": 60.0, "critdmg%": 100.0, "cdr%": 30.0, "leech%": 3.0,
+	"hp%": 50.0, "mp%": 60.0, "armor%": 50.0, "ms%": 30.0, "dr%": 20.0, "pen%": 40.0, "resred": 30.0}
+const CRIT_CAP := 50.0
+const CLASS_MASTERY_CAP := 30.0
+## Основная характеристика класса: +0.5 урона за единицу
+const PRIMARY := {"warrior": "str", "archer": "dex", "mage": "int"}
+## Сколько рейтинга даёт 1% (растёт с уровнем героя — старые вещи слабеют)
+static func rating_per_pct(level: int) -> float: return 1.0 + 0.14 * level
 ## Пассивы и модификаторы умений из талантов (значение — за ранг; %s — число)
 const FX_NAMES := {
 	"aoe%": "+%s%% к области умений", "combo_wave": "3-й удар серии — ударная волна", "thorns": "Отражение %s%% урона",
@@ -516,29 +528,35 @@ func compute_stats(c: Dictionary) -> Dictionary:
 	var sb := Items.set_bonuses(c)
 	add.call(sb.mods)
 	for k in sb.fx: fx[k] = float(fx.get(k, 0.0)) + float(sb.fx[k])
-	raw["dmg%"] = raw.get("dmg%", 0.0) + (int(c["class_level"]) - 1) * 3.0
+	raw["dmg%"] = raw.get("dmg%", 0.0) + minf((int(c["class_level"]) - 1) * 1.5, CLASS_MASTERY_CAP)
 	var g := func(k): return raw.get(k, 0.0)
+	var pc := func(k): return clampf(raw.get(k, 0.0), -90.0, float(PCT_CAPS.get(k, 1000.0)))   # проценты — с потолком
 	var cls: Dictionary = CLASSES[c["class"]]
 	var L := int(c["level"]) - 1
+	var rpp := rating_per_pct(int(c["level"]))
+	var prim: float = g.call(PRIMARY.get(c["class"], "str"))
 	var s := {}
-	s.max_hp = (cls.hp + cls.hp_lvl * L + g.call("hp")) * (1 + g.call("hp%") / 100.0)
-	s.max_mp = (cls.mp + cls.mp_lvl * L + g.call("mp")) * (1 + g.call("mp%") / 100.0)
-	s.damage = cls.dmg + cls.dmg_lvl * L + weapon_dmg + g.call("dmg")
-	s.dmg_mult = 1 + g.call("dmg%") / 100.0
-	s.spell_mult = 1 + g.call("spell%") / 100.0
-	s.attack_speed = maxf(0.3, 1 + g.call("as%") / 100.0)
-	s.move_speed = 5.2 * clampf(1 + g.call("ms%") / 100.0, 0.5, 2.0)
-	s.crit = clampf(5 + g.call("crit"), 0, 80) / 100.0
-	s.crit_mult = 1.5 + g.call("critdmg%") / 100.0
-	s.armor = maxf(0, (5 + item_armor + g.call("armor")) * (1 + g.call("armor%") / 100.0))
+	s.max_hp = (cls.hp + cls.hp_lvl * L + g.call("hp") + g.call("str") * 2.0 + g.call("vit") * 6.0) * (1 + pc.call("hp%") / 100.0)
+	s.max_mp = (cls.mp + cls.mp_lvl * L + g.call("mp") + g.call("int") * 2.0) * (1 + pc.call("mp%") / 100.0)
+	s.damage = cls.dmg + cls.dmg_lvl * L + weapon_dmg + g.call("dmg") + prim * 0.5
+	s.dmg_mult = 1 + pc.call("dmg%") / 100.0
+	s.spell_mult = 1 + pc.call("spell%") / 100.0
+	s.attack_speed = maxf(0.3, 1 + minf(g.call("as%") + g.call("haste_r") / rpp, float(PCT_CAPS["as%"])) / 100.0)
+	s.move_speed = 5.2 * clampf(1 + pc.call("ms%") / 100.0, 0.5, 2.0)
+	s.crit = clampf(5 + g.call("crit") + (g.call("crit_r") + g.call("dex") * 0.5) / rpp, 0, CRIT_CAP) / 100.0
+	s.crit_mult = 1.5 + pc.call("critdmg%") / 100.0
+	s.armor = maxf(0, (5 + item_armor + g.call("armor")) * (1 + pc.call("armor%") / 100.0))
 	s.regen = 0.5 + g.call("regen")
 	s.mp_regen = 2.0 + g.call("mpregen")
-	s.leech = g.call("leech%") / 100.0
-	s.cdr = clampf(g.call("cdr%"), 0, 50) / 100.0
-	s.dr = s.armor / (s.armor + 120.0) * 0.8 + g.call("dr%") / 100.0
-	s.pen = clampf(g.call("pen%") + float(cls.get("pen", 0.0)), 0, Combat.PEN_CAP)   # воин: врождённое пробивание брони
-	s.resred = maxf(0.0, g.call("resred"))
-	if fx.has("leech_x"): s.leech *= 2.0
+	s.leech = pc.call("leech%") / 100.0
+	s.cdr = clampf(g.call("cdr%"), 0, float(PCT_CAPS["cdr%"])) / 100.0
+	# броня: защита зависит от уровня героя — вещи низкого уровня быстро устаревают
+	s.dr = minf(0.75, s.armor / (s.armor + 40.0 + 14.0 * int(c["level"])) * 0.75 + pc.call("dr%") / 100.0)
+	s.pen = clampf(pc.call("pen%") + float(cls.get("pen", 0.0)), 0, Combat.PEN_CAP)   # воин: врождённое пробивание брони
+	s.pen_flat = maxf(0.0, g.call("pen"))
+	s.resred = maxf(0.0, pc.call("resred"))
+	s.rpp = rpp
+	if fx.has("leech_x"): s.leech = minf(s.leech * 2.0, float(PCT_CAPS["leech%"]) / 100.0 * 1.5)
 	if fx.has("no_regen"): s.regen = 0.0
 	s.fx = fx
 	return s
@@ -549,8 +567,10 @@ const HELM_BASES := ["Капюшон", "Железный шлем", "Рогат�
 const RING_BASES := ["Медное кольцо", "Серебряное кольцо", "Кольцо с рубином"]
 const PREFIXES := ["Острый", "Крепкий", "Быстрый", "Древний", "Пылающий", "Ледяной", "Кровавый", "Святой", "Теневой"]
 const UNIQUES := ["Клык Тролля", "Сердце долины", "Пепельный венец", "Шёпот бури"]
-const AFFIXES := [["hp",10,40],["mp",10,35],["dmg%",4,15],["as%",3,10],["ms%",2,8],["crit",1,5],
-	["critdmg%",8,25],["armor",8,30],["regen",0.5,2.5],["spell%",5,16],["leech%",0.3,1.5],["cdr%",2,6],["pen%",4,12],["resred",3,10]]
+## v0.8.0: аффиксы снаряжения — только плоские числа: значение = k · (ур. предмета + 4) · множитель редкости
+const AFFIXES := [["str", 0.45, 0.8], ["dex", 0.45, 0.8], ["int", 0.45, 0.8], ["vit", 0.35, 0.65], ["dmg", 0.18, 0.36],
+	["hp", 1.6, 3.0], ["mp", 1.2, 2.4], ["armor", 0.8, 1.6], ["regen", 0.03, 0.07], ["mpregen", 0.03, 0.07],
+	["crit_r", 0.45, 0.85], ["haste_r", 0.45, 0.85], ["pen", 0.4, 0.8]]
 
 func weapon_base(class_id: String, tier: int) -> String:
 	match class_id:
@@ -560,24 +580,23 @@ func weapon_base(class_id: String, tier: int) -> String:
 
 func starter_weapon(class_id: String) -> Dictionary:
 	return {"uid": str(randi()), "name": CLASSES[class_id].weapon, "slot": 0, "rarity": 0, "ilvl": 1, "base": 3.0, "mods": [],
-		"type": Items.CLASS_WEAPON[class_id][0], "cls": class_id, "req": 1}
+		"type": Items.CLASS_WEAPON[class_id][0], "cls": class_id, "req": 1, "v": Items.ITEM_V}
 
 ## Предмет под свой класс (торговец, тесты). Добыча с врагов — Items.drop_items (для всех классов)
 func roll_item(ilvl: int, class_id: String, rarity_bonus := 0.0, slot := -1) -> Dictionary:
 	return Items.roll(ilvl, class_id, rarity_bonus, false, slot)
 
 ## Уникальные предметы Хранителя Эфира (подземелье): у каждого класса свой, плюс общий перстень
-const WARDEN_UNIQUES := {
-	"warrior": {"name": "Клинок Хранителя", "slot": 0, "mods": [["dmg%", 22], ["hp%", 10], ["leech%", 1.5], ["armor", 30]]},
-	"archer": {"name": "Лук Пустоты", "slot": 0, "mods": [["dmg%", 20], ["as%", 12], ["crit", 6], ["critdmg%", 25]]},
-	"mage": {"name": "Посох Сжатого Эфира", "slot": 0, "mods": [["spell%", 26], ["mp", 40], ["cdr%", 8], ["mpregen", 2]]},
-	"ring": {"name": "Печать Хранителя", "slot": 3, "mods": [["hp", 60], ["dmg%", 10], ["ms%", 6], ["regen", 3]]},
+const WARDEN_UNIQUES := {   # v0.8.0: плоские характеристики, коэффициент · (ур. предмета + 4)
+	"warrior": {"name": "Клинок Хранителя", "slot": 0, "mods": [["str", 1.0], ["vit", 0.7], ["dmg", 0.4], ["armor", 1.6]]},
+	"archer": {"name": "Лук Пустоты", "slot": 0, "mods": [["dex", 1.0], ["haste_r", 0.9], ["crit_r", 0.9], ["dmg", 0.4]]},
+	"mage": {"name": "Посох Сжатого Эфира", "slot": 0, "mods": [["int", 1.0], ["mp", 2.6], ["haste_r", 0.8], ["mpregen", 0.08]]},
+	"ring": {"name": "Печать Хранителя", "slot": 3, "mods": [["hp", 3.2], ["dmg", 0.35], ["vit", 0.6], ["regen", 0.08]]},
 }
 func warden_unique(key: String, ilvl: int) -> Dictionary:
 	var u: Dictionary = WARDEN_UNIQUES[key]
-	var it := {"uid": str(randi()), "name": u.name, "slot": u.slot, "rarity": 3, "ilvl": ilvl, "unique": "warden_" + key, "mods": []}
-	var k := 1.0 + ilvl * 0.05
-	for m in u.mods: it.mods.append([m[0], round(float(m[1]) * k * 10.0) / 10.0])
+	var it := {"uid": str(randi()), "name": u.name, "slot": u.slot, "rarity": 3, "ilvl": ilvl, "unique": "warden_" + key, "mods": [], "v": Items.ITEM_V}
+	for m in u.mods: it.mods.append([m[0], Items.round_stat(float(m[1]) * (ilvl + 4) * Items.RARITY_MULT[3])])
 	it.base = round((3 + ilvl * 1.6) * 1.5) if u.slot == 0 else 0.0
 	it["type"] = Items.CLASS_WEAPON[key][0] if u.slot == 0 else "ring"
 	it["cls"] = key if u.slot == 0 else ""

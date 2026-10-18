@@ -511,7 +511,7 @@ func hit(e, mult: float, spell := false, force_crit := false, fb := {}) -> void:
 	z.hit_stop(float(fb.get("stop", 0.03)) * (1.6 if crit else 1.0))
 	var sh := float(fb.get("shake", 0.0)) + (0.12 if crit else 0.0)
 	if sh > 0: z.shake(sh)
-	if stats.leech > 0: heal(dealt * stats.leech)
+	if stats.leech > 0: heal(minf(dealt * stats.leech, stats.max_hp * Combat.LEECH_HIT_CAP))   # v0.8.0: потолок за удар
 	_on_hit_fx(e, dmg, crit)
 
 func hit_area(center: Vector3, radius: float, mult: float, spell: bool, extra := Callable(), fb := {"knock": 4.0, "stop": 0.05, "shake": 0.15}) -> void:

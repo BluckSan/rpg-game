@@ -54,7 +54,7 @@ func take_damage(dmg: float, crit: bool, elem := "phys") -> float:
 	var p = zone.player if zone else null
 	var skill := false
 	if elem != "true" and p != null and "stats" in p and p.stats is Dictionary and not p.stats.is_empty():
-		dmg *= Combat.player_vs_enemy(self, elem, int(p.data["level"]), float(p.stats.get("pen", 0.0)), float(p.stats.get("resred", 0.0)))
+		dmg *= Combat.player_vs_enemy(self, elem, int(p.data["level"]), float(p.stats.get("pen", 0.0)), float(p.stats.get("resred", 0.0)), float(p.stats.get("pen_flat", 0.0)))
 	if p != null and "last_skill_t" in p: skill = Time.get_ticks_msec() / 1000.0 - float(p.last_skill_t) < 2.0
 	hits_taken += 1
 	_flash = 0.12
