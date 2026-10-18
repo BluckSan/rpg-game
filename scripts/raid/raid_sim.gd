@@ -544,8 +544,8 @@ func _morwen(b: Dictionary) -> void:
 	if phase >= 2 and mech.e <= 0.0:      # наяды-целительницы
 		mech.e = 40.0
 		var pts: Array = RaidDefs.POINTS.duplicate(); pts.shuffle()
-		for i in 2:
-			var e := _new_enemy("ra_naiad", pts[i], RaidDefs.trash_hp(level, n) * 1.2, "naiad")
+		for i in (1 if n <= 1 else 2):   # соло — одна наяда
+			var e := _new_enemy("ra_naiad", pts[i], RaidDefs.trash_hp(level, n) * (0.8 if n <= 1 else 1.2), "naiad")
 			e.aggro = true; e.frac = 0.02
 			_spawn_pub(e)
 		_warn("Наяды исцеляют Морвен — убейте их!")
