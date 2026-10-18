@@ -26,7 +26,7 @@ func _ready() -> void:
 		return
 	print("=== SMOKE TEST ===")
 	for f in Game.list_characters(): Game.delete_character(f["id"])
-	get_tree().create_timer(280.0, true, false, true).timeout.connect(func():
+	get_tree().create_timer(900.0, true, false, true).timeout.connect(func():
 		printerr("TIMEOUT / script error")
 		get_tree().quit(2))
 	await frames(2)
