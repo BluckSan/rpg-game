@@ -17,7 +17,7 @@ func _ready() -> void:
 	roster.add_theme_color_override("font_color", Color(0.75, 0.9, 1.0))
 	roster.add_theme_constant_override("outline_size", 6)
 	roster.add_theme_color_override("font_outline_color", Color.BLACK)
-	roster.position = Vector2(24, 150)
+	roster.anchor_top = 0.36; roster.anchor_bottom = 0.36; roster.offset_left = 24; roster.offset_top = 0
 	root.add_child(roster)
 	log_label = RichTextLabel.new()
 	log_label.bbcode_enabled = true; log_label.scroll_following = true
@@ -25,7 +25,7 @@ func _ready() -> void:
 	log_label.add_theme_font_size_override("normal_font_size", 22)
 	log_label.add_theme_constant_override("outline_size", 6)
 	log_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	log_label.anchor_top = 0.42; log_label.anchor_bottom = 0.68; log_label.anchor_right = 0.34
+	log_label.anchor_top = 0.5; log_label.anchor_bottom = 0.68; log_label.anchor_right = 0.34
 	log_label.offset_left = 24
 	root.add_child(log_label)
 	input = LineEdit.new(); input.placeholder_text = "Сообщение… (Enter — отправить)"
@@ -38,7 +38,7 @@ func _ready() -> void:
 	root.add_child(input)
 	chat_btn = Button.new(); chat_btn.text = "Чат"; chat_btn.focus_mode = Control.FOCUS_NONE
 	chat_btn.add_theme_font_size_override("font_size", 24)
-	chat_btn.position = Vector2(24, 96); chat_btn.custom_minimum_size = Vector2(110, 48)
+	chat_btn.anchor_top = 0.3; chat_btn.anchor_bottom = 0.3; chat_btn.offset_left = 24; chat_btn.offset_right = 134; chat_btn.offset_bottom = 48
 	chat_btn.pressed.connect(open_chat)
 	root.add_child(chat_btn)
 	Net.roster_changed.connect(_refresh)
