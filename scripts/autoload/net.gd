@@ -447,6 +447,10 @@ func c_hello(tok: String, char_id: String, proto: int, version: String) -> void:
 	if d["_code"] != 200 or not (d.get("character") is Dictionary):
 		s_refused.rpc_id(id, "вход не подтверждён — войдите заново"); _kick_later(id); return
 	var c: Dictionary = d.character
+	var need_mig := false   # v0.8.0: старые предметы (проценты) → плоские характеристики, сразу пишем в БД
+	for lst in ["inventory", "equipped", "stash"]:
+		for it in c.get(lst, []): if it is Dictionary and int(it.get("v", 0)) < Items.ITEM_V: need_mig = true
+	c = Game.normalize(c)
 	var pos := Vector3.ZERO
 	var cp = c.get("pos", [0, 0, 0])
 	if cp is Array and cp.size() == 3: pos = Vector3(float(cp[0]), float(cp[1]), float(cp[2]))
@@ -455,6 +459,7 @@ func c_hello(tok: String, char_id: String, proto: int, version: String) -> void:
 		"tp_t": 0.0, "viol": 0, "budget": 24.0, "dirty": false, "save_t": _now(), "chat_t": 0.0, "chat_n": 0,
 		"party": 0, "iid": 0, "inv_t": 0.0, "inv_n": 0}
 	if RaidDefs.is_raid_zone(p.zone): p.zone = "starter"; c["zone"] = "starter"; c["has_pos"] = false
+	if need_mig: p.dirty = true; print("server: предметы «%s» переведены на плоские характеристики (v0.8.0)" % p.name)
 	players[id] = p
 	var roster := []
 	for oid in players:

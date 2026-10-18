@@ -53,6 +53,28 @@ func _ready() -> void:
 		for it in [a, b]: for m in it.mods: if str(m[0]).ends_with("%") or m[0] in ["crit", "resred"]: pct_ok = false
 	check(hi > lo * 2.0, "вещи ур. 30 заметно сильнее вещей ур. 10 (сумма характеристик ×%.1f)" % (hi / maxf(1, lo)))
 	check(pct_ok, "на обычных вещах нет процентных бонусов — только плоские числа")
+	# миграция старых сохранений (одиночная игра и сервер — Game.normalize → Items.migrate)
+	var oldc := DB.new_character("Старый", "warrior", {})
+	oldc["level"] = 20
+	oldc["equipped"] = [{"uid": "o1", "name": "Старый меч", "slot": 0, "rarity": 2, "ilvl": 18, "base": 34.0, "type": "sword", "cls": "warrior", "req": 18,
+		"mods": [["dmg%", 30.0], ["crit", 9.0], ["hp", 80.0], ["as%", 14.0]]},
+		{"uid": "o2", "name": "Печать Хранителя", "slot": 3, "rarity": 3, "ilvl": 12, "base": 0.0, "unique": "warden_ring", "type": "ring", "cls": "", "req": 12,
+		"mods": [["hp", 96.0], ["dmg%", 16.0], ["ms%", 9.6], ["regen", 4.8]]}]
+	oldc["inventory"] = [{"uid": "o3", "name": "Плащ", "slot": 1, "rarity": 4, "set": "blood", "ilvl": 16, "base": 50.0, "type": "cloak", "cls": "", "req": 16,
+		"mods": [["leech%", 2.0], ["critdmg%", 40.0], ["dmg%", 20.0]]}]
+	var mc: Dictionary = Game.normalize(JSON.parse_string(JSON.stringify(oldc)))
+	var all_flat := true; var n_mods := 0
+	for lst in [mc["equipped"], mc["inventory"]]:
+		for it in lst:
+			check(int(it.get("v", 0)) == Items.ITEM_V, "миграция: «%s» → %s" % [it.name, str(it.mods)])
+			for m in it.mods:
+				n_mods += 1
+				if str(m[0]).ends_with("%") or m[0] in ["crit", "resred"]: all_flat = false
+	check(all_flat and n_mods >= 9, "миграция: процентов на вещах не осталось (%d характеристик)" % n_mods)
+	var again: Dictionary = Game.normalize(JSON.parse_string(JSON.stringify(mc)))
+	check(str(again["equipped"][0].mods) == str(mc["equipped"][0].mods), "миграция идемпотентна")
+	var tip := Items.tooltip(mc, mc["equipped"][0], false)
+	check("рейтингу" in tip or "к урону" in tip, "подсказка показывает плоские числа")
 	print("=== BALANCE RESULT: %s (%d errors, %d checks) ===" % ["PASS" if errors == 0 else "FAIL", errors, checks])
 	get_tree().quit(1 if errors else 0)
 

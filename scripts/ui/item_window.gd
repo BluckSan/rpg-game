@@ -260,6 +260,8 @@ func _stats_bb() -> String:
 	s += I.call("heart-bottle") + "Здоровье %d   " % roundi(st.max_hp) + I.call("drop") + "Мана %d\n" % roundi(st.max_mp)
 	s += I.call("sword-wound") + "Урон %d   " % roundi(dmg) + I.call("lightning-frequency") + "Скорость %d%%\n" % roundi(st.attack_speed * 100)
 	s += I.call("crossed-swords") + "Крит %.1f%% (x%.2f)   " % [st.crit * 100, st.crit_mult] + I.call("checked-shield") + "Броня %d (−%d%%)\n" % [roundi(st.armor), roundi(st.dr * 100)]
+	var at: Dictionary = st.get("attrs", {})
+	s += "Сила %d · Ловкость %d · Интеллект %d · Выносливость %d · Пробивание %d\n" % [roundi(at.get("str", 0)), roundi(at.get("dex", 0)), roundi(at.get("int", 0)), roundi(at.get("vit", 0)), roundi(st.get("pen_flat", 0.0))]
 	s += I.call("heart-beats") + "Реген %.1f/с   " % st.regen + I.call("skull-mask") + "Вампиризм %.1f%%   " % (st.leech * 100) + I.call("hourglass") + "Перезарядка −%d%%\n" % roundi(st.cdr * 100)
 	var seen := {}
 	for it in data["equipped"]:

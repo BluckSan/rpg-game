@@ -152,7 +152,7 @@ def valid_save(old: dict, new: dict) -> str:
 
 class Handler(BaseHTTPRequestHandler):
     internal = False
-    server_version = "OskolkiAuth/0.7"
+    server_version = "OskolkiAuth/0.8"
     protocol_version = "HTTP/1.1"
     timeout = 20
 
@@ -207,7 +207,7 @@ class Handler(BaseHTTPRequestHandler):
     def _public(self, method, path):
         ip = self.client_address[0]
         if path == "/api/health":
-            return self._send(200, {"ok": True, "version": "0.7.0"})
+            return self._send(200, {"ok": True, "version": "0.8.0"})
         if method == "POST" and path in ("/api/register", "/api/login"):
             if not rate_ok(ip):
                 return self._send(429, {"error": "слишком много попыток, подождите минуту"})

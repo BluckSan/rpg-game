@@ -556,6 +556,7 @@ func compute_stats(c: Dictionary) -> Dictionary:
 	s.pen_flat = maxf(0.0, g.call("pen"))
 	s.resred = maxf(0.0, pc.call("resred"))
 	s.rpp = rpp
+	s.attrs = {"str": g.call("str"), "dex": g.call("dex"), "int": g.call("int"), "vit": g.call("vit")}
 	if fx.has("leech_x"): s.leech = minf(s.leech * 2.0, float(PCT_CAPS["leech%"]) / 100.0 * 1.5)
 	if fx.has("no_regen"): s.regen = 0.0
 	s.fx = fx

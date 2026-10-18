@@ -1395,7 +1395,7 @@ func _item_tests() -> void:
 
 ## Баланс v0.5: броня, сопротивления, разница уровней; бой «на бумаге» по формулам Combat
 func _balance_tests() -> void:
-	check(absf(Combat.level_factor(4, 9) - 0.55) < 0.001 and Combat.level_factor(9, 9) == 1.0 and Combat.level_factor(9, 11) == 1.0, "разница уровней: −15%/ур. сверх +2")
+	check(absf(Combat.level_factor(4, 9) - 0.4) < 0.001 and Combat.level_factor(9, 9) == 1.0 and absf(Combat.level_factor(9, 11) - 0.76) < 0.001, "разница уровней: −12%/ур. (v0.8.0)")
 	check(Combat.level_factor(1, 30) == 0.1, "урон по врагу на 29 ур. выше — не ниже 10%")
 	check(Combat.enemy_dmg_factor(9, 4) > 1.3 and Combat.enemy_dmg_factor(5, 5) == 1.0, "враг выше вас бьёт сильнее")
 	check(Combat.reward_factor(20, 5) == 0.2 and Combat.reward_factor(8, 5) == 1.0, "опыт/добыча с серых врагов снижены")
