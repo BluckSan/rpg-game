@@ -19,6 +19,7 @@ boot_splash/use_filter=true
 
 DB="*res://scripts/autoload/db.gd"
 Game="*res://scripts/autoload/game.gd"
+Net="*res://scripts/autoload/net.gd"
 
 [display]
 

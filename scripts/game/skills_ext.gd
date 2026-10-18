@@ -53,6 +53,7 @@ static func execute(p, s: Dictionary, target) -> bool:
 			p.invuln = 0.5
 			p.visual.play_action("jump")
 			var from := pos
+			Net.notify_teleport()
 			var steps := 14
 			for i in steps:
 				await p.get_tree().process_frame

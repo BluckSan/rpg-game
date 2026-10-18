@@ -88,6 +88,7 @@ func setup(d: Dictionary) -> void:
 	add_child(cs)
 	floor_snap_length = 0.4
 	visual = CharVisual.new()
+	visual.net_local = true   # действия героя уходят на сервер (онлайн)
 	add_child(visual)
 	rebuild_visual()
 	recalc(true)
@@ -219,6 +220,7 @@ func is_rolling() -> bool:
 	return _roll_time > 0
 
 func teleport(p: Vector3) -> void:
+	Net.notify_teleport()
 	global_position = p
 	velocity = Vector3.ZERO
 
@@ -298,6 +300,7 @@ func forward() -> Vector3:
 	return global_basis.z
 
 func respawn(p: Vector3) -> void:
+	Net.notify_teleport()
 	teleport(p)
 	dead = false
 	visual.set_dead(false)

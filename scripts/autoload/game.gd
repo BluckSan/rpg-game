@@ -343,6 +343,7 @@ func _setup_input_map() -> void:
 
 # ---------- сохранения ----------
 func list_characters() -> Array:
+	if Net.active: return Net.chars.duplicate()   # онлайн: герои на сервере
 	var out := []
 	var d := DirAccess.open(SAVE_DIR)
 	if d == null: return out
@@ -392,6 +393,11 @@ func normalize(c: Dictionary) -> Dictionary:
 
 func save_character(c: Dictionary) -> void:
 	if c.is_empty(): return
+	if Net.active:
+		# онлайн-герой хранится на сервере: новый — создаётся там, в игре — отправляется серверу
+		if Net.in_game: Net.save_character(c)
+		elif not str(c.get("id", "")).begins_with("n"): Net.create_char(c)
+		return
 	var path := SAVE_DIR + "/char_%s.json" % c["id"]
 	var tmp := path + ".tmp"
 	var fa := FileAccess.open(tmp, FileAccess.WRITE)
@@ -403,10 +409,15 @@ func save_character(c: Dictionary) -> void:
 	DirAccess.rename_absolute(tmp, path)
 
 func delete_character(id: String) -> void:
+	if Net.active:
+		Net.delete_char(id); return
 	DirAccess.remove_absolute(SAVE_DIR + "/char_%s.json" % id)
 
 # ---------- сцены ----------
 func play(c: Dictionary) -> void:
+	if Net.active and not Net.in_game:
+		Net.join(c)   # сервер пришлёт подтверждённого героя и вызовет play() снова
+		return
 	current = c
 	var z: Dictionary = DB.ZONES.get(c["zone"], DB.ZONES["starter"])
 	if not z["available"]:
@@ -425,6 +436,7 @@ func travel(zone_id: String, arrive := "") -> void:
 
 func to_menu() -> void:
 	save_character(current)
+	if Net.in_game: Net.leave()
 	var mm = load("res://scripts/game/main_menu.gd")
 	mm.start_on_select = true
 	get_tree().paused = false

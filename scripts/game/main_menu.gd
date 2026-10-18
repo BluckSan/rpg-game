@@ -27,7 +27,15 @@ var confirm_box: Control
 var sun: DirectionalLight3D
 static var start_on_select := false   # после выхода из игры — сразу к выбору героя
 
+var net_status: Label
+var _user_edit: LineEdit
+var _pass_edit: LineEdit
+
 func _ready() -> void:
+	if Net.is_server:
+		get_tree().change_scene_to_file.call_deferred("res://scenes/server.tscn")
+		return
+	Net.chars_changed.connect(func(): if is_instance_valid(list_box) and list_box.is_inside_tree(): refresh_list())
 	_build_stage()
 	ui = CanvasLayer.new()
 	add_child(ui)
@@ -231,15 +239,16 @@ func show_title() -> void:
 	# v0.5.1: логотип — эмблема-кристалл в рунном кольце + золотая надпись
 	var logo := _logo_rect(s)
 	UIK.place(logo, 0.025, 0.665, 0.42, 0.985)
-	var sub := UIK.label(s, "Офлайн-RPG · классы, пути превращения, лут", 30, UIK.MUTED)
+	var sub := UIK.label(s, "RPG · офлайн и онлайн до %d игроков · классы, пути, лут" % Net.MAX_PLAYERS, 30, UIK.MUTED)
 	sub.autowrap_mode = TextServer.AUTOWRAP_OFF
 	UIK.place(sub, 0.055, 0.615, 0.6, 0.665)
 	var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 22)
-	s.add_child(v); UIK.place(v, 0.055, 0.1, 0.32, 0.6)
-	var bp := UIK.button(v, "Играть", show_select, UIK.GOLD, 46, "crossed-swords"); bp.name = "PlayButton"; UIK.min_h(bp, 120)
-	var bs := UIK.button(v, "Настройки", show_settings, UIK.BUTTON, 38, "cog"); bs.name = "SettingsButton"; UIK.min_h(bs, 104)
-	var bc := UIK.button(v, "Авторы", show_credits, UIK.BUTTON, 38, "book-cover"); bc.name = "CreditsButton"; UIK.min_h(bc, 104)
-	var bq := UIK.button(v, "Выход", quit_game, UIK.RED, 38); bq.name = "QuitButton"; UIK.min_h(bq, 104)
+	s.add_child(v); UIK.place(v, 0.055, 0.04, 0.32, 0.6)
+	var bp := UIK.button(v, "Играть", _play_offline, UIK.GOLD, 46, "crossed-swords"); bp.name = "PlayButton"; UIK.min_h(bp, 120)
+	var bo := UIK.button(v, "Онлайн (до %d игроков)" % Net.MAX_PLAYERS, show_online, Color(0.2, 0.36, 0.55), 38, "magic-portal"); bo.name = "OnlineButton"; UIK.min_h(bo, 92)
+	var bs := UIK.button(v, "Настройки", show_settings, UIK.BUTTON, 38, "cog"); bs.name = "SettingsButton"; UIK.min_h(bs, 92)
+	var bc := UIK.button(v, "Авторы", show_credits, UIK.BUTTON, 38, "book-cover"); bc.name = "CreditsButton"; UIK.min_h(bc, 92)
+	var bq := UIK.button(v, "Выход", quit_game, UIK.RED, 38); bq.name = "QuitButton"; UIK.min_h(bq, 92)
 	var ver := UIK.label(s, "v%s" % ProjectSettings.get_setting("application/config/version"), 24, Color(1, 1, 1, 0.45), HORIZONTAL_ALIGNMENT_RIGHT)
 	UIK.place(ver, 0.6, 0.93, 0.98, 0.99)
 
@@ -272,6 +281,61 @@ func quit_game() -> void:
 	Game.clear_lock()
 	get_tree().quit()
 
+func _play_offline() -> void:
+	if Net.active: Net.go_offline()
+	show_select()
+
+func _select_back() -> void:
+	if Net.active: Net.go_offline()
+	show_title()
+
+# ---------------- онлайн: вход и регистрация ----------------
+func show_online() -> void:
+	var s := _new_screen()
+	_set_title_mode(false)
+	s.name = "OnlineScreen"
+	target_x = 0.3
+	var p := UIK.panel(s)
+	UIK.place(p, 0.03, 0.14, 0.42, 0.86)
+	UIK.place(UIK.label(p, "Онлайн-мир", 44, UIK.ACCENT), 0.06, 0.84, 0.94, 0.96)
+	UIK.place(UIK.label(p, "До %d героев в одном мире. Герои хранятся на сервере." % Net.MAX_PLAYERS, 24, UIK.MUTED), 0.06, 0.76, 0.94, 0.84)
+	UIK.place(UIK.label(p, "Логин", 26), 0.06, 0.68, 0.94, 0.75)
+	_user_edit = LineEdit.new(); _user_edit.name = "UserEdit"; _user_edit.text = Net.username
+	_user_edit.max_length = 20; _user_edit.add_theme_font_size_override("font_size", 30)
+	p.add_child(_user_edit); UIK.place(_user_edit, 0.06, 0.58, 0.94, 0.68)
+	UIK.place(UIK.label(p, "Пароль (от 6 символов)", 26), 0.06, 0.5, 0.94, 0.57)
+	_pass_edit = LineEdit.new(); _pass_edit.name = "PassEdit"; _pass_edit.secret = true
+	_pass_edit.max_length = 128; _pass_edit.add_theme_font_size_override("font_size", 30)
+	_pass_edit.text_submitted.connect(func(_t): _do_login(false))
+	p.add_child(_pass_edit); UIK.place(_pass_edit, 0.06, 0.4, 0.94, 0.5)
+	var bl := UIK.button(p, "Войти", _do_login.bind(false), UIK.GOLD, 34); bl.name = "LoginButton"
+	UIK.place(bl, 0.06, 0.26, 0.48, 0.37)
+	var br := UIK.button(p, "Регистрация", _do_login.bind(true), UIK.GREEN, 30); br.name = "RegisterButton"
+	UIK.place(br, 0.52, 0.26, 0.94, 0.37)
+	net_status = UIK.label(p, "", 24, UIK.MUTED)
+	net_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UIK.place(net_status, 0.06, 0.12, 0.94, 0.25)
+	var back := UIK.button(s, "Назад", show_title, UIK.BUTTON, 32); back.name = "BackButton"
+	UIK.place(back, 0.03, 0.04, 0.16, 0.12)
+	UIK.place(UIK.label(s, "Сервер: %s" % Net.host, 22, Color(1, 1, 1, 0.4), HORIZONTAL_ALIGNMENT_RIGHT), 0.6, 0.92, 0.98, 0.99)
+	if Net.has_saved_login():
+		net_status.text = "Вход как %s…" % Net.username
+		var e := await Net.resume()
+		if not is_instance_valid(net_status): return
+		if e == "": show_select()
+		else: net_status.text = e
+
+func _do_login(register: bool) -> void:
+	if Net.busy or not is_instance_valid(_user_edit): return
+	net_status.text = "Регистрация…" if register else "Вход…"
+	var e := await Net.login(_user_edit.text.strip_edges(), _pass_edit.text, register)
+	if not is_instance_valid(net_status): return
+	if e == "":
+		show_select()
+	else:
+		net_status.text = e
+		net_status.add_theme_color_override("font_color", UIK.RED.lightened(0.3))
+
 # ---------------- экран выбора ----------------
 func _new_screen() -> Control:
 	if screen: screen.queue_free()
@@ -295,7 +359,7 @@ func show_select() -> void:
 	var create := UIK.button(s, "+ Создать", open_creator, UIK.GREEN, 36)
 	create.name = "CreateButton"
 	UIK.place(create, 0.03, 0.04, 0.24, 0.14)
-	var back := UIK.button(s, "Назад", show_title, UIK.BUTTON, 32)
+	var back := UIK.button(s, "Назад", _select_back, UIK.BUTTON, 32)
 	back.name = "BackButton"
 	UIK.place(back, 0.25, 0.04, 0.36, 0.14)
 	var ip := UIK.panel(s, Color(0, 0, 0, 0.55))
@@ -306,7 +370,8 @@ func show_select() -> void:
 	UIK.place(play_btn, 0.7, 0.04, 0.88, 0.16)
 	del_btn = UIK.button(s, "Удалить", _on_delete, UIK.RED, 28)
 	UIK.place(del_btn, 0.89, 0.04, 0.97, 0.16)
-	var ver := UIK.label(s, "v%s · офлайн · Godot" % ProjectSettings.get_setting("application/config/version"), 22, Color(1, 1, 1, 0.4), HORIZONTAL_ALIGNMENT_RIGHT)
+	var mode := ("онлайн · " + Net.username + " · " + Net.host) if Net.active else "офлайн"
+	var ver := UIK.label(s, "v%s · %s · Godot" % [ProjectSettings.get_setting("application/config/version"), mode], 22, Color(1, 1, 1, 0.4), HORIZONTAL_ALIGNMENT_RIGHT)
 	UIK.place(ver, 0.6, 0.92, 0.98, 0.99)
 	var sb := UIK.button(s, "", show_settings, UIK.BUTTON, 26, "cog")
 	sb.name = "SettingsButton"

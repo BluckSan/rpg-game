@@ -479,7 +479,10 @@ func _action_anim(kind: String) -> Array:
 		"beast_roar": return ["cheer", 1.3, false]
 	return ["attack_a", 1.2, true]
 
+var net_local := false
+
 func play_action(kind: String) -> void:
+	if net_local: Net.send_action(kind)
 	if beast:
 		var ba := {"attack": "attack", "beast_roar": "roar", "hit": "hit", "jump": "spawn"}
 		if ba.has(kind) or kind in ["spin", "dash", "rage"]: beast.play_action(ba.get(kind, "attack"), 1.4)
@@ -504,6 +507,7 @@ func set_neutral(v: bool) -> void:
 
 ## Произвольная анимация из библиотеки (для комбо и особых атак)
 func play_anim(anim: String, speed := 1.0, upper := true, trail_time := 0.0) -> void:
+	if net_local: Net.send_action("", anim, speed)
 	if beast:
 		beast.play_action("attack", speed)
 		return
