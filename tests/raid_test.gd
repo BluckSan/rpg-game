@@ -59,7 +59,7 @@ func _dungeon(did: String) -> void:
 	check(trash == 8, "[%s] стражи коридора на клиенте: %d (NetEnemy)" % [did, trash])
 	check(d.builder.gate_is_closed, "[%s] решётка арены закрыта до зачистки" % did)
 	var boss = d.builder.boss_enemy()
-	check(boss != null and boss.brain is RaidBrain and absf(boss.max_hp - RaidDefs.boss_hp(lvl, 1)) < 1.0, "[%s] босс «%s»: здоровье %d (соло-масштаб)" % [did, boss.def.name if boss else "?", boss.max_hp if boss else 0])
+	check(boss != null and boss.brain is RaidBrain and absf(boss.max_hp - RaidDefs.boss_hp(lvl, 1) * float(RaidDefs.DUNGEONS[did].get("hp_k", 1.0))) < 1.0, "[%s] босс «%s»: здоровье %d (соло-масштаб)" % [did, boss.def.name if boss else "?", boss.max_hp if boss else 0])
 	var bot := RaidBot.new(d, 1, func(): return [])
 	var t0 := Time.get_ticks_msec()
 	var limit := float(args.get("limit", "900"))   # секунд игрового времени

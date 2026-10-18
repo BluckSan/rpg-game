@@ -19,7 +19,7 @@ const DUNGEONS := {
 		"trash": [["bluedemon", "drake", "bluedemon"], ["drake", "bluedemon", "drake", "bluedemon"]], "elite": "bluedemon",
 		"desc": "Ворагос, Пепельный Король. Рассечение конусом, метеоры (разойдитесь!), плита пепла (соберитесь!), щит со стражами, огненное кольцо. Ярость на 6:00.",
 		"theme": {"floor": Color(0.36, 0.32, 0.3), "wall": Color(0.42, 0.36, 0.33), "light": Color(1.0, 0.55, 0.25), "fog": Color(0.25, 0.12, 0.08), "accent": Color(1.0, 0.4, 0.1)}},
-	"crypt": {"name": "Затопленный Склеп", "zone": "pd_crypt", "boss": "rb_morwen", "enrage": 420.0, "set": "r_tide",
+	"crypt": {"name": "Затопленный Склеп", "zone": "pd_crypt", "boss": "rb_morwen", "enrage": 480.0, "hp_k": 0.85, "set": "r_tide",
 		"trash": [["crab", "ghost", "crab"], ["ghost", "crab", "ghost", "crab"]], "elite": "crab",
 		"desc": "Морвен, Утопленница. Песнь Бездны (прервите умением!), прилив (бегите на островки), наяды-целительницы, водоворот. Ярость на 7:00.",
 		"theme": {"floor": Color(0.3, 0.36, 0.36), "wall": Color(0.34, 0.4, 0.42), "light": Color(0.45, 0.8, 1.0), "fog": Color(0.06, 0.16, 0.2), "accent": Color(0.3, 0.85, 1.0)}},

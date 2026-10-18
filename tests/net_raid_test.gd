@@ -79,7 +79,7 @@ func _run() -> void:
 	check(ok, "союзники в том же экземпляре: %d" % _same_zone_remotes())
 	await get_tree().create_timer(3.0).timeout
 	var boss = z.builder.boss_enemy()
-	check(boss != null and absf(boss.max_hp - RaidDefs.boss_hp(rc.level, rc.n)) < 2.0, "босс: здоровье %d = масштаб на группу из %d (ур. %d)" % [boss.max_hp if boss else 0, rc.n, rc.level])
+	check(boss != null and absf(boss.max_hp - RaidDefs.boss_hp(rc.level, rc.n) * float(RaidDefs.DUNGEONS[rc.did].get("hp_k", 1.0))) < 2.0, "босс: здоровье %d = масштаб на группу из %d (ур. %d)" % [boss.max_hp if boss else 0, rc.n, rc.level])
 	var bot := RaidBot.new(z, Net.my_id, _ally_pos)
 	var limit := float(args.get("limit", "1200"))
 	var t := 0.0; var deaths := 0; var was := false

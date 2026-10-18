@@ -150,7 +150,7 @@ func _spawn_trash() -> void:
 			el.frac = 0.06; el.elite = true
 
 func _spawn_boss() -> void:
-	var b := _new_enemy(d.boss, RaidDefs.ARENA_C + Vector3(0, 0, 6), RaidDefs.boss_hp(level, n), "boss")
+	var b := _new_enemy(d.boss, RaidDefs.ARENA_C + Vector3(0, 0, 6), RaidDefs.boss_hp(level, n) * float(d.get("hp_k", 1.0)), "boss")
 	b.yaw = PI
 	boss_id = b.id
 	_reset_mech()
@@ -530,7 +530,7 @@ func _morwen(b: Dictionary) -> void:
 		return
 	if mech.b <= 0.0:                     # капли: разойдитесь
 		mech.b = 18.0
-		for pid in inside: _tele("disc", players[pid].pos, 3.6, 5.0, 0.3, {"follow": pid, "mode": "spread", "what": "Слеза Бездны", "col": "blue"})
+		for pid in inside: _tele("disc", players[pid].pos, 3.6, 5.0, 0.22, {"follow": pid, "mode": "spread", "what": "Слеза Бездны", "col": "blue"})
 		_warn("Слёзы Бездны! Разойдитесь")
 		_note("drops")
 		return
