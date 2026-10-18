@@ -44,6 +44,8 @@ func _process(delta: float) -> void:
 	rotation.y = yaw
 	pitch_node.rotation_degrees.x = -pitch
 	arm.spring_length = distance
+	# v0.6.0: листва/стволы между камерой и героем растворяются (шейдеры деревьев читают cam_fade_dist)
+	RenderingServer.global_shader_parameter_set("cam_fade_dist", maxf(0.0, camera.global_position.distance_to(target.global_position + Vector3.UP * 1.2) - 1.5))
 	if trauma > 0:
 		trauma = maxf(0.0, trauma - delta * 2.2)
 		var k := trauma * trauma

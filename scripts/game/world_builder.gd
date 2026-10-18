@@ -15,41 +15,29 @@ const DEACTIVATE_R := 165.0
 ## Пропсы по биомам: [ключ, штук на чанк, масштаб от, до, тип: 0 — дерево (столкновение), 1 — камень (столкновение), 2 — мелочь (только рядом)]
 ## [ключ, штук на чанк, масштаб от, до, тип: 0 — дерево (столкновение), 1 — крупный камень, 2 — мелочь без столкновения]
 const PROPS := {
-	"meadows": [["nature_tree_oak", 4, 4.0, 5.5, 0], ["nature_tree_default", 3, 3.6, 5.0, 0], ["nature_tree_fat", 2, 4.0, 5.0, 0],
-		["nature_tree_simple", 2, 4.0, 5.2, 0], ["nature_tree_small", 2, 4.0, 5.0, 0], ["nature_tree_oak_fall", 1, 4.2, 5.2, 0],
-		["nature_plant_bushLarge", 8, 3.0, 4.5, 2], ["nature_plant_bush", 8, 3.0, 4.2, 2], ["nature_plant_bushSmall", 10, 3.0, 4.0, 2],
-		["nature_flower_redA", 12, 2.4, 3.2, 2], ["nature_flower_yellowA", 12, 2.4, 3.2, 2], ["nature_flower_purpleB", 10, 2.4, 3.2, 2],
-		["nature_flower_yellowC", 8, 2.4, 3.2, 2], ["nature_flower_redB", 8, 2.4, 3.2, 2],
-		["nature_rock_largeA", 2, 2.5, 4.0, 1], ["nature_rock_smallA", 5, 2.5, 4.0, 2], ["nature_rock_smallFlatA", 4, 2.5, 3.5, 2],
-		["nature_grass_large", 30, 3.0, 4.2, 2], ["nature_grass", 26, 3.0, 4.5, 2], ["nature_stump_round", 2, 3.0, 3.8, 2]],
-	"forest": [["nature_tree_pineTallA_detailed", 9, 4.5, 6.5, 0], ["nature_tree_pineDefaultA", 7, 4.5, 6.0, 0], ["nature_tree_detailed_dark", 5, 4.5, 6.0, 0],
-		["nature_tree_pineRoundC", 4, 4.5, 6.0, 0], ["nature_tree_pineTallB_detailed", 5, 4.5, 6.5, 0], ["nature_tree_pineTallC_detailed", 4, 4.5, 6.5, 0],
-		["nature_tree_tall_dark", 3, 4.5, 6.0, 0], ["nature_tree_default_dark", 3, 4.5, 5.5, 0], ["nature_tree_default_fall", 1, 4.5, 5.5, 0],
-		["nature_log_large", 2, 3.0, 4.0, 1], ["nature_stump_old", 4, 3.0, 4.0, 2], ["nature_stump_roundDetailed", 3, 3.0, 4.0, 2],
-		["nature_mushroom_redGroup", 8, 3.0, 4.0, 2], ["nature_mushroom_red", 8, 3.0, 4.0, 2], ["nature_mushroom_tan", 6, 3.0, 4.0, 2],
-		["nature_plant_bushDetailed", 10, 3.0, 4.5, 2], ["nature_plant_bushTriangle", 8, 3.0, 4.5, 2], ["nature_plant_flatShort", 14, 3.0, 4.0, 2],
-		["nature_grass_leafs", 20, 3.0, 4.2, 2], ["nature_grass_leafsLarge", 14, 3.0, 4.2, 2], ["nature_rock_tallA", 2, 2.5, 3.5, 1],
-		["nature_flower_purpleC", 6, 2.4, 3.2, 2]],
-	"desert": [["nature_cactus_tall", 6, 4.0, 6.0, 0], ["nature_cactus_short", 8, 4.0, 5.5, 2], ["nature_tree_palmTall", 1, 5.0, 6.0, 0],
-		["nature_tree_palmDetailedTall", 1, 5.0, 6.0, 0], ["nature_tree_palmShort", 1, 4.5, 5.5, 0], ["nature_tree_plateau", 1, 4.5, 5.5, 0],
-		["nature_rock_largeB", 3, 3.0, 5.0, 1], ["nature_rock_tallB", 2, 3.0, 5.0, 1], ["nature_rock_tallC", 2, 3.0, 4.5, 1], ["nature_rock_largeD", 2, 3.0, 4.5, 1],
-		["survival_rock-sand-a", 5, 4.0, 7.0, 2], ["survival_rock-sand-b", 5, 4.0, 7.0, 2], ["nature_stone_tallC", 2, 3.0, 4.5, 1],
-		["nature_rock_smallD", 8, 2.5, 4.0, 2], ["nature_rock_smallE", 6, 2.5, 4.0, 2], ["nature_plant_bushSmall", 4, 2.6, 3.4, 2], ["nature_grass", 8, 2.6, 3.6, 2]],
-	"swamp": [["nature_tree_thin_dark", 7, 4.5, 6.0, 0], ["nature_tree_fat_darkh", 4, 4.5, 5.5, 0], ["nature_tree_simple_dark", 3, 4.5, 5.5, 0],
-		["nature_tree_small_dark", 3, 4.2, 5.2, 0], ["nature_log", 4, 3.5, 4.5, 2], ["nature_hanging_moss", 6, 3.5, 4.5, 2],
-		["nature_mushroom_tanTall", 8, 3.0, 4.5, 2], ["nature_mushroom_tanGroup", 8, 3.0, 4.5, 2], ["nature_stump_oldTall", 4, 3.0, 4.0, 2],
-		["nature_plant_flatTall", 16, 3.0, 4.0, 2], ["nature_plant_flatShort", 12, 3.0, 4.0, 2], ["nature_lily_large", 10, 3.0, 4.5, 2],
-		["nature_lily_small", 10, 3.0, 4.5, 2], ["nature_grass_leafsLarge", 12, 3.0, 4.2, 2]],
-	"snow": [["nature_tree_pineSmallA", 8, 4.5, 6.5, 0], ["nature_tree_pineRoundA", 6, 4.5, 6.0, 0], ["nature_tree_cone", 4, 4.5, 6.0, 0],
-		["nature_tree_pineSmallB", 4, 4.5, 6.0, 0], ["nature_tree_pineSmallC", 3, 4.5, 6.0, 0], ["nature_tree_pineRoundD", 3, 4.5, 6.0, 0],
-		["nature_tree_cone_dark", 2, 4.5, 6.0, 0], ["nature_rock_largeC", 3, 3.0, 5.0, 1], ["nature_rock_largeE", 2, 3.0, 5.0, 1],
-		["nature_stone_tallA", 2, 3.0, 4.5, 1], ["nature_stone_tallE", 2, 3.0, 4.5, 1], ["nature_stone_largeA", 4, 3.0, 4.5, 2],
-		["nature_stone_largeB", 3, 3.0, 4.5, 2], ["nature_stone_smallA", 8, 2.6, 4.0, 2], ["nature_plant_bushSmall", 4, 2.6, 3.4, 2]],
-	"ruins": [["nature_tree_blocks_dark", 3, 4.0, 5.0, 0], ["graveyard_pine-crooked", 4, 4.0, 5.5, 0], ["graveyard_pine-fall-crooked", 2, 4.0, 5.5, 0],
-		["nature_tree_plateau_dark", 2, 4.0, 5.0, 0], ["nature_statue_column", 2, 4.0, 5.0, 1], ["nature_statue_columnDamaged", 3, 4.0, 5.0, 1],
-		["graveyard_gravestone-broken", 5, 3.0, 4.0, 2], ["graveyard_stone-wall-damaged", 2, 4.0, 5.0, 1], ["nature_statue_block", 2, 3.0, 4.0, 1],
-		["graveyard_rocks-tall", 3, 3.5, 5.0, 1], ["nature_rock_smallC", 6, 2.5, 4.0, 2], ["nature_stone_smallC", 6, 2.5, 4.0, 2],
-		["graveyard_debris-wood", 3, 3.0, 4.0, 2], ["nature_grass_leafs", 12, 3.0, 4.0, 2], ["nature_plant_bushTriangle", 4, 3.0, 4.0, 2]],
+	# v0.6.0: реалистичные деревья (TreeGen), растения/камни/брёвна Poly Haven (CC0); «*» — случайный вариант
+	"meadows": [["tree:oak*", 5, 0.8, 1.15, 0], ["tree:birch*", 2, 0.8, 1.1, 0], ["tree:autumn*", 1, 0.8, 1.1, 0],
+		["real:shrub*", 7, 0.8, 1.4, 2], ["real:fern*", 6, 1.0, 1.6, 2], ["real:dandelion*", 14, 2.0, 3.0, 2], ["real:periwinkle*", 10, 2.0, 3.0, 2],
+		["real:sorrel", 8, 2.5, 3.5, 2], ["real:rock_boulder", 1, 1.0, 2.2, 1], ["real:rock_mossb*", 4, 0.6, 1.4, 2], ["real:stump*", 1, 0.8, 1.1, 2],
+		["real:grassclump*", 20, 2.0, 3.0, 2]],
+	"forest": [["tree:fir*", 9, 0.8, 1.2, 0], ["tree:pine*", 6, 0.85, 1.15, 0], ["tree:oak*", 3, 0.9, 1.2, 0], ["tree:dead*", 1, 0.8, 1.0, 0],
+		["real:log", 2, 0.8, 1.2, 1], ["real:stump*", 3, 0.8, 1.2, 2], ["real:roots", 1, 0.7, 1.0, 2], ["real:branches*", 6, 1.5, 2.5, 2],
+		["real:fern*", 16, 1.0, 1.8, 2], ["real:nettle*", 12, 3.0, 4.5, 2], ["real:shrub*", 5, 0.8, 1.3, 2], ["real:rock_moss*", 3, 0.6, 1.3, 1],
+		["real:rock_mossb*", 4, 0.5, 1.0, 2]],
+	"desert": [["real:quiver", 3, 1.6, 2.6, 0], ["real:quiver_dead", 2, 1.5, 2.5, 0], ["tree:dead*", 1, 0.7, 0.9, 0],
+		["real:rock_desert", 3, 1.2, 2.6, 1], ["real:rock_flat", 3, 1.0, 2.5, 1], ["real:rock_round", 2, 1.2, 2.8, 1], ["real:rock_boulder", 3, 0.6, 1.2, 2],
+		["real:rooibos*", 10, 1.2, 2.0, 2], ["real:weed*", 14, 2.0, 3.5, 2], ["real:tuft*", 10, 2.0, 3.0, 2], ["real:branches*", 4, 1.5, 2.5, 2]],
+	"swamp": [["tree:swamp*", 6, 0.8, 1.2, 0], ["tree:dead*", 3, 0.8, 1.1, 0], ["tree:oak*", 1, 0.8, 1.0, 0],
+		["real:log", 3, 0.8, 1.2, 2], ["real:roots", 2, 0.8, 1.1, 2], ["real:stump_b", 2, 0.9, 1.2, 2],
+		["real:fern*", 12, 1.0, 1.6, 2], ["real:grassclump*", 24, 2.5, 4.0, 2], ["real:nettle*", 8, 3.0, 4.0, 2],
+		["nature_lily_large", 10, 3.0, 4.5, 2], ["nature_lily_small", 10, 3.0, 4.5, 2], ["real:rock_mossb*", 3, 0.6, 1.2, 2]],
+	"snow": [["tree:snowfir*", 10, 0.8, 1.2, 0], ["tree:dead*", 1, 0.7, 1.0, 0], ["real:rock_round", 3, 1.2, 2.5, 1], ["real:rock_boulder", 3, 1.0, 2.2, 1],
+		["real:rock_moss*", 4, 0.7, 1.4, 1], ["real:rock_mossb*", 6, 0.5, 1.0, 2], ["real:branches*", 4, 1.5, 2.2, 2], ["real:tuft*", 6, 2.0, 3.0, 2]],
+	"ruins": [["tree:dead*", 3, 0.8, 1.1, 0], ["tree:oak*", 2, 0.8, 1.0, 0], ["tree:fir*", 2, 0.8, 1.0, 0],
+		["nature_statue_column", 2, 4.0, 5.0, 1], ["nature_statue_columnDamaged", 3, 4.0, 5.0, 1], ["graveyard_gravestone-broken", 5, 3.0, 4.0, 2],
+		["graveyard_stone-wall-damaged", 2, 4.0, 5.0, 1], ["nature_statue_block", 2, 3.0, 4.0, 1], ["real:rock_moss*", 3, 0.8, 1.4, 1],
+		["real:rock_mossb*", 5, 0.5, 1.0, 2], ["real:branches*", 4, 1.5, 2.5, 2], ["real:roots", 1, 0.8, 1.0, 2], ["real:nettle*", 8, 3.0, 4.0, 2],
+		["real:fern*", 6, 1.0, 1.4, 2]],
 }
 
 var chunks := {}          # Vector2i -> {lod, node, heights, res}
@@ -77,41 +65,57 @@ static var feature_sink = null  # массив: сюда prop() пишет по�
 static var _prop_mat: StandardMaterial3D
 
 # ---------------- библиотека пропсов ----------------
-static func prop_mesh(key: String) -> Mesh:
+## v0.6.0: ключи "real:"/"tree:" — реалистичные меши со своими PBR-материалами; старые ключи Kenney
+## по возможности заменяются реалистичными (Real.replacement), остальные — с трипланарным PBR-материалом.
+static func prop_mesh(key: String, lod := 0) -> Mesh:
+	if Real.is_real(key): return Real.mesh(key, lod)
 	if not _props.has(key):
 		var p := "res://assets/world/props/%s.res" % key
 		_props[key] = load(p) if ResourceLoader.exists(p) else null
 	return _props[key]
 
-static func prop_material() -> StandardMaterial3D:
-	if _prop_mat == null:
-		_prop_mat = StandardMaterial3D.new()
-		_prop_mat.vertex_color_use_as_albedo = true
-		_prop_mat.vertex_color_is_srgb = true   # палитра Kenney — в sRGB (раньше цвета выглядели выцветшими)
-		_prop_mat.roughness = 0.88
-		_prop_mat.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
-		if Game.quality <= 1: _prop_mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_VERTEX
-	return _prop_mat
+## [ключ, множитель масштаба] — с учётом замены Kenney → реалистичная модель
+static var _resolved := {}
+static func resolve(key: String) -> Array:
+	if Real.is_real(key): return [key, 1.0]
+	if _resolved.has(key): return _resolved[key]
+	var out := [key, 1.0]
+	var r := Real.replacement(key)
+	if not r.is_empty():
+		var nm := Real.mesh(r[0])
+		var om := prop_mesh(key)
+		if nm != null:
+			var f := 1.0
+			if om != null:
+				f = clampf(om.get_aabb().size.y / maxf(nm.get_aabb().size.y, 0.01), r[1], r[2])
+			out = [r[0], f]
+	_resolved[key] = out
+	return out
 
-## Отдельный проп (города, точки интереса): MeshInstance3D с общим материалом
+static func prop_material() -> Material:
+	return Real.surf_material()
+
+## Отдельный проп (города, точки интереса): MeshInstance3D; реалистичные — со своими материалами
 static func prop(parent: Node, key: String, pos: Vector3, yaw_deg: float, s: float) -> MeshInstance3D:
+	var rv := resolve(key)
 	var mi := MeshInstance3D.new()
-	mi.mesh = prop_mesh(key)
-	mi.material_override = prop_material()
+	mi.mesh = prop_mesh(rv[0])
+	if not Real.is_real(rv[0]): mi.material_override = Real.kenney_material(rv[0])
 	parent.add_child(mi)
 	mi.position = pos
 	mi.rotation_degrees.y = yaw_deg
-	mi.scale = Vector3.ONE * s
+	mi.scale = Vector3.ONE * s * float(rv[1])
 	if feature_sink != null and mi.is_inside_tree():
 		var g := mi.global_position
 		var ab := mi.get_aabb()
-		feature_sink.append({"key": key, "pos": Vector2(g.x, g.z), "size": Vector2(ab.size.x, ab.size.z) * s, "yaw": mi.global_rotation.y})
+		feature_sink.append({"key": key, "pos": Vector2(g.x, g.z), "size": Vector2(ab.size.x, ab.size.z) * s * float(rv[1]), "yaw": mi.global_rotation.y})
 	return mi
 
 # ---------------- сборка ----------------
 func build(z) -> void:
 	zone = z
 	WorldData.init()
+	Real.init()
 	rng.seed = 2026
 	_colliders = StaticBody3D.new(); _colliders.name = "Colliders"; _colliders.collision_layer = 1
 	add_child(_colliders)
@@ -153,17 +157,20 @@ func build(z) -> void:
 func apply_graphics() -> void:
 	super.apply_graphics()
 	if terrain_mat: _terrain_tier()
+	Real.apply_graphics()
 	if dress: dress.apply_graphics()
 	_focus_chunk = Vector2i(99999, 99999)   # пересчитать кольца под новую дальность
 
 func is_dungeon_env() -> bool: return false
 
-## Уровни ландшафта: Низкое — цвет вершин; Среднее — текстуры + тени облаков; Высокое — + нормали; Очень/Ультра — + второй масштаб
+## v0.6.0: реалистичная земля на всех пресетах (PBR-текстуры, смешение по высоте, трипланарная скала).
+## Пресет меняет только технику: нормали — Среднее+, второй масштаб — Высокое+, тени облаков — Среднее+.
 func _terrain_tier() -> void:
 	var q := Game.quality
-	terrain_mat.set_shader_parameter("tex_on", q >= 1)
-	terrain_mat.set_shader_parameter("normals_on", q >= 2)
-	terrain_mat.set_shader_parameter("anti_tile", q >= 3)
+	terrain_mat.set_shader_parameter("tex_on", true)
+	terrain_mat.set_shader_parameter("normals_on", q >= 1)
+	terrain_mat.set_shader_parameter("anti_tile", q >= 2)
+	terrain_mat.set_shader_parameter("triplanar_rock", true)
 	terrain_mat.set_shader_parameter("clouds_on", q >= 1)
 
 ## Высота земли (для врагов, лута): по сетке загруженного чанка — совпадает со столкновением; иначе — формула
@@ -343,7 +350,7 @@ static func gen_chunk(k: Vector2i, lod: int, quality: int) -> Dictionary:
 			idx[t + 3] = a + 1; idx[t + 4] = a + w + 1; idx[t + 5] = a + w
 			t += 6
 	var out := {"res": res, "heights": hs, "verts": verts, "norms": norms, "cols": cols, "c0": c0, "c1": c1, "idx": idx,
-		"water": swamp > 0.45, "props": {}, "solid": [], "fires": [], "grass": []}
+		"water": swamp > 0.45, "props": {}, "small": {}, "solid": [], "fires": [], "grass": []}
 	# малые точки интереса (лагеря, повозки, святилища…): пропсы, чей центр — в этом чанке
 	var minors := WorldData.minor_near(rect)
 	for m in minors:
@@ -394,15 +401,25 @@ static func gen_chunk(k: Vector2i, lod: int, quality: int) -> Dictionary:
 				for m in minors: md = minf(md, Vector2(x, z).distance_to(m.pos))
 				if md < (13.0 if kind != 2 else 9.0): continue
 				if row[0] == "nature_lily_large" and hs[iz2 * w + ix2] > -0.2: continue
-				var y := hs[iz2 * w + ix2]
+				var y := _interp_h(hs, w, cell, lx, lz)
 				var s := rng.randf_range(row[2], row[3])
-				var b := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * s)
-				if not out.props.has(row[0]): out.props[row[0]] = []
-				out.props[row[0]].append(Transform3D(b, Vector3(lx, y - 0.05, lz)))
-				if kind != 2 and lod == 0: out.solid.append([Vector3(lx, y, lz), (0.45 if kind == 0 else 1.1) * s / 4.0, kind])
+				var key := Real.pick(row[0], rng)
+				var real := Real.is_real(key)
+				# реалистичные: лёгкий наклон по склону у мелочи и камней, утопить основание
+				var b := Basis(Vector3.UP, rng.randf() * TAU)
+				if real and kind != 0:
+					b = Basis(Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1)).normalized(), rng.randf_range(0.0, 0.18)) * b
+				b = b.scaled(Vector3.ONE * s)
+				var sink := (0.05 if not real else (0.12 * s if kind == 1 else (0.06 if kind == 0 else 0.02)))
+				if not out.props.has(key): out.props[key] = []
+				out.props[key].append(Transform3D(b, Vector3(lx, y - sink, lz)))
+				if kind == 2: out.small[key] = true
+				if kind != 2 and lod == 0:
+					var rad := ((0.45 if kind == 0 else 1.1) * s / 4.0) if not real else ((0.35 * s) if kind == 0 else (0.75 * s))
+					out.solid.append([Vector3(lx, y, lz), rad, kind])
 	# трава-травинки (ветер) — только ближние чанки, Высокое+: плотность по весу слоя травы
 	var gcount := 0
-	if lod == 0: gcount = [0, 0, 3200, 5000, 7000][clampi(quality, 0, 4)]
+	if lod == 0: gcount = [1000, 1800, 3000, 4200, 5600][clampi(quality, 0, 4)]   # v0.6.0: трава-карточки на всех пресетах
 	if gcount > 0:
 		var gr := RandomNumberGenerator.new(); gr.seed = hash(k) ^ 0x6a55
 		for i in gcount:
@@ -469,20 +486,28 @@ func _apply(k: Vector2i, lod: int, d: Dictionary) -> void:
 			var cy := CylinderShape3D.new(); cy.radius = maxf(0.3, s[1]); cy.height = 4.0
 			sh.shape = cy; sh.position = s[0] + Vector3(0, 2.0, 0)
 			body.add_child(sh)
-	for key in d.props:
-		var mesh := prop_mesh(key)
+	for key0 in d.props:
+		var rv := resolve(key0)
+		var key: String = rv[0]
+		var f: float = rv[1]
+		var mesh := prop_mesh(key, lod)
 		if mesh == null: continue
-		var list: Array = d.props[key]
+		var list: Array = d.props[key0]
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
 		mm.mesh = mesh
 		mm.instance_count = list.size()
-		for i in list.size(): mm.set_instance_transform(i, list[i])
+		for i in list.size():
+			var t: Transform3D = list[i]
+			if f != 1.0: t.basis = t.basis.scaled(Vector3.ONE * f)
+			mm.set_instance_transform(i, t)
 		var mmi := MultiMeshInstance3D.new()
 		mmi.multimesh = mm
-		mmi.material_override = prop_material()
-		var small := _is_small(key)
-		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if (small or Game.quality <= 1) else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		if not Real.is_real(key): mmi.material_override = Real.kenney_material(key)
+		var small: bool = d.small.has(key0) or (not Real.is_real(key0) and _is_small(key0))
+		var tree := key.begins_with("tree:") or key == "real:quiver"
+		var shadow := (not small) and Game.shadows_enabled and (Game.quality >= 2 or (tree and Game.quality >= 1))
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadow else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mmi.visibility_range_end = (55.0 if small else Game.view_distance + WorldData.CHUNK)
 		mmi.visibility_range_end_margin = 6.0
 		mmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
@@ -491,16 +516,16 @@ func _apply(k: Vector2i, lod: int, d: Dictionary) -> void:
 	if not d.grass.is_empty():
 		var g: Array = d.grass
 		var mm := MultiMesh.new(); mm.transform_format = MultiMesh.TRANSFORM_3D; mm.use_colors = true
-		mm.mesh = blade_mesh(); mm.instance_count = g.size()
+		mm.mesh = Real.grass_mesh(); mm.instance_count = g.size()
 		for i in g.size():
 			var v: Vector4 = g[i]
-			var sc := 0.75 + v.w * 0.5
-			mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, v.w * 37.0).scaled(Vector3(sc, sc * (0.8 + v.w * 0.6), sc)), Vector3(v.x, v.y - 0.02, v.z)))
+			var sc := 0.55 + v.w * 0.45
+			mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, v.w * 37.0).scaled(Vector3(sc, sc * (0.75 + v.w * 0.7), sc)), Vector3(v.x, v.y - 0.03, v.z)))
 			mm.set_instance_color(i, Color(v.w, 0, 0))
 		var gi := MultiMeshInstance3D.new(); gi.name = "Grass"; gi.multimesh = mm
 		gi.material_override = grass_material(WorldData.biome_at(root.position.x + 32, root.position.z + 32))
 		gi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		gi.visibility_range_end = 42.0; gi.visibility_range_end_margin = 8.0
+		gi.visibility_range_end = [30.0, 36.0, 44.0, 52.0, 60.0][clampi(Game.quality, 0, 4)]; gi.visibility_range_end_margin = 8.0
 		gi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF if Game.quality >= 3 else GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
 		root.add_child(gi)
 	for f in d.fires:
@@ -546,12 +571,12 @@ static var _grass_mats := {}
 static func grass_material(b: int) -> ShaderMaterial:
 	var id: String = WorldData.BIOMES[b].id
 	if not _grass_mats.has(id):
-		var gm := ShaderMaterial.new(); gm.shader = load("res://assets/shaders/grass.gdshader")
-		var cols := {"meadows": [Color(0.16, 0.30, 0.10), Color(0.55, 0.70, 0.28)], "forest": [Color(0.10, 0.22, 0.08), Color(0.35, 0.50, 0.20)],
+		var gm: ShaderMaterial
+		var cols := {"meadows": [Color(0.2, 0.27, 0.11), Color(0.52, 0.6, 0.3)], "forest": [Color(0.14, 0.2, 0.09), Color(0.38, 0.46, 0.22)],
 			"desert": [Color(0.42, 0.36, 0.18), Color(0.78, 0.70, 0.42)], "swamp": [Color(0.16, 0.20, 0.08), Color(0.45, 0.48, 0.20)],
 			"snow": [Color(0.30, 0.36, 0.30), Color(0.70, 0.75, 0.70)], "ruins": [Color(0.16, 0.18, 0.14), Color(0.42, 0.45, 0.32)]}
 		var c: Array = cols.get(id, cols.meadows)
-		gm.set_shader_parameter("base_col", c[0]); gm.set_shader_parameter("tip_col", c[1])
+		gm = Real.grass_material(c[0], c[1])
 		_grass_mats[id] = gm
 	return _grass_mats[id]
 
@@ -689,19 +714,14 @@ func _town(i: int) -> void:
 	root.add_child(lbl); lbl.position = Vector3(0, 9, 0)
 
 func _house(root: Node3D, p: Vector3, yaw: float, stone: bool) -> void:
-	var h := Node3D.new(); root.add_child(h)
-	h.position = p; h.rotation_degrees.y = yaw
-	var s := 4.2
-	var wall := "town_wall" if stone else "town_wall-wood"
-	var door := "town_wall-door" if stone else "town_wall-wood-door"
-	var win := "town_wall-window-stone" if stone else "town_wall-wood-window-shutters"
-	for side in 4:
-		var key: String = door if side == 0 else (win if side % 2 == 1 else wall)
-		var piv := Node3D.new(); h.add_child(piv)
-		piv.rotation_degrees.y = side * 90.0
-		var mi := prop(piv, key, Vector3(0, 0, 0), 0, s)
-		mi.position = Vector3(0, 0, 0)
-	prop(h, "town_roof-high-point" if stone else "town_roof-point", Vector3(0, s, 0), 0, s)
+	## v0.6.0: реалистичный дом (HouseGen) вместо стен Kenney; стиль — от позиции (разнообразие)
+	var style := 1 if stone else (absi(int(p.x * 7.0 + p.z * 3.0)) % 2) * 2
+	var mi := MeshInstance3D.new(); mi.mesh = HouseGen.mesh(style)
+	root.add_child(mi)
+	mi.position = p; mi.rotation_degrees.y = yaw + 180.0
+	if feature_sink != null and mi.is_inside_tree():
+		var g := mi.global_position
+		feature_sink.append({"key": "house", "pos": Vector2(g.x, g.z), "size": Vector2(HouseGen.W + 0.6, HouseGen.D + 0.6), "yaw": mi.global_rotation.y})
 
 func _box_col(p: Vector3, size: Vector3, yaw: float) -> void:
 	var cs := CollisionShape3D.new()

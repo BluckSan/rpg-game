@@ -10,6 +10,10 @@ const SPOTS := [
 	["snow", Vector3(560, 0, -440), -0.8],
 	["ruins", Vector3(40, 0, -560), 3.0],
 	["town", Vector3(14, 0, 590), 3.1],
+	["valley", Vector3(14, 0, 16), 2.3, "starter"],
+	["valley_forest", Vector3(-30, 0, 4), 1.4, "starter"],
+	["dungeon", Vector3(0, 0, 44), 3.14, "dungeon"],
+	["dungeon_arena", Vector3(0, 0, 90), 3.14, "dungeon"],
 ]
 
 func _ready() -> void:
@@ -30,9 +34,13 @@ func _ready() -> void:
 	for s in SPOTS:
 		if only != "" and not only.split(",").has(s[0]): continue
 		var p: Vector3 = s[1]
-		WorldData.init()
-		p.y = WorldData.height(p.x, p.z) + 0.3
-		c["zone"] = "global"; c["has_pos"] = true; c["pos"] = [p.x, p.y, p.z]
+		var zid: String = s[3] if s.size() > 3 else "global"
+		if zid == "global":
+			WorldData.init()
+			p.y = WorldData.height(p.x, p.z) + 0.3
+		else: p.y = 0.3
+		DB.set_zone_flag(c, "starter", "boss_troll_killed")
+		c["zone"] = zid; c["has_pos"] = true; c["pos"] = [p.x, p.y, p.z]
 		Game.save_character(c); Game.current = c
 		get_tree().change_scene_to_file("res://scenes/zone.tscn")
 		await get_tree().create_timer(0.5).timeout

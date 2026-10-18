@@ -57,3 +57,10 @@ textures/vram_compression/import_s3tc_bptc=true
 anti_aliasing/quality/msaa_3d=1
 rendering_device/fallback_to_opengl3=true
 
+
+[shader_globals]
+
+cam_fade_dist={
+"type": "float",
+"value": 0.0
+}

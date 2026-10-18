@@ -126,6 +126,9 @@ func _room(x0: float, x1: float, z0: float, z1: float, gaps_n: Array, gaps_s: Ar
 
 func _wall_x(x: float, z0: float, z1: float) -> void:
 	_add("box", Vector3(x, 2.5, (z0 + z1) / 2), Vector3(1.0, 5.0, z1 - z0 + 1.0), WALL)
+	# v0.6.0: цоколь и карниз из бута — стена перестаёт быть «блоком»
+	_add("box", Vector3(x, 0.35, (z0 + z1) / 2), Vector3(1.35, 0.7, z1 - z0 + 1.2), DUNGEON_TRIM, Vector3.ZERO, false)
+	_add("box", Vector3(x, 5.05, (z0 + z1) / 2), Vector3(1.4, 0.35, z1 - z0 + 1.3), DUNGEON_TRIM, Vector3.ZERO, false)
 	var n := int((z1 - z0) / 6.0)
 	for i in n:   # пилястры и факелы
 		var zz := z0 + (i + 0.5) * (z1 - z0) / n
@@ -147,6 +150,8 @@ func _wall_z(z: float, x0: float, x1: float, gaps: Array) -> void:
 	for s in segs:
 		if s[1] - s[0] < 0.1: continue
 		_add("box", Vector3((s[0] + s[1]) / 2, 2.5, z), Vector3(s[1] - s[0], 5.0, 1.0), WALL)
+		_add("box", Vector3((s[0] + s[1]) / 2, 0.35, z), Vector3(s[1] - s[0] + 0.2, 0.7, 1.35), DUNGEON_TRIM, Vector3.ZERO, false)
+		_add("box", Vector3((s[0] + s[1]) / 2, 5.05, z), Vector3(s[1] - s[0] + 0.3, 0.35, 1.4), DUNGEON_TRIM, Vector3.ZERO, false)
 
 func _arena() -> void:
 	var c := arena_center
@@ -158,6 +163,7 @@ func _arena() -> void:
 		if a > 255 and a < 285: continue   # проход (−Z)
 		var p := c + Vector3(cos(deg_to_rad(a)), 0, sin(deg_to_rad(a))) * (arena_r + 1.0)
 		_add("box", p + Vector3.UP * 2.75, Vector3(3.6, 5.5, 1.2), WALL, Vector3(0, -a + 90, 0))
+		_add("box", p + Vector3.UP * 0.35, Vector3(3.7, 0.7, 1.55), DUNGEON_TRIM, Vector3(0, -a + 90, 0), false)
 	# переходник коридор → арена
 	_add("box", Vector3(-4.5, 2.5, 86.5), Vector3(1.0, 5.0, 2.0), WALL)
 	_add("box", Vector3(4.5, 2.5, 86.5), Vector3(1.0, 5.0, 2.0), WALL)

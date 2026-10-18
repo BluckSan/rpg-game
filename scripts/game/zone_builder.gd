@@ -48,8 +48,8 @@ func build(z) -> void:
 	_dungeon_gate(dungeon_gate_point)
 	_scatter()
 	_boundary()
+	_real_world()
 	_flush_batches()
-	if Game.desktop and Game.is_pc_platform(): _hi_world()
 	apply_graphics()
 	# спавны
 	Spawner.create(z, enemies_root, Vector3(28, 0, 22), "slime", 1, 2, 6, 9, 15)
@@ -79,12 +79,9 @@ func _lighting() -> void:
 	var we := WorldEnvironment.new()
 	var e := Environment.new()
 	var sky := Sky.new()
-	var sm := ProceduralSkyMaterial.new()
-	sm.sky_top_color = Color(0.3, 0.48, 0.75)
-	sm.sky_horizon_color = Color(0.7, 0.74, 0.78)
-	sm.ground_horizon_color = Color(0.62, 0.66, 0.66)
-	sm.ground_bottom_color = Color(0.22, 0.25, 0.2)
-	sm.sun_angle_max = 20
+	# v0.6.0: фото-небо (Poly Haven, CC0) на всех пресетах
+	var sm := ShaderMaterial.new(); sm.shader = load("res://shaders/sky_clouds.gdshader")
+	sm.set_shader_parameter("pano", load("res://assets/real/sky/sky_day.jpg"))
 	sky.sky_material = sm
 	sky.radiance_size = Sky.RADIANCE_SIZE_64
 	sky.process_mode = Sky.PROCESS_MODE_QUALITY
@@ -111,8 +108,8 @@ func _lighting() -> void:
 	e.glow_bloom = 0.04
 	e.glow_hdr_threshold = 1.1
 	e.adjustment_enabled = true
-	e.adjustment_saturation = 1.08
-	e.adjustment_contrast = 1.04
+	e.adjustment_saturation = 0.98
+	e.adjustment_contrast = 1.05
 	we.environment = e
 	we.name = "Env"
 	add_child(we)
@@ -187,48 +184,77 @@ func _heavy_env(e: Environment, sun: DirectionalLight3D) -> void:
 
 func is_dungeon_env() -> bool: return false
 
-## ПК: шейдерная земля, трава с ветром (чанки 16 м, дальность 38 м), пруд с водой
-func _hi_world() -> void:
-	var nb := NoiseTexture2D.new(); nb.width = 512; nb.height = 512; nb.seamless = true
-	var fn := FastNoiseLite.new(); fn.frequency = 0.008; fn.fractal_octaves = 4; nb.noise = fn
-	var ns := NoiseTexture2D.new(); ns.width = 256; ns.height = 256; ns.seamless = true
-	var fs := FastNoiseLite.new(); fs.frequency = 0.05; fs.fractal_octaves = 2; ns.noise = fs
-	var tm := ShaderMaterial.new(); tm.shader = load("res://assets/shaders/terrain.gdshader")
-	tm.set_shader_parameter("noise_big", nb); tm.set_shader_parameter("noise_small", ns)
-	var ground := MeshInstance3D.new(); ground.name = "TerrainHi"
-	var pm := PlaneMesh.new(); pm.size = Vector2(SIZE * 2 + 40, SIZE * 2 + 40)
-	ground.mesh = pm; ground.material_override = tm
-	ground.position = Vector3(0, 0.003, 0)
-	add_child(ground); detail_nodes.append(ground)
-	# трава
-	var blade := _blade_mesh()
-	var gm := ShaderMaterial.new(); gm.shader = load("res://assets/shaders/grass.gdshader")
+## v0.6.0: реалистичная земля (тот же сплат-шейдер с PBR-слоями, что и в мире), травяные карточки с ветром и пруд —
+## на всех платформах и пресетах; пресет меняет только плотность и дальность травы
+func _real_world() -> void:
+	var tm := ShaderMaterial.new(); tm.shader = load("res://shaders/terrain.gdshader")
+	tm.set_shader_parameter("layers", load("res://assets/terrain/layers.jpg"))
+	tm.set_shader_parameter("normals", load("res://assets/terrain/normals.jpg"))
+	tm.set_shader_parameter("cloud_noise", WorldDress.cloud_texture())
+	var q := Game.quality
+	tm.set_shader_parameter("normals_on", q >= 1); tm.set_shader_parameter("anti_tile", q >= 2)
+	tm.set_shader_parameter("clouds_on", q >= 1)
+	var fn := FastNoiseLite.new(); fn.seed = 4242; fn.frequency = 0.035; fn.fractal_octaves = 3
+	var ext := SIZE + 20.0; var STEP := 2.0; var n := int(ext * 2 / STEP) + 1
+	var verts := PackedVector3Array(); var norms := PackedVector3Array(); var cols := PackedColorArray()
+	var c0 := PackedFloat32Array(); var c1 := PackedFloat32Array(); var idx := PackedInt32Array()
+	var ruins := Vector3(-4, 0, 64)
+	for j in n:
+		for i in n:
+			var p := Vector3(-ext + i * STEP, 0.003, -ext + j * STEP)
+			var nz := fn.get_noise_2d(p.x, p.z)
+			var dirt := 1.0 - smoothstep(1.4, 2.8, _dist_to_path(p))
+			dirt = maxf(dirt, 1.0 - smoothstep(5.0, 9.0, p.length()))                # лагерь
+			dirt = maxf(dirt, 1.0 - smoothstep(POND_R + 0.4, POND_R + 2.6, p.distance_to(POND)))
+			var gravel := 1.0 - smoothstep(10.0, 18.0, p.distance_to(ruins))
+			var rock := smoothstep(SIZE - 10.0, SIZE + 4.0, p.length())
+			var leaf := smoothstep(0.15, 0.45, nz) * (1.0 - dirt)
+			var g := maxf(1.0 - dirt - gravel * 0.7 - rock - leaf * 0.6, 0.0)
+			verts.append(p); norms.append(Vector3.UP); cols.append(Color(1, 1, 1, 1))
+			c0.append_array([g, leaf, gravel * 0.7, smoothstep(-0.5, -0.2, -nz) * 0.15 * g])
+			c1.append_array([dirt, 0.0, rock, 0.0])
+	for j in n - 1:
+		for i in n - 1:
+			var k := j * n + i
+			idx.append_array([k, k + 1, k + n, k + 1, k + n + 1, k + n])
+	var arr := []; arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = verts; arr[Mesh.ARRAY_NORMAL] = norms; arr[Mesh.ARRAY_COLOR] = cols
+	arr[Mesh.ARRAY_CUSTOM0] = c0; arr[Mesh.ARRAY_CUSTOM1] = c1; arr[Mesh.ARRAY_INDEX] = idx
+	var fmt := (Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT) | (Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM1_SHIFT)
+	var am := ArrayMesh.new(); am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr, [], {}, fmt)
+	var ground := MeshInstance3D.new(); ground.name = "TerrainReal"; ground.mesh = am; ground.material_override = tm
+	ground.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(ground)
+	# трава — карточки с фото-текстурой (как в мире)
+	var gm := Real.grass_material(Color(0.2, 0.27, 0.11), Color(0.52, 0.6, 0.3))
 	var CH := 16.0
+	var per: int = [260, 450, 750, 1050, 1400][clampi(q, 0, 4)]
 	var grng := RandomNumberGenerator.new(); grng.seed = 777
 	var x := -SIZE + CH / 2
 	while x < SIZE:
 		var zz := -SIZE + CH / 2
 		while zz < SIZE:
 			var xf: Array = []
-			for i in 900:
+			for i in per:
 				var p := Vector3(x + grng.randf_range(-CH / 2, CH / 2), 0, zz + grng.randf_range(-CH / 2, CH / 2))
-				if p.length() < 13 or _dist_to_path(p) < 2.0 or p.distance_to(Vector3(-4, 0, 64)) < 17 or p.distance_to(Vector3(52, 0, -14)) < 12 \
-						or (absf(p.x - 6) < 12 and absf(p.z + 46) < 10) or p.distance_to(POND) < POND_R + 0.5 or p.distance_to(dungeon_gate_point) < 6 or p.length() > SIZE - 4:
+				if p.length() < 9 or _dist_to_path(p) < 2.0 or p.distance_to(Vector3(-4, 0, 64)) < 15 or p.distance_to(Vector3(52, 0, -14)) < 12 \
+						or (absf(p.x - 6) < 12 and absf(p.z + 46) < 10) or p.distance_to(POND) < POND_R + 1.5 or p.distance_to(dungeon_gate_point) < 6 or p.length() > SIZE - 4:
 					continue
-				var s := grng.randf_range(0.7, 1.3)
-				xf.append(Transform3D(Basis(Vector3.UP, grng.randf() * TAU).scaled(Vector3(s, s * grng.randf_range(0.8, 1.4), s)), p))
+				var w := grng.randf()
+				var sc := 0.55 + w * 0.45
+				xf.append(Transform3D(Basis(Vector3.UP, w * 37.0).scaled(Vector3(sc, sc * (0.75 + w * 0.7), sc)), p + Vector3.DOWN * 0.03))
 			if xf.size() > 0:
 				var mm := MultiMesh.new(); mm.transform_format = MultiMesh.TRANSFORM_3D; mm.use_colors = true
-				mm.mesh = blade; mm.instance_count = xf.size()
+				mm.mesh = Real.grass_mesh(); mm.instance_count = xf.size()
 				for i in xf.size():
 					mm.set_instance_transform(i, xf[i])
 					mm.set_instance_color(i, Color(grng.randf(), 0, 0))
 				var mi := MultiMeshInstance3D.new(); mi.multimesh = mm; mi.material_override = gm
 				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-				mi.visibility_range_end = 38.0; mi.visibility_range_end_margin = 6.0
-				mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+				mi.visibility_range_end = [30.0, 36.0, 44.0, 52.0, 60.0][clampi(q, 0, 4)]; mi.visibility_range_end_margin = 6.0
+				mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF if q >= 3 else GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
 				mi.name = "Grass"
-				add_child(mi); hi_nodes.append(mi)
+				add_child(mi)
 			zz += CH
 		x += CH
 	# пруд
@@ -243,13 +269,11 @@ func _hi_world() -> void:
 	water.mesh = wmesh; water.material_override = wm
 	water.position = POND + Vector3(0, 0.05, 0)
 	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(water); hi_nodes.append(water)
-	var shore := U.prim("cylinder", self, POND + Vector3(0, 0.008, 0), Vector3(POND_R * 2 + 2.5, 0.004, POND_R * 2 + 2.5), Color(0.42, 0.38, 0.28))
-	hi_nodes.append(shore)
+	add_child(water)
 	for i in 10:
 		var a := TAU * i / 10.0 + 0.3
-		var rk := U.prim("sphere", self, POND + Vector3(cos(a), 0.15, sin(a)) * (POND_R + 0.8), Vector3(1.1, 0.5, 0.9) * (0.6 + 0.08 * (i % 4)), STONE * 0.85)
-		hi_nodes.append(rk)
+		var key: String = ["real:rock_moss_a", "real:rock_mossb_b", "real:rock_flat", "real:rock_round"][i % 4]
+		_add_real(key, Transform3D(Basis(Vector3.UP, a * 3.0).scaled(Vector3.ONE * (0.5 + 0.06 * (i % 4))), POND + Vector3(cos(a), -0.05, sin(a)) * (POND_R + 0.8)))
 
 ## Травинка: 3 скрещённые плоскости-треугольника (UV.y — высота для ветра)
 func _blade_mesh() -> ArrayMesh:
@@ -308,10 +332,11 @@ func point_blocked(p: Vector3, r: float) -> bool:
 ## Статика по типу примитива и ячейке 24×24 м: каждая ячейка — свой MultiMesh, поэтому
 ## работает отсечение по камере и по дальности (visibility_range) — меньше вершин и вызовов.
 const CELL := 24.0
+const DUNGEON_TRIM := Color(0.31, 0.3, 0.33)   # цоколь/карниз стен подземелья (бутовый камень)
 func _flush_batches() -> void:
-	var m := StandardMaterial3D.new()
-	m.vertex_color_use_as_albedo = true
-	m.roughness = 0.85
+	# v0.6.0: вместо одноцветных блоков — трипланарные PBR-материалы (кладка, плиты, дерево, ткань…); слой — в custom data
+	var m := Real.surf_material(-1, true)
+	_flush_real()
 	for kind in _batches:
 		var cells := {}
 		for it in _batches[kind]:
@@ -326,11 +351,14 @@ func _flush_batches() -> void:
 			var mm := MultiMesh.new()
 			mm.transform_format = MultiMesh.TRANSFORM_3D
 			mm.use_colors = true
+			mm.use_custom_data = true
 			mm.mesh = U.mesh(kind)
 			mm.instance_count = list.size()
 			for i in list.size():
 				mm.set_instance_transform(i, list[i][0])
 				mm.set_instance_color(i, list[i][1])
+				var ly := _layer_for(kind, list[i][1], (list[i][0] as Transform3D).basis.get_scale())
+				mm.set_instance_custom_data(i, Color((ly + 1) / 255.0, 0, 0, 0))
 			var mmi := MultiMeshInstance3D.new()
 			mmi.multimesh = mm
 			mmi.material_override = m
@@ -339,6 +367,48 @@ func _flush_batches() -> void:
 				mmi.visibility_range_end = Game.view_distance + CELL
 				mmi.add_to_group("view_range")
 			add_child(mmi)
+
+## слой материала (Real.SURF) для блока по цвету/форме; -1 — определить в шейдере по цвету
+func _layer_for(kind: String, c: Color, sc: Vector3) -> int:
+	var flat := sc.y < 0.12 or (kind == "cylinder" and sc.y < 0.06)
+	if is_dungeon_env():
+		if flat or (sc.y < 1.2 and sc.x > 6.0): return Real.SURF.floor
+		if c.is_equal_approx(DUNGEON_TRIM): return Real.SURF.rubble
+		if c.s > 0.35: return -1
+		return Real.SURF.stone
+	var hsv := Vector3(c.h, c.s, c.v)
+	if c.is_equal_approx(DIRT) or (flat and hsv.x > 0.05 and hsv.x < 0.14 and hsv.y > 0.3): return Real.SURF.dirt
+	if hsv.x > 0.17 and hsv.x < 0.45 and hsv.y > 0.25: return Real.SURF.grass
+	if hsv.y < 0.16 or (hsv.y < 0.3 and hsv.x > 0.5 and hsv.x < 0.8):
+		if kind == "sphere": return Real.SURF.rock
+		return Real.SURF.floor if flat else Real.SURF.stone
+	if hsv.x < 0.14 and hsv.y > 0.25:
+		if kind == "sphere": return Real.SURF.thatch
+		if hsv.z > 0.62 and hsv.y < 0.5: return Real.SURF.cloth
+		return Real.SURF.beam if kind == "cylinder" else Real.SURF.planks
+	if hsv.y < 0.3 and hsv.z > 0.6: return Real.SURF.cloth
+	return -1
+
+## v0.6.0: реалистичные деревья/камни/растения (Real) — по ячейкам 24 м, MultiMesh со своими материалами
+var _real := {}   # key -> [Transform3D]
+func _add_real(key: String, t: Transform3D) -> void:
+	if not _real.has(key): _real[key] = []
+	_real[key].append(t)
+
+func _flush_real() -> void:
+	for key in _real:
+		var cells := {}
+		for t in _real[key]:
+			var o: Vector3 = t.origin
+			var ck := Vector2i(floori(o.x / CELL), floori(o.z / CELL))
+			if not cells.has(ck): cells[ck] = []
+			cells[ck].append(t)
+		var tree: bool = key.begins_with("tree:")
+		var small: bool = not tree and not key.begins_with("real:rock")
+		for ck in cells:
+			var mmi := Real.batch(self, key, cells[ck], 0, (45.0 if small else Game.view_distance + CELL), tree and Game.shadows_enabled)
+			if mmi and not small: mmi.add_to_group("view_range")
+	_real.clear()
 
 func _glow(kind: String, pos: Vector3, scale: Vector3, c: Color, emission: float, scr: Script = null) -> Node3D:
 	var w := Node3D.new()
@@ -381,12 +451,7 @@ func _ground() -> void:
 	var bs := BoxShape3D.new(); bs.size = Vector3(SIZE * 2 + 40, 1, SIZE * 2 + 40)
 	cs.shape = bs; cs.position = Vector3(0, -0.5, 0)
 	_colliders.add_child(cs)
-	_add("box", Vector3(0, -0.5, 0), Vector3(SIZE * 2 + 40, 1, SIZE * 2 + 40), GRASS, Vector3.ZERO, false)
-	for s in PATHS: _path(s[0], s[1])
-	for i in 60:
-		var p := _rand_pos(SIZE - 5)
-		var sz := _r(4, 12)
-		_add("cylinder", Vector3(p.x, 0.005, p.z), Vector3(sz, 0.005, sz * _r(0.6, 1)), GRASS_DARK if rng.randf() < 0.5 else Color(0.38, 0.52, 0.26), Vector3(0, _r(0, 360), 0), false)
+	# видимая земля — TerrainReal (_real_world); пятна и тропы рисует сплат-шейдер
 
 func _path(a: Vector3, b: Vector3) -> void:
 	var d := b - a
@@ -437,26 +502,25 @@ func _camp(c: Vector3) -> void:
 	sign_lbl.rotation_degrees.y = 180
 
 func _tree(p: Vector3, s: float, pine: bool) -> void:
-	_add("cylinder", p + Vector3.UP * 1.2 * s, Vector3(0.35 * s, 1.2 * s, 0.35 * s), WOOD)
-	if pine:
-		var col := Color(0.16, 0.32, 0.18) * _r(0.85, 1.15); col.a = 1
-		for i in 3:
-			_add("cone", p + Vector3.UP * (2.6 + i * 1.0) * s, Vector3((3.0 - i * 0.7) * s, 1.8 * s, (3.0 - i * 0.7) * s), col, Vector3.ZERO, false)
-	else:
-		var col := Color(0.25, 0.45, 0.2) * _r(0.85, 1.15); col.a = 1
-		_add("sphere", p + Vector3.UP * 3.0 * s, Vector3(2.8, 2.4, 2.8) * s, col, Vector3.ZERO, false)
-		_add("sphere", p + Vector3(0.6, 3.6, 0.3) * s, Vector3(1.8, 1.6, 1.8) * s, col * 1.1, Vector3.ZERO, false)
+	# v0.6.0: реалистичное дерево (TreeGen); столкновение — по стволу, как раньше
+	_add_collider("cylinder", p + Vector3.UP * 1.2 * s, Vector3(0.35 * s, 1.2 * s, 0.35 * s), Vector3.ZERO)
+	var kind := ("fir" if rng.randf() < 0.65 else "pine") if pine else ("oak" if rng.randf() < 0.75 else "birch")
+	var key := "tree:%s:%d" % [kind, rng.randi() % Real.TREE_VARIANTS]
+	_add_real(key, Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * clampf(s, 0.7, 1.25) * 0.85), p))
 
 func _rock(p: Vector3, s: float) -> void:
-	var c := STONE * _r(0.8, 1.1); c.a = 1
-	_add("sphere", p + Vector3.UP * 0.3 * s, Vector3(1.4, 0.9, 1.2) * s, c, Vector3(_r(-10, 10), _r(0, 360), _r(-10, 10)))
+	_add_collider("sphere", p + Vector3.UP * 0.3 * s, Vector3(1.4, 0.9, 1.2) * s, Vector3.ZERO)
+	var keys := ["real:rock_boulder", "real:rock_round", "real:rock_moss_a", "real:rock_moss_d", "real:rock_mossb_c", "real:rock_desert"]
+	var key: String = keys[rng.randi() % keys.size()]
+	var b := Basis(Vector3.UP, rng.randf() * TAU) * Basis(Vector3.RIGHT, _r(-0.12, 0.12))
+	_add_real(key, Transform3D(b.scaled(Vector3.ONE * s * 0.9), p + Vector3.DOWN * 0.15 * s))
 
 func _meadow(c: Vector3) -> void:
 	var cols := [Color(1, 0.85, 0.2), Color(0.9, 0.3, 0.4), Color(0.6, 0.5, 1), Color.WHITE]
-	for i in 40:
+	for i in 70:
 		var p := c + _circle(14)
-		_add("sphere", p + Vector3.UP * 0.25, Vector3.ONE * 0.22, cols[rng.randi() % 4], Vector3.ZERO, false)
-		_add("cylinder", p + Vector3.UP * 0.12, Vector3(0.04, 0.12, 0.04), GRASS_DARK, Vector3.ZERO, false)
+		var key: String = ["real:dandelion_a", "real:dandelion_c", "real:periwinkle_a", "real:periwinkle_c", "real:sorrel", "real:fern_c"][rng.randi() % 6]
+		_add_real(key, Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * _r(2.0, 3.2)), p))
 	for i in 5: _rock(c + _circle(15), _r(0.6, 1.2))
 
 func _forest(c: Vector3) -> void:
@@ -606,8 +670,9 @@ func _boundary() -> void:
 	for i in 72:
 		var p := Vector3(0, 0, SIZE + _r(0, 6)).rotated(Vector3.UP, deg_to_rad(i * 5))
 		var s := _r(8, 16)
-		var c := STONE * _r(0.6, 0.85); c.a = 1
-		_add("sphere", p + Vector3.UP * s * 0.2, Vector3(s, s * _r(0.8, 1.3), s), c, Vector3(0, _r(0, 360), 0))
+		_add_collider("sphere", p + Vector3.UP * s * 0.2, Vector3(s, s, s), Vector3.ZERO)
+		var key: String = ["real:rock_round", "real:rock_boulder", "real:rock_desert"][i % 3]
+		_add_real(key, Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s * 0.45, s * _r(0.45, 0.7), s * 0.45)), p + Vector3.DOWN * s * 0.1))
 	for i in 4:
 		var cs := CollisionShape3D.new()
 		var bs := BoxShape3D.new(); bs.size = Vector3(SIZE * 2, 10, 1)

@@ -90,6 +90,7 @@ func setup(z, builder) -> void:
 	if we: env = we.environment
 	if env and env.sky:
 		sky_mat = ShaderMaterial.new(); sky_mat.shader = load("res://shaders/sky_clouds.gdshader")
+		sky_mat.set_shader_parameter("pano", load("res://assets/real/sky/sky_day.jpg"))
 		env.sky.sky_material = sky_mat
 	for i in 2:
 		var gp := GPUParticles3D.new(); gp.name = "Ambient%d" % i
