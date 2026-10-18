@@ -184,7 +184,7 @@ func _enemy_ai(e: Dictionary, dt: float) -> void:
 	var is_boss: bool = e.id == boss_id
 	if e.role == "naiad":   # наяда стоит и лечит босса
 		var b = enemies.get(boss_id)
-		if b and b.alive and not b.get("hidden", false): b.hp = minf(b.mhp, b.hp + b.mhp * 0.012 * dt)
+		if b and b.alive and not b.get("hidden", false): b.hp = minf(b.mhp, b.hp + b.mhp * 0.004 * dt)
 	if e.role == "trash" and not e.aggro:
 		for pid in _alive_players():
 			if U.flat_dist(players[pid].pos, e.pos) < 11.0: _aggro_pack(e); break

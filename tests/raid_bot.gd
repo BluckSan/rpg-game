@@ -126,4 +126,5 @@ func step(dt: float) -> void:
 	if stuck_t > 1.0:
 		if mv != Vector3.ZERO and U.flat_dist(last_pos, p.global_position) < 0.3: p.request_jump()
 		last_pos = p.global_position; stuck_t = 0.0
+	if me.z < 2.5 and mv.z < 0.0: mv.z = 0.0   # не уходить в портал выхода
 	p.force_move = mv.normalized() if mv.length() > 0.05 else Vector3.ZERO

@@ -218,7 +218,7 @@ func _process(delta: float) -> void:
 	var p = zone.player
 	if p == null or zone.get("raid") == null: return
 	if _exit_cd > 0.0: _exit_cd -= delta; return
-	var near_exit := U.flat_dist(p.global_position, exit_portal_point) < 2.2
+	var near_exit := U.flat_dist(p.global_position, exit_portal_point) < 1.7
 	if arena_exit and U.flat_dist(p.global_position, arena_exit.global_position) < 2.4: near_exit = true
 	if near_exit:
 		_exit_cd = 4.0

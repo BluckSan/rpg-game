@@ -67,7 +67,7 @@ func _process(delta: float) -> void:
 # ---------- рамки группы ----------
 func _frames() -> void:
 	var mem: Array = Net.party.get("members", []) if Net.in_game else []
-	while frames.get_child_count() < mem.size(): frames.add_child(_frame())
+	while frames.get_child_count() < mem.size(): _frame()
 	for i in frames.get_child_count():
 		var f: Control = frames.get_child(i)
 		f.visible = i < mem.size()
