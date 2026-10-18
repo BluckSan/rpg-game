@@ -129,7 +129,7 @@ func apply_graphics() -> void:
 		e.glow_enabled = Game.glow
 		e.fog_depth_end = Game.view_distance
 		e.fog_depth_begin = Game.view_distance * 0.35
-		e.adjustment_enabled = Game.quality >= 2
+		e.adjustment_enabled = Game.quality >= 1
 		_heavy_env(e, sun)
 	for n in hi_nodes: if is_instance_valid(n): n.visible = Game.heavy_fx()
 	for n in detail_nodes: if is_instance_valid(n): n.visible = Game.pc_detail()
@@ -426,6 +426,10 @@ func _light(pos: Vector3, c: Color, energy: float, rng_m: float, flicker := fals
 	add_child(l)
 	l.position = pos
 
+## v0.6.0: случайности чисто визуального выбора (вид дерева, камня) — отдельно, чтобы раскладка долины
+## (позиции врагов, укрытий, камней) осталась той же, что в v0.5.1
+var vrng := RandomNumberGenerator.new()
+
 func _r(a: float, b: float) -> float:
 	return rng.randf_range(a, b)
 
@@ -451,7 +455,10 @@ func _ground() -> void:
 	var bs := BoxShape3D.new(); bs.size = Vector3(SIZE * 2 + 40, 1, SIZE * 2 + 40)
 	cs.shape = bs; cs.position = Vector3(0, -0.5, 0)
 	_colliders.add_child(cs)
-	# видимая земля — TerrainReal (_real_world); пятна и тропы рисует сплат-шейдер
+	# видимая земля — TerrainReal (_real_world); пятна и тропы рисует сплат-шейдер.
+	# Те же вызовы rng, что раньше давали пятна травы, — чтобы раскладка долины не сдвинулась
+	for i in 60:
+		_rand_pos(SIZE - 5); _r(4, 12); _r(0.6, 1); rng.randf(); _r(0, 360)
 
 func _path(a: Vector3, b: Vector3) -> void:
 	var d := b - a
@@ -504,23 +511,30 @@ func _camp(c: Vector3) -> void:
 func _tree(p: Vector3, s: float, pine: bool) -> void:
 	# v0.6.0: реалистичное дерево (TreeGen); столкновение — по стволу, как раньше
 	_add_collider("cylinder", p + Vector3.UP * 1.2 * s, Vector3(0.35 * s, 1.2 * s, 0.35 * s), Vector3.ZERO)
-	var kind := ("fir" if rng.randf() < 0.65 else "pine") if pine else ("oak" if rng.randf() < 0.75 else "birch")
-	var key := "tree:%s:%d" % [kind, rng.randi() % Real.TREE_VARIANTS]
-	_add_real(key, Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * clampf(s, 0.7, 1.25) * 0.85), p))
+	rng.randf()   # как в v0.5.1 (оттенок кроны)
+	var kind := ("fir" if vrng.randf() < 0.65 else "pine") if pine else ("oak" if vrng.randf() < 0.75 else "birch")
+	var key := "tree:%s:%d" % [kind, vrng.randi() % Real.TREE_VARIANTS]
+	_add_real(key, Transform3D(Basis(Vector3.UP, vrng.randf() * TAU).scaled(Vector3.ONE * clampf(s, 0.7, 1.25) * 0.85), p))
 
 func _rock(p: Vector3, s: float) -> void:
 	_add_collider("sphere", p + Vector3.UP * 0.3 * s, Vector3(1.4, 0.9, 1.2) * s, Vector3.ZERO)
 	var keys := ["real:rock_boulder", "real:rock_round", "real:rock_moss_a", "real:rock_moss_d", "real:rock_mossb_c", "real:rock_desert"]
-	var key: String = keys[rng.randi() % keys.size()]
-	var b := Basis(Vector3.UP, rng.randf() * TAU) * Basis(Vector3.RIGHT, _r(-0.12, 0.12))
+	var key: String = keys[vrng.randi() % keys.size()]
+	rng.randf(); var tx := _r(-10, 10); var yaw := _r(0, 360); _r(-10, 10)   # те же вызовы, что в v0.5.1
+	var b := Basis(Vector3.UP, deg_to_rad(yaw)) * Basis(Vector3.RIGHT, deg_to_rad(tx) * 0.7)
 	_add_real(key, Transform3D(b.scaled(Vector3.ONE * s * 0.9), p + Vector3.DOWN * 0.15 * s))
 
 func _meadow(c: Vector3) -> void:
 	var cols := [Color(1, 0.85, 0.2), Color(0.9, 0.3, 0.4), Color(0.6, 0.5, 1), Color.WHITE]
-	for i in 70:
+	for i in 40:
 		var p := c + _circle(14)
-		var key: String = ["real:dandelion_a", "real:dandelion_c", "real:periwinkle_a", "real:periwinkle_c", "real:sorrel", "real:fern_c"][rng.randi() % 6]
-		_add_real(key, Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * _r(2.0, 3.2)), p))
+		rng.randi()
+		var key: String = ["real:dandelion_a", "real:dandelion_c", "real:periwinkle_a", "real:periwinkle_c", "real:sorrel", "real:fern_c"][vrng.randi() % 6]
+		_add_real(key, Transform3D(Basis(Vector3.UP, vrng.randf() * TAU).scaled(Vector3.ONE * vrng.randf_range(2.0, 3.2)), p))
+	for i in 30:   # гуще цветы — без влияния на раскладку
+		var a := vrng.randf() * TAU; var r := sqrt(vrng.randf()) * 14.0
+		var key: String = ["real:dandelion_b", "real:periwinkle_b", "real:sorrel", "real:weed_a"][vrng.randi() % 4]
+		_add_real(key, Transform3D(Basis(Vector3.UP, vrng.randf() * TAU).scaled(Vector3.ONE * vrng.randf_range(2.0, 3.0)), c + Vector3(cos(a) * r, 0, sin(a) * r)))
 	for i in 5: _rock(c + _circle(15), _r(0.6, 1.2))
 
 func _forest(c: Vector3) -> void:
@@ -672,7 +686,8 @@ func _boundary() -> void:
 		var s := _r(8, 16)
 		_add_collider("sphere", p + Vector3.UP * s * 0.2, Vector3(s, s, s), Vector3.ZERO)
 		var key: String = ["real:rock_round", "real:rock_boulder", "real:rock_desert"][i % 3]
-		_add_real(key, Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s * 0.45, s * _r(0.45, 0.7), s * 0.45)), p + Vector3.DOWN * s * 0.1))
+		_r(0.6, 0.85); var hy := _r(0.8, 1.3); var yaw := _r(0, 360)   # те же вызовы, что в v0.5.1
+		_add_real(key, Transform3D(Basis(Vector3.UP, deg_to_rad(yaw)).scaled(Vector3(s * 0.45, s * 0.45 * hy, s * 0.45)), p + Vector3.DOWN * s * 0.1))
 	for i in 4:
 		var cs := CollisionShape3D.new()
 		var bs := BoxShape3D.new(); bs.size = Vector3(SIZE * 2, 10, 1)

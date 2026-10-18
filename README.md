@@ -1,8 +1,18 @@
-# Осколки Эфира (v0.5.1) — Godot 4
+# Осколки Эфира (v0.6.0) — Godot 4
 
 Офлайн-RPG для Android в духе MMORPG: прокачка как в Enshrouded и Path of Exile.
-Движок **Godot 4.7.2**, язык GDScript, рендерер Mobile. Персонажи и монстры — анимированные glTF-модели (CC0, см. «Ассеты и лицензии»); окружение — примитивы в коде и модели Kenney (CC0).
+Движок **Godot 4.7.2**, язык GDScript, рендерер Mobile. Персонажи и монстры — анимированные glTF-модели (CC0, см. «Ассеты и лицензии»); окружение — реалистичные CC0-ассеты Poly Haven и ambientCG (фотограмметрия, PBR), процедурные деревья с фото-листвой и дома из PBR-материалов; часть построек — Kenney (CC0).
 Предыдущая версия на Unity лежит в ветке [`unity`](../../tree/unity).
+
+## Что нового в v0.6.0 — реалистичная графика
+- **Никакой «кубической» графики:** окружение собрано из CC0-фотограмметрии Poly Haven (камни, пни, коряги, кусты, папоротники, крапива, сундуки, бочки, фонари, статуя, ворота…) и PBR-материалов ambientCG. Модели упрощены (LOD), текстуры сжаты (VRAM, 256–1024 px).
+- **Рельеф:** сплат из 7 PBR-слоёв со смешиванием по высоте, трипланар на крутых склонах, анти-повтор, тени облаков. Тот же шейдер в стартовой долине, на всех пресетах.
+- **Растительность:** процедурные деревья (дуб, берёза, осенние, сосна, ель, заснеженная ель, сухие, болотные) с корой и фото-листвой ambientCG, ветер, просвечивание; травяные карточки с ветром.
+- **Постройки:** дома в трёх стилях (фахверк, камень, штукатурка с соломой) из PBR-материалов; оставшиеся модели Kenney покрыты трипланарными материалами (кладка, плитка, доски, ткань, металл).
+- **Подземелье:** стены из каменной кладки с цоколем и карнизом из бута, мощёный пол.
+- **Небо:** фото-HDRI Poly Haven, повёрнутое так, что солнце на фото совпадает с источником света; тон по биому. ACES, туман, SSAO на ПК.
+- **Персонажи:** микрорельеф ткани и металла, «блеск ворса», подповерхностное рассеяние кожи (ПК).
+- **Пресеты** меняют только технические параметры (масштаб рендера, тени, дальность, плотность травы); облик одинаковый на телефоне и ПК, «Экономия батареи» работает.
 
 ## Что нового в v0.5.1
 - **Монстры:** 18 новых семейств (CC0, Quaternius) с разными моделями по зонам, роли ИИ (таран, лекарь, держит дистанцию, заклинатель, подрывник), аффиксы элит/редких (быстрый, каменный, вампир, взрывной, горящий, призыватель, защищённый), уникальные боссы зон (Огрон, Корнелап, Ургал, Гниль, Хьяльм, Серафим Эфира). Призванные скелеты стоят на земле, боссы не сплющиваются при смене фазы.
@@ -206,6 +216,8 @@ python3 tools/assets/build_anims.py   # ретаргет 40 клипов Univers
 Шрифт Philosopher (Ярослав Захаров) — SIL Open Font License 1.1 (`fonts/OFL-Philosopher.txt`).
 Иконки — **game-icons.net**, лицензия **CC BY 3.0** (https://creativecommons.org/licenses/by/3.0/), авторы **Lorc**, **Delapouite**, **Skoll**, **Sbed** (https://game-icons.net). Иконки перекрашиваются в игре.
 Окружение открытого мира — **Kenney** (https://kenney.nl), CC0 1.0: Castle Kit 2.0, Fantasy Town Kit 2.0, Graveyard Kit 5.0, Survival Kit 2.0, Nature Kit 2.1 (`assets/kenney/*/License.txt`; модели запечены в `assets/world/props`, исходники в сборку не входят).
+Реалистичные модели и небо — **Poly Haven** (https://polyhaven.com), CC0 1.0: WoodenTable_01, boulder_01, dandelion_01, dead_quiver_trunk, dead_tree_trunk_02, dry_branches_medium_01, fern_02, gothic_statue, grass_medium_02, large_castle_door, modular_fort_01, namaqualand_boulder_02–05, nettle_plant, periwinkle_plant, quiver_tree_02, rock_07, rock_moss_set_01, rock_moss_set_02, root_cluster_01, shrub_02–04, shrub_sorrel_01, spinning_wheel_01, stone_fire_pit, treasure_chest, tree_stump_01–02, weed_plant_02, wicker_basket_01, wild_rooibos_bush, wine_barrel_01, wooden_axe_03, wooden_bucket_01, wooden_crate_01–02, wooden_ladder, wooden_lantern_01, wooden_stool_01; HDRI «Kloofendal 48d Partly Cloudy (Pure Sky)» (`assets/real/LICENSE.txt`).
+PBR-материалы, кора и листва — **ambientCG**, CC0 1.0: Bricks076A, Bricks102, PavingStones131, Planks023A, Wood051, RoofingTiles006, Plaster001, ThatchedRoof001A, Fabric030, Metal032, Rock022, Ground054, Bark001, Bark006, Bark012, Bark014, Foliage001–008, LeafSet005, LeafSet024, PineNeedles001.
 Текстуры рельефа — **ambientCG** (https://ambientcg.com), CC0 1.0: Grass004, Ground037, Ground048, Ground080, Ground054, Snow006, Rock030 (`assets/terrain/LICENSE.txt`).
 Иконки снаряжения — **Idylwild** (https://idylwild.itch.io, OpenGameArt), CC0 1.0: Idylwild's Armory, Arsenal, Arcanum, Inventory; шляпы, обручи и пояса дорисованы в той же палитре (`assets/items/LICENSE.txt`).
 Монстры v0.5.1 — Quaternius (CC0): Ultimate Monsters, Ultimate Animated Animals (бык), модели Spider, Bat, Goblin, Bee, Crab, Rat (poly.pizza).

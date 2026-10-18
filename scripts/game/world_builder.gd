@@ -115,7 +115,7 @@ static func prop(parent: Node, key: String, pos: Vector3, yaw_deg: float, s: flo
 func build(z) -> void:
 	zone = z
 	WorldData.init()
-	Real.init()
+	Real.prewarm()
 	rng.seed = 2026
 	_colliders = StaticBody3D.new(); _colliders.name = "Colliders"; _colliders.collision_layer = 1
 	add_child(_colliders)
@@ -433,6 +433,19 @@ static func gen_chunk(k: Vector2i, lod: int, quality: int) -> Dictionary:
 			if WorldData.road_dist(x, z, segs) < 3.0: continue
 			var y := _interp_h(hs, w, cell, lx, lz)
 			out.grass.append(Vector4(lx, y, lz, gr.randf()))
+	# v0.6.0: буфер MultiMesh травы считается в потоке (в кадре — только присвоение)
+	if not out.grass.is_empty():
+		var gb := PackedFloat32Array(); gb.resize(out.grass.size() * 16)
+		var o := 0
+		for v: Vector4 in out.grass:
+			var sc := 0.55 + v.w * 0.45
+			var b := Basis(Vector3.UP, v.w * 37.0).scaled(Vector3(sc, sc * (0.75 + v.w * 0.7), sc))
+			gb[o] = b.x.x; gb[o + 1] = b.y.x; gb[o + 2] = b.z.x; gb[o + 3] = v.x
+			gb[o + 4] = b.x.y; gb[o + 5] = b.y.y; gb[o + 6] = b.z.y; gb[o + 7] = v.y - 0.03
+			gb[o + 8] = b.x.z; gb[o + 9] = b.y.z; gb[o + 10] = b.z.z; gb[o + 11] = v.z
+			gb[o + 12] = v.w; gb[o + 13] = 0.0; gb[o + 14] = 0.0; gb[o + 15] = 1.0
+			o += 16
+		out["grass_buf"] = gb
 	return out
 
 static func _interp_h(hs: PackedFloat32Array, w: int, cell: float, lx: float, lz: float) -> float:
@@ -517,11 +530,7 @@ func _apply(k: Vector2i, lod: int, d: Dictionary) -> void:
 		var g: Array = d.grass
 		var mm := MultiMesh.new(); mm.transform_format = MultiMesh.TRANSFORM_3D; mm.use_colors = true
 		mm.mesh = Real.grass_mesh(); mm.instance_count = g.size()
-		for i in g.size():
-			var v: Vector4 = g[i]
-			var sc := 0.55 + v.w * 0.45
-			mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, v.w * 37.0).scaled(Vector3(sc, sc * (0.75 + v.w * 0.7), sc)), Vector3(v.x, v.y - 0.03, v.z)))
-			mm.set_instance_color(i, Color(v.w, 0, 0))
+		mm.buffer = d.grass_buf
 		var gi := MultiMeshInstance3D.new(); gi.name = "Grass"; gi.multimesh = mm
 		gi.material_override = grass_material(WorldData.biome_at(root.position.x + 32, root.position.z + 32))
 		gi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

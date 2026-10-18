@@ -14,7 +14,12 @@ uniform float metal_add = 0.0;
 uniform float rough_mul = 1.0;
 uniform vec4 emission_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
 uniform float emission_strength = 0.0;
-uniform float rim_amount = 0.28;   // v0.5.1: контровой свет (силуэт читается на тёмном фоне)
+uniform float rim_amount = 0.28;
+// v0.6.0: микрорельеф ткани/металла (ambientCG Fabric030 / Metal032) поверх родной нормали — ткань перестаёт быть «пластиком»
+uniform sampler2DArray detail_n : hint_normal, filter_linear_mipmap, repeat_enable;
+uniform bool detail_on = false;
+uniform float detail_scale = 9.0;
+uniform float detail_strength = 0.55;   // v0.5.1: контровой свет (силуэт читается на тёмном фоне)
 
 vec3 rgb2hsv(vec3 c) {
 	vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
@@ -43,7 +48,17 @@ void fragment() {
 	AO = orm.r; AO_LIGHT_AFFECT = 0.6;
 	ROUGHNESS = clamp(orm.g * rough_mul, 0.05, 1.0);
 	METALLIC = clamp(orm.b + metal_add, 0.0, 1.0);
-	NORMAL_MAP = texture(normal_tex, UV).rgb;
+	vec3 nb = texture(normal_tex, UV).rgb * 2.0 - 1.0;
+	if (detail_on) {
+		vec3 dc = texture(detail_n, vec3(UV * detail_scale, 6.0)).rgb * 2.0 - 1.0;
+		vec3 dm = texture(detail_n, vec3(UV * detail_scale * 0.7, 7.0)).rgb * 2.0 - 1.0;
+		vec2 d = mix(dc.xy, dm.xy * 0.5, METALLIC);
+		nb.xy += d * detail_strength * (0.4 + 0.6 * ROUGHNESS);
+		// мягкий «блеск ворса» на шероховатой ткани
+		float fr = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 4.0);
+		ALBEDO += ALBEDO * fr * 0.25 * ROUGHNESS * (1.0 - METALLIC);
+	}
+	NORMAL_MAP = normalize(nb) * 0.5 + 0.5;
 	EMISSION = emission_color.rgb * emission_strength * m;
 	RIM = rim_amount * (1.0 - METALLIC * 0.5); RIM_TINT = 0.55;
 	SPECULAR = 0.5;

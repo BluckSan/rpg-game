@@ -1,0 +1,7 @@
+Реалистичные ассеты v0.6.0 — все CC0 1.0 (общественное достояние), https://creativecommons.org/publicdomain/zero/1.0/
+
+Poly Haven (https://polyhaven.com, CC0): модели WoodenTable_01, boulder_01, dandelion_01, dead_quiver_trunk, dead_tree_trunk_02, dry_branches_medium_01, fern_02, gothic_statue, grass_medium_02, large_castle_door, modular_fort_01, namaqualand_boulder_02–05, nettle_plant, periwinkle_plant, quiver_tree_02, rock_07, rock_moss_set_01, rock_moss_set_02, root_cluster_01, shrub_02–04, shrub_sorrel_01, spinning_wheel_01, stone_fire_pit, treasure_chest, tree_stump_01–02, weed_plant_02, wicker_basket_01, wild_rooibos_bush, wine_barrel_01, wooden_axe_03, wooden_bucket_01, wooden_crate_01–02, wooden_ladder, wooden_lantern_01, wooden_stool_01;
+HDRI неба: Kloofendal 48d Partly Cloudy (Pure Sky) (assets/real/sky/sky_day.jpg — верхняя полусфера, тонмаппинг в JPG).
+ambientCG (https://ambientcg.com, CC0): Bricks076A, Bricks102, PavingStones131, Planks023A, Wood051, RoofingTiles006, Plaster001, ThatchedRoof001A, Fabric030, Metal032, Rock022, Ground054, Bark001, Bark006, Bark012, Bark014, Foliage001–008, LeafSet005, LeafSet024, PineNeedles001; рельеф — Grass004, Ground037, Ground048, Ground080, Ground054, Snow006, Rock030.
+Модели прорежены (LOD) и запечены в assets/real/mesh/*.res, текстуры уменьшены до 256–1024 px.
+Ассетов с лицензией CC-BY в этой папке нет.

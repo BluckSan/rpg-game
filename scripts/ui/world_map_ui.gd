@@ -410,6 +410,7 @@ func tap(pos: Vector2) -> bool:
 	var best = null; var bd := 26.0
 	for mk in markers:
 		var d: float = (mk.screen as Vector2).distance_to(pos)
+		if mk.get("wp", "") != "": d -= 10.0   # камни перемещения важнее соседних построек
 		if d < bd: bd = d; best = mk
 	if best == null:
 		tip.visible = false

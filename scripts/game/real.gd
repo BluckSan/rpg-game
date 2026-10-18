@@ -29,6 +29,20 @@ static func init() -> void:
 			if not variants.has(parts[0]): variants[parts[0]] = []
 			variants[parts[0]].append(n)
 
+## v0.6.0: заранее собрать деревья и загрузить сетки (при загрузке мира, а не в кадре подгрузки чанка)
+static func prewarm(lods := 2) -> void:
+	init()
+	for kind in TreeGen.KINDS:
+		for v in TREE_VARIANTS:
+			for l in lods: mesh("tree:%s:%d" % [kind, v], l)
+	var d := DirAccess.open("res://assets/real/mesh/")
+	if d == null: return
+	for f in d.get_files():
+		var f2 := f.trim_suffix(".remap")
+		if f2.ends_with(".res"):
+			for l in lods: mesh("real:" + f2.get_basename(), l)
+	grass_mesh()
+
 ## конкретный ключ из шаблона (в фоновом потоке — только чтение variants)
 static func pick(key: String, rng: RandomNumberGenerator) -> String:
 	if not key.ends_with("*"): return key

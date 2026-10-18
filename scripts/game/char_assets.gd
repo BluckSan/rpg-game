@@ -120,6 +120,7 @@ static func outfit_mat(kind: String, o: Dictionary) -> Material:
 		var m := ShaderMaterial.new(); m.shader = preload("res://assets/shaders/outfit.gdshader")
 		m.set_shader_parameter("albedo_tex", tex(kind + "_albedo")); m.set_shader_parameter("normal_tex", tex(kind + "_normal"))
 		m.set_shader_parameter("orm_tex", tex(kind + "_orm"))
+		m.set_shader_parameter("detail_n", load("res://assets/real/surf/normal.jpg")); m.set_shader_parameter("detail_on", Game.quality >= 1)
 		m.set_shader_parameter("hue_shift", float(o.get("hue", 0.0))); m.set_shader_parameter("sat_mul", float(o.get("sat", 1.0)))
 		m.set_shader_parameter("val_mul", float(o.get("val", 1.0))); m.set_shader_parameter("metal_add", float(o.get("metal", 0.0)))
 		m.set_shader_parameter("rough_mul", float(o.get("rough", 1.0))); m.set_shader_parameter("sat_threshold", float(o.get("thr", 0.22)))

@@ -12,7 +12,9 @@ void fragment() {
 	NORMAL_MAP = texture(normal_tex, UV).rgb;
 	NORMAL_MAP_DEPTH = 0.8;
 	ROUGHNESS = roughness;
-	SPECULAR = 0.35;
+	SPECULAR = 0.4;
+	SSS_STRENGTH = 0.35;   // v0.6.0: подповерхностное рассеяние (Forward+; на Mobile игнорируется)
+	BACKLIGHT = vec3(0.12, 0.04, 0.03);
 	float rim = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
 	EMISSION = emission_color.rgb + rim_color.rgb * ALBEDO * rim * 0.12;
 	RIM = 0.22; RIM_TINT = 0.7;   // v0.5.1

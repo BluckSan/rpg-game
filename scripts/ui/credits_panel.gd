@@ -10,9 +10,17 @@ const TEXT := """[center][b][color=#f2c46d]Осколки Эфира[/color][/b]
 game-icons.net — авторы [b]Lorc[/b], [b]Delapouite[/b], [b]Skoll[/b], [b]Sbed[/b]
 Лицензия: creativecommons.org/licenses/by/3.0 · иконки перекрашены и уменьшены.
 
+[b][color=#f2c46d]Фотограмметрия и реалистичные модели — CC0 1.0[/color][/b]
+[b]Poly Haven[/b] (polyhaven.com): WoodenTable_01, boulder_01, dandelion_01, dead_quiver_trunk, dead_tree_trunk_02, dry_branches_medium_01, fern_02, gothic_statue, grass_medium_02, large_castle_door, modular_fort_01, namaqualand_boulder_02–05, nettle_plant, periwinkle_plant, quiver_tree_02, rock_07, rock_moss_set_01, rock_moss_set_02, root_cluster_01, shrub_02–04, shrub_sorrel_01, spinning_wheel_01, stone_fire_pit, treasure_chest, tree_stump_01–02, weed_plant_02, wicker_basket_01, wild_rooibos_bush, wine_barrel_01, wooden_axe_03, wooden_bucket_01, wooden_crate_01–02, wooden_ladder, wooden_lantern_01, wooden_stool_01.
+Небо — HDRI «Kloofendal 48d Partly Cloudy (Pure Sky)» (Greg Zaal / Poly Haven, CC0). Модели упрощены (LOD), текстуры уменьшены.
+
+[b][color=#f2c46d]PBR-материалы, кора, листва — CC0 1.0[/color][/b]
+[b]ambientCG[/b] (ambientcg.com): Bricks076A, Bricks102, PavingStones131, Planks023A, Wood051, RoofingTiles006, Plaster001, ThatchedRoof001A, Fabric030, Metal032, Rock022, Ground054, Bark001, Bark006, Bark012, Bark014, Foliage001–008, LeafSet005, LeafSet024, PineNeedles001.
+Из атласов листвы собраны карточки листьев, хвои и травы; деревья и дома строятся в коде.
+
 [b][color=#f2c46d]3D-модели окружения — CC0 1.0[/color][/b]
 [b]Kenney[/b] (kenney.nl): Castle Kit 2.0, Fantasy Town Kit 2.0, Graveyard Kit 5.0, Survival Kit 2.0, Nature Kit 2.1
-Модели перекрашены и запечены в вершинные цвета.
+Остались только постройки и мелочи; они покрыты PBR-материалами ambientCG.
 
 [b][color=#f2c46d]Персонажи, монстры, анимации, оружие — CC0 1.0[/color][/b]
 [b]Quaternius[/b] (quaternius.com): Universal Base Characters, Universal Animation Library 1 и 2,
