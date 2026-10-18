@@ -412,10 +412,14 @@ func _srv_disconnected(id: int) -> void:
 	players.erase(id)
 	if p == null: return
 	if p.authed:
+		pending_flush[p.char_id] = true
 		await _srv_flush(p, true)
+		pending_flush.erase(p.char_id)
 		for oid in players:
 			if players[oid].authed: s_player_left.rpc_id(oid, id, p.name)
 	print("server: отключение %d (всего %d)" % [id, players.size()])
+
+var pending_flush := {}
 
 func _srv_http(method: int, path: String, body: Dictionary) -> Dictionary:
 	var rq := HTTPRequest.new(); rq.timeout = 10.0
@@ -447,6 +451,11 @@ func c_hello(tok: String, char_id: String, proto: int, version: String) -> void:
 	for oid in players:   # один и тот же герой дважды — нельзя
 		if players[oid].authed and players[oid].char_id == char_id:
 			s_refused.rpc_id(id, "этот герой уже в игре"); _kick_later(id); return
+	if pending_flush.has(char_id):   # v0.9.2: прошлый выход ещё сохраняется — подождать
+		for i in 100:
+			await get_tree().create_timer(0.1).timeout
+			if not pending_flush.has(char_id): break
+		if not players.has(id): return
 	var d := await _srv_http(HTTPClient.METHOD_POST, "/internal/session", {"token": tok, "char_id": char_id})
 	if not players.has(id): return
 	if d["_code"] != 200 or not (d.get("character") is Dictionary):
@@ -570,12 +579,17 @@ func c_save(json: String) -> void:
 		s_inv.rpc_id(multiplayer.get_remote_sender_id(), "sync", InvOps.pub(c), {"err": ""})
 
 func _srv_flush(p: Dictionary, force := false) -> void:
+	if not force and (p.get("mkt_busy", false) or p.get("flushing", false)): return
+	while p.get("mkt_busy", false) or p.get("flushing", false): await get_tree().create_timer(0.05).timeout
 	if not p.dirty: return
 	if not force and _now() - float(p.save_t) < SAVE_FLUSH: return
 	p.dirty = false; p.save_t = _now()
 	var c: Dictionary = p.data
 	c["pos"] = [p.pos.x, p.pos.y, p.pos.z]
+	c["_rev"] = int(c.get("_rev", 0)) + 1   # v0.9.2: номер версии — устаревшая запись не перезапишет сделку
+	p["flushing"] = true
 	var d := await _srv_http(HTTPClient.METHOD_PUT, "/internal/characters/" + p.char_id, {"account_id": p.acc, "data": c})
+	p["flushing"] = false
 	if d["_code"] != 200: print("server: сохранение «%s» отклонено: %s" % [p.name, d.get("error", d["_code"])])
 
 func _server_tick(delta: float) -> void:
@@ -1566,6 +1580,8 @@ func c_inv(op: String, args: Array) -> void:
 	if now - float(p.get("invop_t", 0.0)) > 1.0: p["invop_t"] = now; p["invop_n"] = 0
 	p["invop_n"] = int(p.get("invop_n", 0)) + 1
 	if int(p.invop_n) > 30: return   # не больше 30 операций в секунду
+	if p.get("mkt_busy", false):
+		s_inv.rpc_id(id, op, InvOps.pub(p.data), {"err": "Подождите: идёт сделка на рынке"}); return
 	var r := InvOps.apply(p.data, op, args)
 	if str(r.get("err", "")) == "": inv_stats.ok += 1
 	else: inv_stats.rejected += 1
@@ -1583,4 +1599,131 @@ func s_inv(op: String, state: Dictionary, r: Dictionary) -> void:
 	if z and z.has_method("apply_character_changes"): z.apply_character_changes(false)
 	if z and "hud" in z and z.hud and z.hud.window and z.hud.window.has_method("refresh"): z.hud.window.refresh()
 	inv_result.emit(op, r)
+
+# ---------- v0.9.2: рынок (аукцион) — сделки в БД одной транзакцией вместе с героем ----------
+signal market_result(op: String, r: Dictionary)
+const MARKET_TAX := 0.07
+static func market_fee(price: int) -> int: return clampi(int(round(price * 0.02)), 5, 5000)
+var mkt_stats := {"list": 0, "buy": 0, "cancel": 0, "claim": 0, "denied": 0}
+
+func market(op: String, args: Dictionary = {}) -> void:
+	if in_game and _connected(): c_mkt.rpc_id(1, op.left(12), args)
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_mkt(op: String, args: Dictionary) -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null: return
+	if p.get("mkt_busy", false):
+		s_mkt.rpc_id(id, op, {"ok": false, "error": "Подождите: предыдущая сделка ещё идёт"}); return
+	p["mkt_busy"] = true
+	var r: Dictionary = {}
+	r = await _mkt_do(p, op, args)
+	p["mkt_busy"] = false
+	if not r.get("ok", false): mkt_stats.denied += 1
+	if players.has(id):
+		s_mkt.rpc_id(id, op, r)
+		if op in ["list", "buy", "claim"]: s_inv.rpc_id(id, "market", InvOps.pub(p.data), {"err": ""})
+
+## Перед сделкой — записать героя (в БД должна быть текущая версия), затем кандидат с номером версии +1
+func _mkt_prep(p: Dictionary) -> void:
+	while p.get("flushing", false): await get_tree().create_timer(0.05).timeout
+	p.dirty = true
+	p["mkt_busy"] = false
+	await _srv_flush(p, true)
+	p["mkt_busy"] = true
+
+func _mkt_cand(p: Dictionary) -> Dictionary:
+	var c: Dictionary = p.data.duplicate(true)
+	c["pos"] = [p.pos.x, p.pos.y, p.pos.z]
+	c["_rev"] = int(p.data.get("_rev", 0)) + 1
+	return c
+
+func _mkt_do(p: Dictionary, op: String, a: Dictionary) -> Dictionary:
+	var base := {"account_id": p.acc, "char_id": p.char_id}
+	match op:
+		"search":
+			var f: Dictionary = a.get("filters", {}) if a.get("filters") is Dictionary else {}
+			var d := await _srv_http(HTTPClient.METHOD_POST, "/internal/market/search", {"filters": f, "char_id": p.char_id})
+			return {"ok": d["_code"] == 200, "list": d.get("list", []), "error": d.get("error", "")}
+		"mine":
+			var d := await _srv_http(HTTPClient.METHOD_POST, "/internal/market/mine", base)
+			return {"ok": d["_code"] == 200, "list": d.get("list", []), "mail": d.get("mail", []), "error": d.get("error", "")}
+		"list":
+			var uid := str(a.get("uid", "")).left(40)
+			var price := int(a.get("price", 0))
+			if price < 1 or price > 50000000: return {"ok": false, "error": "Цена: от 1 до 50 000 000"}
+			var it = Items.find_uid(p.data.get("inventory", []), uid)
+			if it == null: return {"ok": false, "error": "Выставить можно вещь из инвентаря"}
+			var fee := market_fee(price)
+			if int(p.data.get("gold", 0)) < fee: return {"ok": false, "error": "Плата за выставление: %d золота" % fee}
+			await _mkt_prep(p)
+			it = Items.find_uid(p.data.get("inventory", []), uid)
+			if it == null: return {"ok": false, "error": "Предмет пропал"}
+			var cand := _mkt_cand(p)
+			cand.inventory.erase(Items.find_uid(cand.inventory, uid)); cand["gold"] = int(cand.gold) - fee
+			var body := base.duplicate(); body["data"] = cand; body["item"] = it; body["price"] = price
+			var d := await _srv_http(HTTPClient.METHOD_POST, "/internal/market/list", body)
+			if d["_code"] != 200: return {"ok": false, "error": str(d.get("error", "нет связи с базой"))}
+			var cur = Items.find_uid(p.data.inventory, uid)
+			if cur != null: p.data.inventory.erase(cur)
+			p.data["gold"] = int(p.data.gold) - fee; p.data["_rev"] = cand._rev
+			mkt_stats.list += 1
+			return {"ok": true, "id": int(d.get("id", 0)), "fee": fee}
+		"buy":
+			var lid := int(a.get("id", 0))
+			var g := await _srv_http(HTTPClient.METHOD_POST, "/internal/market/get", {"id": lid})
+			if g["_code"] != 200 or not (g.get("listing") is Dictionary) or str(g.listing.get("status", "")) != "active": return {"ok": false, "error": "Лот уже продан или снят"}
+			var L: Dictionary = g.listing
+			if str(L.get("seller_char", "")) == p.char_id: return {"ok": false, "error": "Это ваш лот"}
+			if int(p.data.get("gold", 0)) < int(L.price): return {"ok": false, "error": "Не хватает золота"}
+			if (p.data.inventory as Array).size() >= DB.INVENTORY_SIZE: return {"ok": false, "error": "Инвентарь полон"}
+			await _mkt_prep(p)
+			var cand := _mkt_cand(p)
+			cand.inventory.append(L.item); cand["gold"] = int(cand.gold) - int(L.price)
+			if int(cand.gold) < 0: return {"ok": false, "error": "Не хватает золота"}
+			var body := base.duplicate(); body["data"] = cand; body["id"] = lid
+			var d := await _srv_http(HTTPClient.METHOD_POST, "/internal/market/buy", body)
+			if d["_code"] != 200: return {"ok": false, "error": str(d.get("error", "нет связи с базой"))}
+			var item: Dictionary = L.item
+			_mkt_int(item)
+			p.data.inventory.append(item); p.data["gold"] = int(p.data.gold) - int(L.price); p.data["_rev"] = cand._rev
+			mkt_stats.buy += 1
+			return {"ok": true, "item": item, "price": int(L.price)}
+		"cancel":
+			var d := await _srv_http(HTTPClient.METHOD_POST, "/internal/market/cancel", {"char_id": p.char_id, "id": int(a.get("id", 0))})
+			if d["_code"] != 200: return {"ok": false, "error": str(d.get("error", "нет связи с базой"))}
+			mkt_stats.cancel += 1
+			return {"ok": true}
+		"claim":
+			var m := await _srv_http(HTTPClient.METHOD_POST, "/internal/market/mine", base)
+			if m["_code"] != 200: return {"ok": false, "error": "нет связи с базой"}
+			var free: int = DB.INVENTORY_SIZE - (p.data.inventory as Array).size()
+			var ids := []; var gold := 0; var items := []
+			for ml in m.get("mail", []):
+				if ml.get("item") is Dictionary:
+					if free <= 0: continue
+					free -= 1; items.append(ml.item)
+				gold += int(ml.get("gold", 0)); ids.append(int(ml.id))
+			if ids.is_empty(): return {"ok": false, "error": "Почта пуста" if (m.get("mail", []) as Array).is_empty() else "Инвентарь полон"}
+			await _mkt_prep(p)
+			var cand := _mkt_cand(p)
+			for it in items: cand.inventory.append(it)
+			cand["gold"] = int(cand.gold) + gold
+			var body := base.duplicate(); body["data"] = cand; body["ids"] = ids
+			var d := await _srv_http(HTTPClient.METHOD_POST, "/internal/market/claim", body)
+			if d["_code"] != 200: return {"ok": false, "error": str(d.get("error", "нет связи с базой"))}
+			for it in items: _mkt_int(it); p.data.inventory.append(it)
+			p.data["gold"] = int(p.data.gold) + gold; p.data["_rev"] = cand._rev
+			mkt_stats.claim += 1
+			return {"ok": true, "gold": gold, "items": items.size()}
+	return {"ok": false, "error": "неизвестная операция"}
+
+func _mkt_int(it: Dictionary) -> void:
+	for k in ["slot", "rarity", "ilvl", "req", "up", "v"]: if it.has(k): it[k] = int(it[k])
+
+@rpc("authority", "call_remote", "reliable")
+func s_mkt(op: String, r: Dictionary) -> void:
+	market_result.emit(op, r)
 

@@ -380,6 +380,7 @@ func _open(which: String) -> void:
 		"map": window = preload("res://scripts/ui/world_map_ui.gd").new()
 		"skills": window = preload("res://scripts/ui/skills_ui.gd").new()
 		"craft": window = preload("res://scripts/ui/craft_ui.gd").new()
+		"market": window = preload("res://scripts/ui/market_ui.gd").new()
 		_: window = preload("res://scripts/ui/pause_menu.gd").new()
 	window.name = "Window_" + which
 	UIK.full(window)

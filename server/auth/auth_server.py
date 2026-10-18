@@ -57,7 +57,87 @@ CREATE TABLE IF NOT EXISTS characters (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS characters_account ON characters(account_id);
+CREATE TABLE IF NOT EXISTS market_listings (
+  id BIGSERIAL PRIMARY KEY,
+  seller_char BIGINT NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+  seller_name TEXT NOT NULL,
+  item JSONB NOT NULL,
+  item_uid TEXT NOT NULL,
+  price BIGINT NOT NULL CHECK (price > 0),
+  slot INT NOT NULL, cls TEXT NOT NULL, ilvl INT NOT NULL, rarity INT NOT NULL, set_id TEXT NOT NULL, name_lc TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active',
+  buyer_char BIGINT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS market_active ON market_listings(status, expires_at);
+CREATE INDEX IF NOT EXISTS market_seller ON market_listings(seller_char, status);
+CREATE UNIQUE INDEX IF NOT EXISTS market_uid_active ON market_listings(item_uid) WHERE status = 'active';
+CREATE TABLE IF NOT EXISTS market_mail (
+  id BIGSERIAL PRIMARY KEY,
+  char_id BIGINT NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  gold BIGINT NOT NULL DEFAULT 0,
+  item JSONB,
+  note TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  claimed BOOLEAN NOT NULL DEFAULT false
+);
+CREATE INDEX IF NOT EXISTS market_mail_char ON market_mail(char_id, claimed);
 """
+
+# ---------- v0.9.2: рынок ----------
+# Все операции — одной транзакцией вместе с записью героя (строки блокируются FOR UPDATE): предмет
+# переходит атомарно; повтор/гонка запросов не дублирует ни вещь, ни золото.
+MARKET_TTL_H = 48
+MARKET_MAX_ACTIVE = 20
+MARKET_TAX = 0.07           # налог с продажи (уходит из игры)
+MARKET_PRICE_MAX = 50_000_000
+
+
+def market_fee(price: int) -> int:
+    """Плата за выставление (не возвращается): 2%, от 5 до 5000 золота."""
+    return max(5, min(5000, int(round(price * 0.02))))
+
+
+def market_sweep(cur):
+    """Истёкшие лоты: вещь возвращается продавцу почтой."""
+    cur.execute("UPDATE market_listings SET status = 'expired' WHERE status = 'active' AND expires_at < now() "
+                "RETURNING seller_char, item")
+    for ch, item in cur.fetchall():
+        cur.execute("INSERT INTO market_mail(char_id, kind, item, note) VALUES (%s, 'expired', %s, %s)",
+                    (ch, Json(item), "Срок лота истёк: %s" % str(item.get("name", "предмет"))))
+
+
+def lock_char(cur, cid: int, aid: int):
+    cur.execute("SELECT data FROM characters WHERE id = %s AND account_id = %s FOR UPDATE", (cid, aid))
+    row = cur.fetchone()
+    return row[0] if row else None
+
+
+def rev_ok(old: dict, new: dict) -> bool:
+    return int(new.get("_rev", 0)) > int(old.get("_rev", 0))
+
+
+def write_char(cur, cid: int, new: dict):
+    new["id"] = "n%d" % cid
+    cur.execute("UPDATE characters SET data = %s, updated_at = now() WHERE id = %s", (Json(new), cid))
+
+
+def uids(data: dict):
+    out = set()
+    for k in ("inventory", "equipped", "stash"):
+        for it in data.get(k, []) or []:
+            if isinstance(it, dict):
+                out.add(str(it.get("uid", "")))
+    return out
+
+
+def listing_pub(r):
+    return {"id": r[0], "seller": r[1], "item": r[2], "price": int(r[3]), "expires": r[4].isoformat(), "status": r[5]}
+
+
+LIST_COLS = "id, seller_name, item, price, expires_at, status"
 
 
 def db(fn):
@@ -147,6 +227,8 @@ def valid_save(old: dict, new: dict) -> str:
         return "gold jump"
     if len(json.dumps(new)) > MAX_BODY:
         return "too big"
+    if "_rev" in old and not rev_ok(old, new):
+        return "stale"   # v0.9.2: устаревшее сохранение (после сделки на рынке) не перезаписывает героя
     return ""
 
 
@@ -207,7 +289,7 @@ class Handler(BaseHTTPRequestHandler):
     def _public(self, method, path):
         ip = self.client_address[0]
         if path == "/api/health":
-            return self._send(200, {"ok": True, "version": "0.8.0"})
+            return self._send(200, {"ok": True, "version": "0.9.2"})
         if method == "POST" and path in ("/api/register", "/api/login"):
             if not rate_ok(ip):
                 return self._send(429, {"error": "слишком много попыток, подождите минуту"})
@@ -327,7 +409,135 @@ class Handler(BaseHTTPRequestHandler):
                 return ""
             err = db(save)
             return self._send(200 if not err else 400, {"ok": not err, "error": err})
+        if method == "POST" and path.startswith("/internal/market/"):
+            return self._market(path[len("/internal/market/"):], self._body())
         return self._send(404, {"error": "not found"})
+
+    def _market(self, op, b):
+        cid_m = re.match(r"^n(\d+)$", str(b.get("char_id", "")))
+        cid = int(cid_m.group(1)) if cid_m else 0
+        aid = int(b.get("account_id", 0))
+        if op == "search":
+            f = b.get("filters", {}) or {}
+            def search(cur):
+                market_sweep(cur)
+                q = "SELECT " + LIST_COLS + " FROM market_listings WHERE status = 'active'"
+                a = []
+                if f.get("slot", -1) not in (-1, None, ""):
+                    q += " AND slot = %s"; a.append(int(f["slot"]))
+                if f.get("cls"):
+                    q += " AND (cls = %s OR cls = '')"; a.append(str(f["cls"])[:12])
+                if f.get("lvl_min"):
+                    q += " AND ilvl >= %s"; a.append(int(f["lvl_min"]))
+                if f.get("lvl_max"):
+                    q += " AND ilvl <= %s"; a.append(int(f["lvl_max"]))
+                if f.get("rarity", -1) not in (-1, None, ""):
+                    q += " AND rarity = %s"; a.append(int(f["rarity"]))
+                if f.get("set_only"):
+                    q += " AND set_id <> ''"
+                if f.get("text"):
+                    q += " AND name_lc LIKE %s"; a.append("%" + str(f["text"]).lower()[:40].replace("%", "") + "%")
+                if f.get("mine"):
+                    q += " AND seller_char = %s"; a.append(cid)
+                q += {"price": " ORDER BY price ASC", "price_desc": " ORDER BY price DESC", "level": " ORDER BY ilvl DESC"}.get(str(f.get("sort", "")), " ORDER BY id DESC")
+                q += " LIMIT %s OFFSET %s"; a += [min(60, int(f.get("limit", 40))), max(0, int(f.get("offset", 0)))]
+                cur.execute(q, a)
+                return [listing_pub(r) for r in cur.fetchall()]
+            return self._send(200, {"ok": True, "list": db(search)})
+        if op == "get":
+            r = db(lambda cur: (market_sweep(cur), cur.execute("SELECT " + LIST_COLS + ", seller_char FROM market_listings WHERE id = %s", (int(b.get("id", 0)),)), cur.fetchone())[2])
+            if not r:
+                return self._send(404, {"ok": False, "error": "лот не найден"})
+            d = listing_pub(r); d["seller_char"] = "n%d" % r[6]
+            return self._send(200, {"ok": True, "listing": d})
+        if op == "mine":
+            def mine(cur):
+                market_sweep(cur)
+                cur.execute("SELECT " + LIST_COLS + " FROM market_listings WHERE seller_char = %s AND status = 'active' ORDER BY id DESC", (cid,))
+                lst = [listing_pub(r) for r in cur.fetchall()]
+                cur.execute("SELECT id, kind, gold, item, note FROM market_mail WHERE char_id = %s AND NOT claimed ORDER BY id", (cid,))
+                mail = [{"id": r[0], "kind": r[1], "gold": int(r[2]), "item": r[3], "note": r[4]} for r in cur.fetchall()]
+                return {"ok": True, "list": lst, "mail": mail}
+            return self._send(200, db(mine))
+        new = b.get("data")
+        if op == "list":
+            item = b.get("item"); price = int(b.get("price", 0))
+            if not isinstance(item, dict) or not isinstance(new, dict) or not (1 <= price <= MARKET_PRICE_MAX):
+                return self._send(400, {"ok": False, "error": "неверный лот"})
+            uid = str(item.get("uid", ""))
+            def lst(cur):
+                old = lock_char(cur, cid, aid)
+                if old is None: return "нет героя"
+                if not rev_ok(old, new): return "stale"
+                if uid == "" or uid not in uids(old) or uid in uids(new): return "предмета нет у героя"
+                if int(old.get("gold", 0)) - int(new.get("gold", 0)) != market_fee(price): return "плата не списана"
+                cur.execute("SELECT count(*) FROM market_listings WHERE seller_char = %s AND status = 'active'", (cid,))
+                if cur.fetchone()[0] >= MARKET_MAX_ACTIVE: return "не больше %d лотов" % MARKET_MAX_ACTIVE
+                cur.execute("SELECT 1 FROM market_listings WHERE item_uid = %s AND status = 'active'", (uid,))
+                if cur.fetchone(): return "предмет уже выставлен"
+                cur.execute("INSERT INTO market_listings(seller_char, seller_name, item, item_uid, price, slot, cls, ilvl, rarity, set_id, name_lc, expires_at) "
+                            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, now() + %s * interval '1 hour') RETURNING id",
+                            (cid, str(old.get("name", "?"))[:20], Json(item), uid, price, int(item.get("slot", 0)), str(item.get("cls", "")),
+                             int(item.get("ilvl", 1)), int(item.get("rarity", 0)), str(item.get("set", "")), str(item.get("name", "")).lower()[:60], MARKET_TTL_H))
+                lid = cur.fetchone()[0]
+                write_char(cur, cid, new)
+                return lid
+            r = db(lst)
+            return self._send(200 if isinstance(r, int) else 400, {"ok": isinstance(r, int), "id": r if isinstance(r, int) else 0, "error": "" if isinstance(r, int) else r})
+        if op == "buy":
+            lid = int(b.get("id", 0))
+            def buy(cur):
+                market_sweep(cur)
+                cur.execute("SELECT seller_char, item, price, item_uid FROM market_listings WHERE id = %s AND status = 'active' FOR UPDATE", (lid,))
+                row = cur.fetchone()
+                if not row: return "лот уже продан или снят"
+                seller, item, price, uid = row
+                if seller == cid: return "это ваш лот"
+                old = lock_char(cur, cid, aid)
+                if old is None: return "нет героя"
+                if not isinstance(new, dict) or not rev_ok(old, new): return "stale"
+                if uid in uids(old) or uid not in uids(new): return "предмет не передан"
+                if int(old.get("gold", 0)) - int(new.get("gold", 0)) != int(price): return "цена не совпадает"
+                if int(new.get("gold", 0)) < 0: return "не хватает золота"
+                cur.execute("UPDATE market_listings SET status = 'sold', buyer_char = %s WHERE id = %s", (cid, lid))
+                net = int(price) - int(round(int(price) * MARKET_TAX))
+                cur.execute("INSERT INTO market_mail(char_id, kind, gold, note) VALUES (%s, 'sold', %s, %s)",
+                            (seller, net, "Продано: %s за %d (налог %d)" % (str(item.get("name", "")), int(price), int(price) - net)))
+                write_char(cur, cid, new)
+                return ""
+            err = db(buy)
+            return self._send(200 if not err else 400, {"ok": not err, "error": err})
+        if op == "cancel":
+            lid = int(b.get("id", 0))
+            def cancel(cur):
+                cur.execute("UPDATE market_listings SET status = 'cancelled' WHERE id = %s AND seller_char = %s AND status = 'active' RETURNING item", (lid, cid))
+                row = cur.fetchone()
+                if not row: return "лот не найден"
+                cur.execute("INSERT INTO market_mail(char_id, kind, item, note) VALUES (%s, 'cancelled', %s, %s)",
+                            (cid, Json(row[0]), "Лот снят: %s" % str(row[0].get("name", ""))))
+                return ""
+            err = db(cancel)
+            return self._send(200 if not err else 400, {"ok": not err, "error": err})
+        if op == "claim":
+            ids = [int(x) for x in (b.get("ids") or [])][:60]
+            def claim(cur):
+                old = lock_char(cur, cid, aid)
+                if old is None: return "нет героя"
+                if not isinstance(new, dict) or not rev_ok(old, new): return "stale"
+                cur.execute("SELECT id, gold, item FROM market_mail WHERE char_id = %s AND NOT claimed AND id = ANY(%s) FOR UPDATE", (cid, ids))
+                rows = cur.fetchall()
+                if len(rows) != len(ids): return "почта уже получена"
+                gold = sum(int(r[1]) for r in rows)
+                if int(new.get("gold", 0)) - int(old.get("gold", 0)) != gold: return "золото не совпадает"
+                have = uids(new)
+                for r in rows:
+                    if r[2] and str(r[2].get("uid", "")) not in have: return "предмет не получен"
+                cur.execute("UPDATE market_mail SET claimed = true WHERE id = ANY(%s)", (ids,))
+                write_char(cur, cid, new)
+                return ""
+            err = db(claim)
+            return self._send(200 if not err else 400, {"ok": not err, "error": err})
+        return self._send(404, {"ok": False, "error": "нет такой операции"})
 
 
 class InternalHandler(Handler):
