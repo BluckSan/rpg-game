@@ -883,7 +883,7 @@ func _build_target_frame() -> void:
 	target_frame = UIK.panel(root, Color(0.06, 0.05, 0.08, 0.88))
 	target_frame.name = "TargetFrame"
 	target_frame.anchor_left = 0.5; target_frame.anchor_right = 0.5
-	target_frame.offset_left = -330; target_frame.offset_right = 330; target_frame.offset_top = 10; target_frame.offset_bottom = 112
+	target_frame.offset_left = -330; target_frame.offset_right = 330; target_frame.offset_top = 124; target_frame.offset_bottom = 226
 	target_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tf_name = UIK.label(target_frame, "", 24, UIK.ACCENT)
 	tf_name.autowrap_mode = TextServer.AUTOWRAP_OFF; tf_name.clip_text = true
