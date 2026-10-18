@@ -716,6 +716,7 @@ func _process(delta: float) -> void:
 	if c0.pips != pip: c0.pips = pip; c0.queue_redraw()
 	roll_btn.set_state(clampf(player.roll_cd / Player.ROLL_CD, 0, 1), 0.0, "")
 	objective.text = _objective()
+	_update_goal_beacon()
 	var free := DB.free_points(d)
 	talent_badge.get_parent().visible = free > 0
 	talent_badge.text = str(free)
@@ -885,7 +886,37 @@ func _objective() -> String:
 	for e in zone.enemies:
 		if e.alive and e.def.boss: boss_alive = true
 	if boss_alive: return "Цель: победить Древнего тролля в руинах (рек. ур. %d+, череп на карте)" % Combat.boss_rec("troll", 9)
-	return "Цель: портал в Земли Эфира (замок на карте)"
+	return "Цель: портал в Земли Эфира — выход в мир (синий портал, отмечен на мини-карте)"
+
+## v0.9.1: точка текущей цели (для мини-карты, стрелки к цели и маяка в мире); Vector3.INF — нет точки.
+## В долине цель «выйти в мир» ведёт к порталу в Земли Эфира, а не ко входу в Склеп.
+func objective_target() -> Vector3:
+	if zone == null or zone.builder == null or zone.player == null: return Vector3.INF
+	if zone.builder is PartyDungeonBuilder or zone.builder is WorldBuilder: return Vector3.INF
+	if zone.is_dungeon():
+		return zone.builder.guide_target() if zone.builder.has_method("guide_target") else Vector3.INF
+	for e in zone.enemies:
+		if e.alive and e.def.boss: return zone.arena_point
+	if DB.zone_lock_reason(zone.data, "dungeon") == "" and not DB.zone_flag(zone.data, "dungeon", "boss_warden_killed") and zone.dungeon_gate_point != Vector3.ZERO:
+		return zone.dungeon_gate_point
+	return zone.portal_point if zone.portal_point != Vector3.ZERO else Vector3.INF
+
+var goal_beacon: Node3D
+func _update_goal_beacon() -> void:
+	var t := objective_target()
+	if goal_beacon == null or not is_instance_valid(goal_beacon):
+		goal_beacon = Node3D.new(); goal_beacon.name = "GoalBeacon"
+		var mi := MeshInstance3D.new()
+		var cm := CylinderMesh.new(); cm.top_radius = 0.35; cm.bottom_radius = 0.9; cm.height = 14.0
+		mi.mesh = cm; mi.position.y = 7.0
+		var m := StandardMaterial3D.new(); m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA; m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		m.albedo_color = Color(1.0, 0.82, 0.35, 0.22); m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		mi.material_override = m; mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		goal_beacon.add_child(mi)
+		zone.add_child(goal_beacon)
+	goal_beacon.visible = t != Vector3.INF and not zone.is_dungeon() and U.flat_dist(t, player.global_position) > 6.0
+	if t != Vector3.INF: goal_beacon.global_position = Vector3(t.x, zone.ground_y(t) if zone.has_method("ground_y") else t.y, t.z)
 
 
 # ---------------- v0.9.0: рамка цели и значки баффов ----------------

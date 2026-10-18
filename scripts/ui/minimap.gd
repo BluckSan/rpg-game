@@ -14,7 +14,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_ring = load("res://assets/ui/compass_ring.png")
 	_font = UIK.title_font()
-	for n in ["skull-crossed-bones", "two-coins", "castle", "person"]: _icons[n] = UIK.icon(n)
+	for n in ["skull-crossed-bones", "two-coins", "castle", "person", "magic-portal", "dungeon-gate"]: _icons[n] = UIK.icon(n)
 
 func _process(_d: float) -> void:
 	if zone and zone.builder is WorldBuilder and mouse_filter != Control.MOUSE_FILTER_STOP:
@@ -66,9 +66,13 @@ func _draw() -> void:
 			var m := to_map(wp.pos)
 			if m.length() < r * 0.78: draw_circle(c + m, 6.0, Color(0.35, 0.8, 1.0) if open.has(wp.id) else Color(0.5, 0.5, 0.5))
 	elif zone.merchant != null: _marker(c, r, zone.merchant_point, "two-coins", Color(1, 0.85, 0.3))
-	if zone.portal_point != Vector3.ZERO: _marker(c, r, zone.portal_point, "castle", Color(0.6, 0.75, 1))
-	if zone.dungeon_gate_point != Vector3.ZERO: _marker(c, r, zone.dungeon_gate_point, "castle", Color(0.75, 0.5, 1.0), DB.zone_lock_reason(zone.data, "dungeon") == "")
-	if boss_alive: _marker(c, r, zone.arena_point, "skull-crossed-bones", Color(1, 0.35, 0.3), true)
+	# v0.9.1: пульсирует и получает стрелку только текущая цель (раньше «выход в мир» подсвечивал вход в Склеп)
+	var goal: Vector3 = zone.hud.objective_target() if zone.hud and zone.hud.has_method("objective_target") else Vector3.INF
+	goal_point = goal
+	if zone.portal_point != Vector3.ZERO: _marker(c, r, zone.portal_point, "magic-portal", Color(0.45, 0.7, 1), _is_goal(zone.portal_point, goal))
+	if zone.dungeon_gate_point != Vector3.ZERO: _marker(c, r, zone.dungeon_gate_point, "dungeon-gate", Color(0.75, 0.5, 1.0), _is_goal(zone.dungeon_gate_point, goal))
+	if boss_alive: _marker(c, r, zone.arena_point, "skull-crossed-bones", Color(1, 0.35, 0.3), _is_goal(zone.arena_point, goal))
+	if goal != Vector3.INF and not zone.is_dungeon(): _goal_arrow(c, r, goal)
 	# игрок (стрелка — направление персонажа относительно камеры)
 	var fwd: Vector3 = zone.player.forward()
 	var a := to_map(zone.player.global_position + fwd * 10.0)
@@ -105,6 +109,18 @@ func _draw_route(c: Vector2, r: float) -> void:
 	var pr := 9.0 + sin(Time.get_ticks_msec() * 0.008) * 3.0
 	draw_circle(c + m, pr, Color(1, 0.8, 0.3, 0.85))
 	draw_arc(c + m, pr + 4, 0, TAU, 20, Color(0, 0, 0, 0.8), 2.0)
+
+var goal_point := Vector3.INF   # для тестов: куда указывает цель
+func _is_goal(p: Vector3, goal: Vector3) -> bool: return goal != Vector3.INF and U.flat_dist(p, goal) < 1.0
+
+## Стрелка у края мини-карты в сторону цели (если цель дальше видимой области)
+func _goal_arrow(c: Vector2, r: float, goal: Vector3) -> void:
+	var m := to_map(goal)
+	if m.length() < r * 0.66: return
+	var d := m.normalized(); var sd := Vector2(-d.y, d.x)
+	var tip := c + d * r * 0.84
+	var col := Color(1, 0.85, 0.35, 0.75 + sin(Time.get_ticks_msec() * 0.008) * 0.25)
+	draw_colored_polygon(PackedVector2Array([tip, tip - d * 16 + sd * 10, tip - d * 16 - sd * 10]), col)
 
 func _marker(c: Vector2, r: float, p: Vector3, ic: String, col: Color, pulse := false) -> void:
 	var m := to_map(p)
