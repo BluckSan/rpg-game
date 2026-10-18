@@ -745,7 +745,7 @@ func _update_cast() -> void:
 	if cast_panel == null: _build_cast_ui()
 	var boss = null
 	for e in zone.enemies:
-		if is_instance_valid(e) and e.alive and e.def.boss and e.brain is WardenBrain: boss = e
+		if is_instance_valid(e) and e.alive and e.def.boss and (e.brain is WardenBrain or e.brain is RaidBrain): boss = e
 	var br = boss.brain if boss else null
 	var on: bool = br != null and br.cast_name != "" and br.cast_total > 0
 	cast_panel.visible = on
@@ -762,6 +762,7 @@ func _update_cast() -> void:
 		enrage_label.text = "Ярость через %d:%02d" % [int(left) / 60, int(left) % 60] if left > 0 else "ЯРОСТЬ!"
 
 func _objective() -> String:
+	if zone.builder is PartyDungeonBuilder: return zone.builder.objective()
 	if zone.builder is WorldBuilder:
 		var lv := int(zone.data["level"])
 		var best := 0

@@ -156,6 +156,14 @@ var ENEMIES := {
 	"boss_gnil": {"name": "Топяной великан Гнилобрюх", "hp": 2500.0, "dmg": 30.0, "speed": 2.8, "range": 3.4, "interval": 2.0, "aggro": 16.0, "radius": 1.8, "xp": 660.0, "ranged": false, "boss": true, "color": Color(0.7,0.6,0.15), "model": "frog", "model_scale": 3.6, "moves": ["spores", "slam", "rock"], "adds": ["frog", "bat"], "proj": Color(0.6, 0.95, 0.2)},
 	"boss_hyalm": {"name": "Инеистый йети Хьяльм", "hp": 2600.0, "dmg": 32.0, "speed": 3.2, "range": 3.4, "interval": 1.9, "aggro": 17.0, "radius": 1.8, "xp": 720.0, "ranged": false, "boss": true, "color": Color(0.8,0.9,1.0), "model": "yeti", "model_scale": 2.3, "moves": ["slam", "nova", "charge"], "adds": ["wolf", "hywirl"], "proj": Color(0.6, 0.9, 1.0)},
 	"boss_seraph": {"name": "Падший серафим Эфира", "hp": 2800.0, "dmg": 34.0, "speed": 3.4, "range": 3.6, "interval": 2.0, "aggro": 18.0, "radius": 1.8, "xp": 800.0, "ranged": false, "boss": true, "color": Color(0.7,0.15,0.2), "model": "demon", "model_scale": 3.0, "moves": ["nova", "breath", "rock"], "adds": ["imp", "ether_guard"], "proj": Color(0.95, 0.5, 1.0)},
+	# ---- групповые подземелья (v0.8.0): боссы и их помощники (симулируются сервером — RaidSim) ----
+	"rb_voragos": {"name": "Ворагос, Пепельный Король", "hp": 9000.0, "dmg": 34.0, "speed": 3.4, "range": 3.8, "interval": 2.0, "aggro": 30.0, "radius": 1.9, "xp": 1800.0, "ranged": false, "boss": true, "color": Color(0.5,0.2,0.1), "model": "bluedemon", "model_scale": 3.3, "tint": Color(0.42, 0.3, 0.27), "emission": Color(1.0, 0.42, 0.08), "elem": "fire", "raid": true},
+	"rb_morwen": {"name": "Морвен, Утопленница", "hp": 9000.0, "dmg": 32.0, "speed": 3.0, "range": 4.0, "interval": 2.2, "aggro": 30.0, "radius": 1.8, "xp": 1800.0, "ranged": false, "boss": true, "color": Color(0.2,0.5,0.55), "model": "ghost", "model_scale": 3.4, "tint": Color(0.55, 0.8, 0.85), "emission": Color(0.2, 0.75, 1.0), "elem": "ice", "raid": true},
+	"rb_aeteron": {"name": "Аэтерон, Страж Звезды", "hp": 9000.0, "dmg": 34.0, "speed": 3.2, "range": 3.8, "interval": 2.0, "aggro": 30.0, "radius": 1.8, "xp": 1800.0, "ranged": false, "boss": true, "color": Color(0.5,0.4,0.8), "model": "skeleton", "model_scale": 2.6, "tint": Color(0.62, 0.55, 0.9), "emission": Color(0.85, 0.55, 1.0), "elem": "lightning", "raid": true},
+	"rb_aeteron_l": {"name": "Аэтерон: Свет", "hp": 1000.0, "dmg": 30.0, "speed": 3.4, "range": 3.0, "interval": 1.8, "aggro": 30.0, "radius": 1.3, "xp": 0.0, "ranged": false, "boss": false, "color": Color(1.0,0.85,0.5), "model": "skeleton", "model_scale": 1.8, "tint": Color(1.0, 0.9, 0.65), "emission": Color(1.0, 0.85, 0.4), "raid": true},
+	"rb_aeteron_r": {"name": "Аэтерон: Тень", "hp": 1000.0, "dmg": 30.0, "speed": 3.4, "range": 3.0, "interval": 1.8, "aggro": 30.0, "radius": 1.3, "xp": 0.0, "ranged": false, "boss": false, "color": Color(0.3,0.2,0.5), "model": "skeleton", "model_scale": 1.8, "tint": Color(0.35, 0.28, 0.55), "emission": Color(0.55, 0.3, 1.0), "raid": true},
+	"ra_ashguard": {"name": "Пепельный страж", "hp": 400.0, "dmg": 20.0, "speed": 3.2, "range": 2.4, "interval": 1.6, "aggro": 30.0, "radius": 0.9, "xp": 0.0, "ranged": false, "boss": false, "color": Color(0.4,0.3,0.25), "model": "orc", "model_scale": 1.25, "tint": Color(0.45, 0.36, 0.32), "emission": Color(1.0, 0.45, 0.1), "raid": true},
+	"ra_naiad": {"name": "Наяда Бездны", "hp": 300.0, "dmg": 14.0, "speed": 0.0, "range": 14.0, "interval": 2.4, "aggro": 30.0, "radius": 0.7, "xp": 0.0, "ranged": true, "boss": false, "color": Color(0.3,0.7,0.8), "model": "ghost", "model_scale": 1.2, "tint": Color(0.5, 0.95, 0.9), "emission": Color(0.3, 1.0, 0.85), "raid": true, "proj": Color(0.4, 0.9, 1.0)},
 }
 
 ## Зоны: стартовая долина, подземелье, открытый мир «Земли Эфира» (WorldBuilder).
@@ -163,6 +171,10 @@ var ZONES := {
 	"starter": {"name": "Пепельная долина", "scene": "res://scenes/zone.tscn", "available": true, "min_level": 1},
 	"dungeon": {"name": "Склеп Эфира", "scene": "res://scenes/zone.tscn", "available": true, "min_level": 1, "requires": ["starter", "boss_troll_killed"]},
 	"global": {"name": "Земли Эфира", "scene": "res://scenes/zone.tscn", "available": true, "min_level": 5},
+	# v0.8.0: групповые подземелья (вход — окно «Группа / Подземелья»; онлайн — экземпляр на сервере)
+	"pd_ash": {"name": "Пепельная Цитадель", "scene": "res://scenes/zone.tscn", "available": true, "min_level": 1, "party": true},
+	"pd_crypt": {"name": "Затопленный Склеп", "scene": "res://scenes/zone.tscn", "available": true, "min_level": 1, "party": true},
+	"pd_star": {"name": "Звёздное Святилище", "scene": "res://scenes/zone.tscn", "available": true, "min_level": 1, "party": true},
 }
 
 # ---------------- Дерево талантов ----------------

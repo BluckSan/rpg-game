@@ -42,10 +42,12 @@ func _ready() -> void:
 	chat_btn.pressed.connect(open_chat)
 	root.add_child(chat_btn)
 	Net.roster_changed.connect(_refresh)
+	Net.party_changed.connect(_refresh)
 	_refresh()
 
 func _refresh() -> void:
 	if not is_instance_valid(roster): return
+	roster.visible = not Net.in_party()   # в группе вместо списка — рамки группы (PartyUI)
 	var names := Net.online_names()
 	roster.text = "Онлайн: %d/%d\n%s" % [names.size(), Net.MAX_PLAYERS, "\n".join(names.slice(0, 10))]
 	var t := ""

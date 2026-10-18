@@ -24,6 +24,8 @@ var builder: StarterZoneBuilder
 var interactables: Array = []
 var pillars: Array = []
 var pillar_r := 1.4
+var raid: RaidClient          # групповое подземелье (v0.8.0)
+var party_ui: Node            # рамки группы и окно «Группа / Подземелья»
 ## Возвышенности для наземных врагов (у игрока — физика): диски, коробки, пандусы
 var _h_discs: Array = []
 var _h_boxes: Array = []
@@ -60,7 +62,11 @@ func _ready() -> void:
 	fx_root = Node3D.new(); fx_root.name = "FX"; add_child(fx_root)
 	if not DB.ZONES.has(data.get("zone", "")) or (data["zone"] == "dungeon" and DB.zone_lock_reason(data, "dungeon") != ""):
 		data["zone"] = "starter"
-	if data["zone"] == "dungeon": builder = DungeonBuilder.new()
+	# групповое подземелье: онлайн — только внутри экземпляра сервера, офлайн — соло-забег (своя симуляция)
+	if RaidDefs.is_raid_zone(data["zone"]) and (RaidDefs.by_zone(data["zone"]) == "" or (Net.in_game and Net.raid_iid == 0)):
+		data["zone"] = "starter"; data["has_pos"] = false
+	if RaidDefs.is_raid_zone(data["zone"]): builder = PartyDungeonBuilder.new()
+	elif data["zone"] == "dungeon": builder = DungeonBuilder.new()
 	elif data["zone"] == "global": builder = WorldBuilder.new()
 	else: builder = StarterZoneBuilder.new()
 	builder.name = "World"
@@ -93,6 +99,13 @@ func _ready() -> void:
 	add_child(player)
 	player.global_position = Vector3(data["pos"][0], float(data["pos"][1]) + 0.2, data["pos"][2]) if data.get("has_pos", false) else spawn_point
 	player.setup(data)
+
+	if builder is PartyDungeonBuilder:
+		raid = RaidClient.new(); raid.name = "Raid"
+		add_child(raid)
+		raid.setup(self, builder.did)
+	party_ui = PartyUI.new(); party_ui.zone = self
+	add_child(party_ui)
 
 	cam_rig = CameraRig.new()
 	add_child(cam_rig)
@@ -143,6 +156,8 @@ func near_stash() -> bool:
 
 func is_dungeon() -> bool:
 	return builder is DungeonBuilder
+
+func is_raid() -> bool: return builder is PartyDungeonBuilder
 
 ## Ближайшая доступная точка взаимодействия рядом с игроком (или пустой словарь)
 func nearest_interactable() -> Dictionary:

@@ -76,6 +76,7 @@ var _safe_t := 0.0
 var rescues := 0
 var _cap_shape: CapsuleShape3D
 
+var last_skill_t := -100.0
 func setup(d: Dictionary) -> void:
 	data = d
 	cls = DB.CLASSES[d["class"]]
@@ -464,6 +465,7 @@ func try_use(slot: int) -> bool:
 	mp -= cost
 	cooldowns[slot] = max_cooldown(slot)
 	_cur_slot = slot
+	if slot > 0: last_skill_t = Time.get_ticks_msec() / 1000.0   # удар умением прерывает касты боссов подземелий
 	_execute(s)
 	return true
 

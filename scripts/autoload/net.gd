@@ -12,8 +12,9 @@ signal net_error(msg: String)
 signal joined
 signal chat_received(from: String, text: String)
 signal roster_changed
+signal party_changed
 
-const PROTOCOL := 2
+const PROTOCOL := 3   # v0.8.0: группы и подземелья
 const DEFAULT_HOST := "146.0.76.20"
 const AUTH_PORT := 7780
 const GAME_PORT := 7777
@@ -40,6 +41,13 @@ var _send_t := 0.0
 var _peer: ENetMultiplayerPeer
 var _cert: X509Certificate
 var _overlay: Node
+# ---------- v0.8.0: группа и подземелья (клиент) ----------
+const PARTY_MAX := 5
+var party := {}                  # {id, leader, members: [{id, name, cls, lvl, hp, zone}]} — от сервера
+var party_invites := {}          # party_id -> имя пригласившего
+var raid_iid := 0
+var raid_did := ""
+var raid_client: Node
 
 # ---------- сервер ----------
 var players := {}                # peer_id -> {...}
@@ -47,6 +55,12 @@ var internal_key := ""
 var internal_url := "http://127.0.0.1:7781"
 var _snap_t := 0.0
 var _log_t := 0.0
+var parties := {}                # party_id -> {id, leader, members: [peer], invites: {peer: t}}
+var instances := {}              # iid -> {sim, did, zone, members: [peer], party, log_n}
+var _next_party := 1
+var _next_iid := 1
+var _party_t := 0.0
+var _raid_snap_t := 0.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -218,6 +232,8 @@ func _close_peer() -> void:
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	for id in remotes.keys(): _drop_remote(id)
 	remotes.clear()
+	party = {}; party_invites.clear(); raid_iid = 0; raid_did = ""; raid_client = null
+	party_changed.emit()
 	if _overlay and is_instance_valid(_overlay): _overlay.queue_free()
 	_overlay = null
 
@@ -267,7 +283,7 @@ func _process(delta: float) -> void:
 	# удалённые игроки — сглаживание
 	for id in remotes:
 		var r: Dictionary = remotes[id]
-		var same: bool = r.zone == str(Game.current.get("zone", ""))
+		var same: bool = r.zone == zone_key()
 		if same and (r.node == null or not is_instance_valid(r.node)):
 			r.node = RemotePlayer.create(z, r)
 		elif not same and r.node and is_instance_valid(r.node):
@@ -275,6 +291,11 @@ func _process(delta: float) -> void:
 		if r.node and is_instance_valid(r.node): r.node.step(delta, r.pos, r.yaw, r.hp)
 	if _overlay == null or not is_instance_valid(_overlay):
 		_overlay = NetOverlay.new(); z.add_child(_overlay)
+
+## Ключ зоны для видимости других игроков: в подземельях — с номером экземпляра (разные группы не видят друг друга)
+func zone_key() -> String:
+	var z := str(Game.current.get("zone", ""))
+	return z + ("#%d" % raid_iid if RaidDefs.is_raid_zone(z) and raid_iid > 0 else "")
 
 func _drop_remote(id: int) -> void:
 	if not remotes.has(id): return
@@ -380,6 +401,9 @@ func _srv_connected(id: int) -> void:
 
 func _srv_disconnected(id: int) -> void:
 	var p = players.get(id)
+	if p != null and p.get("authed", false):
+		_srv_raid_remove(id)
+		_srv_party_remove(id, "вышел из игры")
 	players.erase(id)
 	if p == null: return
 	if p.authed:
@@ -402,7 +426,10 @@ func _srv_http(method: int, path: String, body: Dictionary) -> Dictionary:
 
 func _info(id: int, p: Dictionary) -> Dictionary:
 	return {"id": id, "name": p.name, "look": p.data.get("look", {}), "class": p.data.get("class", "warrior"),
-		"asc": p.data.get("ascendancy", ""), "level": int(p.data.get("level", 1)), "zone": p.zone, "pos": p.pos, "yaw": p.yaw}
+		"asc": p.data.get("ascendancy", ""), "level": int(p.data.get("level", 1)), "zone": _srv_zone_key(p), "pos": p.pos, "yaw": p.yaw}
+
+func _srv_zone_key(p: Dictionary) -> String:
+	return str(p.zone) + ("#%d" % int(p.get("iid", 0)) if RaidDefs.is_raid_zone(str(p.zone)) else "")
 
 @rpc("any_peer", "call_remote", "reliable")
 func c_hello(tok: String, char_id: String, proto: int, version: String) -> void:
@@ -425,7 +452,9 @@ func c_hello(tok: String, char_id: String, proto: int, version: String) -> void:
 	if cp is Array and cp.size() == 3: pos = Vector3(float(cp[0]), float(cp[1]), float(cp[2]))
 	var p := {"authed": true, "acc": int(d.account_id), "user": str(d.username), "char_id": char_id, "name": str(c.get("name", "?")),
 		"data": c, "zone": str(c.get("zone", "starter")), "pos": pos, "yaw": 0.0, "hp": 1.0, "t": _now(), "tp_until": _now() + 5.0,
-		"tp_t": 0.0, "viol": 0, "budget": 24.0, "dirty": false, "save_t": _now(), "chat_t": 0.0, "chat_n": 0}
+		"tp_t": 0.0, "viol": 0, "budget": 24.0, "dirty": false, "save_t": _now(), "chat_t": 0.0, "chat_n": 0,
+		"party": 0, "iid": 0, "inv_t": 0.0}
+	if RaidDefs.is_raid_zone(p.zone): p.zone = "starter"; c["zone"] = "starter"; c["has_pos"] = false
 	players[id] = p
 	var roster := []
 	for oid in players:
@@ -486,7 +515,7 @@ func c_action(kind: String, anim: String, speed: float) -> void:
 	var p = _authed(id)
 	if p == null or kind.length() > 24 or anim.length() > 48: return
 	for oid in players:
-		if oid != id and players[oid].authed and players[oid].zone == p.zone:
+		if oid != id and players[oid].authed and _srv_zone_key(players[oid]) == _srv_zone_key(p):
 			s_action.rpc_id(oid, id, kind, anim, clampf(speed, 0.1, 4.0))
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -539,11 +568,307 @@ func _server_tick(delta: float) -> void:
 			var p = players[id]
 			if not p.authed: continue
 			ids.append(id)
-			data.append_array([p.pos.x, p.pos.y, p.pos.z, p.yaw, p.hp]); zones.append(p.zone)
+			data.append_array([p.pos.x, p.pos.y, p.pos.z, p.yaw, p.hp]); zones.append(_srv_zone_key(p))
 		if ids.size() > 1:
 			for id in ids: s_snapshot.rpc_id(id, ids, data, zones)
 		for id in ids: _srv_flush(players[id])
+	_srv_raids_tick(delta)
+	_party_t -= delta
+	if _party_t <= 0.0:
+		_party_t = 0.5
+		for pid in parties: _srv_party_send(pid)
 	_log_t -= delta
 	if _log_t <= 0.0:
 		_log_t = 300.0
-		print("server: онлайн %d, память %.1f МБ" % [players.size(), OS.get_static_memory_usage() / 1048576.0])
+		print("server: онлайн %d, групп %d, подземелий %d, память %.1f МБ" % [players.size(), parties.size(), instances.size(), OS.get_static_memory_usage() / 1048576.0])
+
+
+# =====================================================================
+# v0.8.0: группы (до 5) и групповые подземелья
+# =====================================================================
+
+# ---------- клиент: вызовы ----------
+func party_invite(pname: String) -> void:
+	if in_game and _connected(): c_party_invite.rpc_id(1, pname)
+func party_accept(party_id: int) -> void:
+	party_invites.erase(party_id)
+	if in_game and _connected(): c_party_accept.rpc_id(1, party_id)
+	party_changed.emit()
+func party_decline(party_id: int) -> void:
+	party_invites.erase(party_id); party_changed.emit()
+func party_leave() -> void:
+	if in_game and _connected(): c_party_leave.rpc_id(1)
+func party_kick(pname: String) -> void:
+	if in_game and _connected(): c_party_kick.rpc_id(1, pname)
+func is_leader() -> bool: return not party.is_empty() and int(party.get("leader", 0)) == my_id
+func in_party() -> bool: return not party.is_empty()
+
+## Вход в подземелье: онлайн — через сервер (лидер ведёт всю группу), офлайн — сразу соло-забег
+func raid_enter(did: String) -> void:
+	if not RaidDefs.DUNGEONS.has(did): return
+	if in_game:
+		if _connected(): c_raid_enter.rpc_id(1, did)
+		return
+	var z = get_tree().current_scene
+	if z and z.has_method("save"): z.save()
+	Game.travel(RaidDefs.DUNGEONS[did].zone)
+
+func raid_ready(rc: Node) -> void:
+	raid_client = rc
+	if in_game and _connected(): c_raid_ready.rpc_id(1)
+func raid_hit(eid: int, dmg: float, skill: bool) -> void:
+	if in_game and _connected(): c_raid_hit.rpc_id(1, eid, dmg, skill)
+func raid_leave() -> void:
+	if in_game and _connected(): c_raid_leave.rpc_id(1)
+	raid_iid = 0; raid_did = ""; raid_client = null
+
+# ---------- RPC: сервер → клиент ----------
+@rpc("authority", "call_remote", "reliable")
+func s_party(st: Dictionary) -> void:
+	party = st
+	party_changed.emit()
+
+@rpc("authority", "call_remote", "reliable")
+func s_party_invite(from_name: String, party_id: int) -> void:
+	party_invites[party_id] = from_name
+	Game.toast("%s приглашает вас в группу (окно «Группа»)" % from_name, 4.0)
+	_chat_local("", "%s приглашает вас в группу" % from_name)
+	party_changed.emit()
+
+@rpc("authority", "call_remote", "reliable")
+func s_notice(text: String) -> void:
+	Game.toast(text, 3.0)
+	_chat_local("", text)
+
+@rpc("authority", "call_remote", "reliable")
+func s_raid_start(did: String, iid: int) -> void:
+	if not RaidDefs.DUNGEONS.has(did): return
+	raid_iid = iid; raid_did = did
+	var z = get_tree().current_scene
+	if z and z.has_method("save"): z.save()
+	Game.travel(RaidDefs.DUNGEONS[did].zone)
+
+@rpc("authority", "call_remote", "reliable")
+func s_raid_ev(ev: Dictionary) -> void:
+	if raid_client and is_instance_valid(raid_client): raid_client.handle(ev)
+
+@rpc("authority", "call_remote", "unreliable_ordered")
+func s_raid_snap(ids: PackedInt32Array, data: PackedFloat32Array) -> void:
+	if raid_client and is_instance_valid(raid_client): raid_client.apply_snap(ids, data)
+
+# ---------- сервер: группы ----------
+func _srv_find(pname: String) -> int:
+	var key := pname.strip_edges().to_lower()
+	for oid in players:
+		if players[oid].authed and str(players[oid].name).to_lower() == key: return oid
+	return 0
+
+func _srv_party_state(pid: int) -> Dictionary:
+	var pt = parties.get(pid)
+	if pt == null: return {}
+	var mem := []
+	for m in pt.members:
+		var p = players.get(m)
+		if p == null: continue
+		mem.append({"id": m, "name": p.name, "cls": str(p.data.get("class", "warrior")), "lvl": int(p.data.get("level", 1)),
+			"hp": float(p.hp), "zone": str(p.zone), "iid": int(p.iid)})
+	return {"id": pid, "leader": pt.leader, "members": mem}
+
+func _srv_party_send(pid: int) -> void:
+	var st := _srv_party_state(pid)
+	for m in parties[pid].members:
+		if players.has(m): s_party.rpc_id(m, st)
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_party_invite(pname: String) -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null: return
+	var now := _now()
+	if now - float(p.inv_t) < 1.0: return
+	p.inv_t = now
+	var tid := _srv_find(pname.left(40))
+	if tid == 0 or tid == id: s_notice.rpc_id(id, "Игрок «%s» не в сети" % pname.left(40)); return
+	if int(players[tid].party) != 0: s_notice.rpc_id(id, "%s уже в группе" % players[tid].name); return
+	var pid := int(p.party)
+	if pid == 0:
+		pid = _next_party; _next_party += 1
+		parties[pid] = {"id": pid, "leader": id, "members": [id], "invites": {}}
+		p.party = pid
+		_srv_party_send(pid)
+	var pt: Dictionary = parties[pid]
+	if pt.leader != id: s_notice.rpc_id(id, "Приглашать может только лидер группы"); return
+	if pt.members.size() >= PARTY_MAX: s_notice.rpc_id(id, "В группе уже %d игроков" % PARTY_MAX); return
+	pt.invites[tid] = now
+	s_party_invite.rpc_id(tid, p.name, pid)
+	s_notice.rpc_id(id, "Приглашение отправлено: %s" % players[tid].name)
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_party_accept(party_id: int) -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null or int(p.party) != 0: return
+	var pt = parties.get(party_id)
+	if pt == null or not pt.invites.has(id) or _now() - float(pt.invites[id]) > 120.0:
+		s_notice.rpc_id(id, "Приглашение устарело"); return
+	if pt.members.size() >= PARTY_MAX: s_notice.rpc_id(id, "Группа уже полная"); return
+	pt.invites.erase(id)
+	pt.members.append(id); p.party = party_id
+	for m in pt.members:
+		if m != id: s_notice.rpc_id(m, "%s вступает в группу" % p.name)
+	_srv_party_send(party_id)
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_party_leave() -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	if _authed(id) == null: return
+	_srv_party_remove(id, "покидает группу")
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_party_kick(pname: String) -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null or int(p.party) == 0: return
+	var pt: Dictionary = parties[int(p.party)]
+	if pt.leader != id: s_notice.rpc_id(id, "Исключать может только лидер"); return
+	var tid := _srv_find(pname.left(40))
+	if tid == 0 or tid == id or not pt.members.has(tid): return
+	s_notice.rpc_id(tid, "Вас исключили из группы")
+	_srv_party_remove(tid, "исключён(а) из группы")
+
+func _srv_party_remove(id: int, why: String) -> void:
+	var p = players.get(id)
+	if p == null or int(p.get("party", 0)) == 0: return
+	var pid := int(p.party)
+	p.party = 0
+	var pt = parties.get(pid)
+	if _peer and _peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and players.has(id) and multiplayer.get_peers().has(id):
+		s_party.rpc_id(id, {})
+	if pt == null: return
+	pt.members.erase(id)
+	for m in pt.members:
+		if players.has(m): s_notice.rpc_id(m, "%s %s" % [p.name, why])
+	if pt.members.size() <= 1:
+		for m in pt.members:
+			if players.has(m):
+				players[m].party = 0
+				s_party.rpc_id(m, {})
+				s_notice.rpc_id(m, "Группа распущена")
+		parties.erase(pid)
+		return
+	if pt.leader == id:
+		pt.leader = pt.members[0]
+		s_notice.rpc_id(pt.leader, "Вы теперь лидер группы")
+	_srv_party_send(pid)
+
+# ---------- сервер: подземелья ----------
+@rpc("any_peer", "call_remote", "reliable")
+func c_raid_enter(did: String) -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null or not RaidDefs.DUNGEONS.has(did): return
+	var members := [id]
+	var pid := int(p.party)
+	if pid != 0:
+		var pt: Dictionary = parties[pid]
+		if pt.leader != id: s_notice.rpc_id(id, "Подземелье открывает лидер группы"); return
+		members = pt.members.duplicate()
+		# группа уже внутри этого подземелья — догоняющие входят в тот же экземпляр
+		for iid in instances:
+			var inst: Dictionary = instances[iid]
+			if inst.party == pid and inst.did == did and not inst.sim.done:
+				for m in members:
+					if players.has(m) and int(players[m].iid) != iid:
+						_srv_raid_remove(m); players[m].iid = iid; s_raid_start.rpc_id(m, did, iid)
+				return
+	var lvl := 1
+	for m in members: lvl = maxi(lvl, int(players[m].data.get("level", 1)))
+	var sim := RaidSim.new()
+	sim.setup(did, lvl, members.size())
+	var iid := _next_iid; _next_iid += 1
+	instances[iid] = {"sim": sim, "did": did, "zone": RaidDefs.DUNGEONS[did].zone, "members": [], "party": pid, "log_n": 0, "t0": _now()}
+	for m in members:
+		if not players.has(m): continue
+		_srv_raid_remove(m)
+		players[m].iid = iid
+		s_raid_start.rpc_id(m, did, iid)
+	print("server: подземелье #%d «%s» — группа %d, ур. %d" % [iid, RaidDefs.DUNGEONS[did].name, members.size(), lvl])
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_raid_ready() -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null: return
+	var inst = instances.get(int(p.iid))
+	if inst == null: return
+	if not inst.members.has(id): inst.members.append(id)
+	inst.had = true
+	inst.sim.add_player(id, {"name": p.name, "cls": str(p.data.get("class", "warrior")), "lvl": int(p.data.get("level", 1))})
+	p.tp_until = _now() + 3.0   # переход в зону: позиция прыгает ко входу
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_raid_hit(eid: int, dmg: float, skill: bool) -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null: return
+	var inst = instances.get(int(p.iid))
+	if inst == null or str(p.zone) != inst.zone: return
+	inst.sim.hit(id, eid, dmg, skill)
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_raid_leave() -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	if _authed(id) == null: return
+	_srv_raid_remove(id)
+
+func _srv_raid_remove(id: int) -> void:
+	var p = players.get(id)
+	if p == null: return
+	var iid := int(p.get("iid", 0))
+	p.iid = 0
+	var inst = instances.get(iid)
+	if inst == null: return
+	inst.members.erase(id)
+	inst.sim.remove_player(id)
+
+func _srv_raids_tick(delta: float) -> void:
+	_raid_snap_t -= delta
+	var snap := _raid_snap_t <= 0.0
+	if snap: _raid_snap_t = 1.0 / SNAP_HZ
+	for iid in instances.keys():
+		var inst: Dictionary = instances[iid]
+		var sim: RaidSim = inst.sim
+		# пустой экземпляр (никто не вошёл за 60 с или все вышли) — удаляем
+		var any := false
+		for pid in players:
+			if int(players[pid].get("iid", 0)) == iid: any = true
+		if not any and (inst.get("had", false) or _now() - float(inst.t0) > 60.0):
+			print("server: подземелье #%d закрыто" % iid)
+			instances.erase(iid); continue
+		for m in inst.members:
+			var p = players.get(m)
+			if p and str(p.zone) == inst.zone: sim.update_player(m, p.pos, float(p.hp))
+		sim.tick(delta)
+		for e in sim.events:
+			var to: int = e[0]
+			if to == 0:
+				for m in inst.members:
+					if players.has(m): s_raid_ev.rpc_id(m, e[1])
+			elif inst.members.has(to): s_raid_ev.rpc_id(to, e[1])
+		sim.events.clear()
+		if snap and not inst.members.is_empty():
+			var s := sim.snapshot()
+			for m in inst.members:
+				if players.has(m): s_raid_snap.rpc_id(m, s[0], s[1])
+		while int(inst.log_n) < sim.mlog.size():
+			var l = sim.mlog[int(inst.log_n)]
+			inst.log_n = int(inst.log_n) + 1
+			print("server: #%d %s [%.1f] %s" % [iid, inst.did, l[0], l[1]])

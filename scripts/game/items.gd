@@ -58,6 +58,13 @@ const SETS := {
 		"b2": [["leech%", 1.0]], "b4": [["dmg%", 10], ["hp%", 8]], "b6": {"fx": {"crit_heal": 3, "leech_x": 1}, "desc": "Похищение жизни ×2; крит лечит 3%"}},
 	"seals": {"name": "Печати Эфира", "cls": "", "lvl": 25, "pieces": ["cloak", "circlet", "gloves", "boots", "amulet", "belt"],
 		"b2": [["dmg%", 10], ["spell%", 10]], "b4": [["cdr%", 8], ["as%", 8]], "b6": {"fx": {"proc_bolt": 25, "crit_mark": 1}, "desc": "25% шанс молнии; крит проклинает цель (+30% урона)"}},
+	# v0.8.0: комплекты групповых подземелий (lvl 99 — не выпадают в мире, только с боссов RaidSim; уровень предмета — по группе)
+	"r_ash": {"name": "Регалии Пепельного Короля", "cls": "", "lvl": 99, "raid": true, "pieces": ["cloak", "circlet", "gloves", "boots", "ring", "belt"],
+		"b2": [["dmg%", 15]], "b4": [["hp%", 12], ["crit", 5]], "b6": {"fx": {"proc_burn": 35, "kill_explode": 35}, "desc": "35% шанс поджечь; убитые враги взрываются (35%)"}},
+	"r_tide": {"name": "Покров Утопленницы", "cls": "", "lvl": 99, "raid": true, "pieces": ["cloak", "circlet", "gloves", "boots", "amulet", "belt"],
+		"b2": [["hp%", 15]], "b4": [["dr%", 8], ["regen", 4]], "b6": {"fx": {"leech_x": 1, "crit_heal": 4, "kill_heal": 5}, "desc": "Похищение жизни ×2; крит лечит 4%; убийство — 5%"}},
+	"r_star": {"name": "Осколки Звезды", "cls": "", "lvl": 99, "raid": true, "pieces": ["cloak", "circlet", "gloves", "boots", "ring", "amulet"],
+		"b2": [["spell%", 15], ["dmg%", 8]], "b4": [["cdr%", 10], ["critdmg%", 30]], "b6": {"fx": {"proc_bolt": 30, "chain_plus": 2, "crit_mark": 1}, "desc": "30% шанс молнии, цепи +2; крит проклинает цель"}},
 }
 
 static func tier_of(ilvl: int) -> int: return clampi(ilvl / 9, 0, 2)
