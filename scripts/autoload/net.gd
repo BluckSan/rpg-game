@@ -13,7 +13,7 @@ signal joined
 signal chat_received(from: String, text: String)
 signal roster_changed
 
-const PROTOCOL := 1
+const PROTOCOL := 2
 const DEFAULT_HOST := "146.0.76.20"
 const AUTH_PORT := 7780
 const GAME_PORT := 7777
@@ -315,15 +315,15 @@ func s_player_left(id: int, pname: String) -> void:
 	_chat_local("", "%s выходит" % pname)
 
 @rpc("authority", "call_remote", "unreliable_ordered")
-func s_snapshot(data: PackedFloat32Array, zones: PackedStringArray) -> void:
-	# [id, x, y, z, yaw, hp] * n, зоны — отдельно
-	var n := data.size() / 6
+func s_snapshot(ids: PackedInt32Array, data: PackedFloat32Array, zones: PackedStringArray) -> void:
+	# ids отдельно (id пира не помещается в float32 без потерь), data: [x, y, z, yaw, hp] * n
+	var n := mini(ids.size(), data.size() / 5)
 	for i in n:
-		var id := int(data[i * 6])
+		var id := ids[i]
 		if not remotes.has(id): continue
 		var r: Dictionary = remotes[id]
-		r.pos = Vector3(data[i * 6 + 1], data[i * 6 + 2], data[i * 6 + 3])
-		r.yaw = data[i * 6 + 4]; r.hp = data[i * 6 + 5]
+		r.pos = Vector3(data[i * 5], data[i * 5 + 1], data[i * 5 + 2])
+		r.yaw = data[i * 5 + 3]; r.hp = data[i * 5 + 4]
 		if i < zones.size(): r.zone = zones[i]
 
 @rpc("authority", "call_remote", "reliable")
@@ -534,14 +534,14 @@ func _server_tick(delta: float) -> void:
 	if _snap_t <= 0.0:
 		_snap_t = 1.0 / SNAP_HZ
 		var data := PackedFloat32Array(); var zones := PackedStringArray()
-		var ids := []
+		var ids := PackedInt32Array()
 		for id in players:
 			var p = players[id]
 			if not p.authed: continue
 			ids.append(id)
-			data.append_array([id, p.pos.x, p.pos.y, p.pos.z, p.yaw, p.hp]); zones.append(p.zone)
+			data.append_array([p.pos.x, p.pos.y, p.pos.z, p.yaw, p.hp]); zones.append(p.zone)
 		if ids.size() > 1:
-			for id in ids: s_snapshot.rpc_id(id, data, zones)
+			for id in ids: s_snapshot.rpc_id(id, ids, data, zones)
 		for id in ids: _srv_flush(players[id])
 	_log_t -= delta
 	if _log_t <= 0.0:
