@@ -26,6 +26,7 @@ var pillars: Array = []
 var pillar_r := 1.4
 var raid: RaidClient          # групповое подземелье (v0.8.0)
 var party_ui: Node            # рамки группы и окно «Группа / Подземелья»
+var target_ctl: Node          # v0.9.0: выбор цели (TargetCtl)
 ## Возвышенности для наземных врагов (у игрока — физика): диски, коробки, пандусы
 var _h_discs: Array = []
 var _h_boxes: Array = []

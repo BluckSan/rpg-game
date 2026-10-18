@@ -253,6 +253,21 @@ func _skill_button(t: String, offset: Vector2, sz: float, c: Color, ic: String) 
 	root.add_child(sb)
 	return sb
 
+## Подписи клавиш на кнопках и шпаргалка (после переназначения — обновляются)
+func refresh_key_hints() -> void:
+	if not Game.desktop: return
+	skill_btns[0].key_hint = Controls.key_hint("attack")
+	for i in range(1, skill_btns.size()): skill_btns[i].key_hint = Controls.key_hint("skill_%d" % i)
+	potion_btn.key_hint = Controls.key_hint("potion")
+	_key_e = " [%s]" % Controls.key_hint("interact")
+	for b in skill_btns + [potion_btn]: b.queue_redraw()
+	var help = root.find_child("KeyHelp", false, false)
+	if help:
+		var K := func(a): return Controls.key_hint(a)
+		help.text = "%s%s%s%s — ход · %s — атака · 1–8 — умения\n%s — цель · %s — сброс цели · ПКМ — камера\n%s — прыжок · %s — кувырок · %s — зелье · %s — герой\n%s — умения · %s — таланты · %s — карта · Esc — меню" % [
+			K.call("move_up"), K.call("move_left"), K.call("move_down"), K.call("move_right"), K.call("attack"), K.call("target_next"), K.call("target_clear"),
+			K.call("jump"), K.call("roll"), K.call("potion"), K.call("hero"), K.call("skills"), K.call("talents"), K.call("map")]
+
 func refresh_skill_buttons() -> void:
 	for i in range(1, skill_btns.size()):
 		var s = player.get_skill(i)
@@ -268,11 +283,9 @@ func _setup_desktop() -> void:
 	joy_base.visible = false
 	jump_btn.visible = false
 	roll_btn.visible = false
-	var keys := ["ЛКМ", "1", "2", "3", "4", "5", "6", "7", "8"]
-	for i in skill_btns.size(): skill_btns[i].key_hint = keys[i]
-	potion_btn.key_hint = "H"
-	_key_e = " [E]"
-	var help := UIK.label(root, "WASD — ход · ЛКМ — атака · 1–8 — умения\nПКМ — камера · колесо — зум · Пробел — прыжок\nShift — кувырок · H — зелье · I — герой · T — таланты\nU — умения · M — карта · Esc — меню", 17, Color(1, 1, 1, 0.6))
+	refresh_key_hints()
+	var help := UIK.label(root, "", 17, Color(1, 1, 1, 0.6))
+	help.name = "KeyHelp"
 	help.autowrap_mode = TextServer.AUTOWRAP_OFF
 	help.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	help.add_theme_constant_override("outline_size", 5)
@@ -280,32 +293,48 @@ func _setup_desktop() -> void:
 	help.offset_left = 20; help.offset_right = 480; help.offset_top = -150; help.offset_bottom = -20
 	help.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-## Горячие клавиши (true — событие обработано)
+## Горячие клавиши (true — событие обработано). v0.9.0: по действиям Controls (переназначаются в настройках)
+## Совместимость (тесты): нажатие клавиши по коду
 func _hotkey(k: int) -> bool:
+	var ev := InputEventKey.new(); ev.keycode = k; ev.physical_keycode = k; ev.pressed = true
+	return _hotkey_ev(ev)
+
+const WINDOW_ACTIONS := {"Window_hero": "hero", "Window_talents": "talents", "Window_skills": "skills", "Window_shop": "interact"}
+func _hotkey_ev(ev: InputEvent) -> bool:
+	var esc: bool = ev is InputEventKey and (ev as InputEventKey).keycode == KEY_ESCAPE
+	var act := Controls.action_of(ev)
 	if window != null:
-		var wname := String(window.name)
-		if k == KEY_ESCAPE or (k in [KEY_I, KEY_C] and wname == "Window_hero") or (k in [KEY_T, KEY_N] and wname == "Window_talents") or (k in [KEY_U, KEY_P] and wname == "Window_skills") \
-				or (k == KEY_E and wname == "Window_shop"):
+		if esc or (act != "" and WINDOW_ACTIONS.get(String(window.name), "") == act):
 			close_window(); return true
 		return false
-	match k:
-		KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8:
-			var i := k - KEY_0
-			player.try_use(i)
-			skill_btns[i].set_held(true)
-			get_tree().create_timer(0.12).timeout.connect(func(): if is_instance_valid(skill_btns[i]): skill_btns[i].set_held(false))
-		KEY_SPACE: press_jump()
-		KEY_SHIFT, KEY_K: press_roll()
-		KEY_H, KEY_Q: player.use_potion()
-		KEY_I, KEY_C: _open("hero")
-		KEY_U, KEY_P: _open("skills")
-		KEY_T, KEY_N: _open("talents")
-		KEY_M:
+	if esc:
+		if zone.target_ctl and zone.target_ctl.has_target():   # Esc сначала сбрасывает цель, затем — меню
+			zone.target_ctl.clear(); return true
+		_open("pause"); return true
+	if act.begins_with("skill_"):
+		var i := int(act.substr(6))
+		player.try_use(i)
+		skill_btns[i].set_held(true)
+		get_tree().create_timer(0.12).timeout.connect(func(): if is_instance_valid(skill_btns[i]): skill_btns[i].set_held(false))
+		return true
+	match act:
+		"jump": press_jump()
+		"roll": press_roll()
+		"potion": player.use_potion()
+		"hero": _open("hero")
+		"skills": _open("skills")
+		"talents": _open("talents")
+		"map":
 			if zone.builder is WorldBuilder: _open("map")
 			else: minimap.toggle_big()
-		KEY_ESCAPE: _open("pause")
-		KEY_E:
+		"interact":
 			if not interact(): return false
+		"target_next": if zone.target_ctl: zone.target_ctl.cycle()
+		"target_clear": if zone.target_ctl: zone.target_ctl.clear()
+		"target_self": if zone.target_ctl: zone.target_ctl.select(player)
+		"attack":
+			if ev is InputEventMouseButton: return false   # ЛКМ по миру — обычная логика (выбор цели/атака)
+			player.attack_held = true
 		_: return false
 	return true
 
@@ -468,8 +497,11 @@ func _over_top_button(p: Vector2) -> bool:
 	return false
 
 func _input(ev: InputEvent) -> void:
-	if ev is InputEventKey and ev.pressed and not ev.echo and player != null:
-		if _hotkey(ev.keycode):
+	if player != null and ev is InputEventKey and not ev.pressed and Controls.action_of(ev) == "attack":
+		player.attack_held = false
+	var extra_mb: bool = ev is InputEventMouseButton and ev.pressed and (ev.button_index == MOUSE_BUTTON_MIDDLE or ev.button_index >= MOUSE_BUTTON_XBUTTON1)
+	if player != null and ((ev is InputEventKey and ev.pressed and not ev.echo) or extra_mb):
+		if _hotkey_ev(ev):
 			get_viewport().set_input_as_handled()
 			return
 	if window != null: return

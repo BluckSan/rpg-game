@@ -17,13 +17,85 @@ func setup(close_cb: Callable, z = null) -> void:
 	p.anchor_left = 0.5; p.anchor_right = 0.5; p.anchor_top = 0.5; p.anchor_bottom = 0.5
 	p.offset_left = -520; p.offset_right = 520; p.offset_top = -480; p.offset_bottom = 480
 	UIK.place(UIK.label(p, "Настройки", 54, UIK.ACCENT, HORIZONTAL_ALIGNMENT_CENTER), 0, 0.885, 1, 0.98)
+	var tabs := UIK.hbox(p, 64, 12)
+	UIK.place(tabs, 0.03, 0.80, 0.97, 0.875)
+	for t in [["main", "Основные"], ["controls", "Управление (ПК)"]]:
+		var tb := UIK.button(tabs, t[1], _show_tab.bind(t[0]), UIK.BUTTON, 28)
+		tb.name = "Tab_" + t[0]
+		UIK.expand(tb, 1.0)
 	var lp := Control.new(); p.add_child(lp)
-	UIK.place(lp, 0.03, 0.15, 0.97, 0.88)
+	UIK.place(lp, 0.03, 0.15, 0.97, 0.79)
 	rows = UIK.scroll_list(lp, 12)
 	var done := UIK.button(p, "Готово", close, UIK.GREEN, 36)
 	done.name = "Done"
 	UIK.place(done, 0.3, 0.025, 0.7, 0.125)
-	_build()
+	_show_tab("main")
+
+var tab := "main"
+func _show_tab(t: String) -> void:
+	tab = t
+	_capture = []
+	_refreshers.clear()
+	UIK.clear(rows)
+	for b in find_children("Tab_*", "", true, false): b.modulate = Color(1.2, 1.15, 0.85) if String(b.name) == "Tab_" + t else Color(0.75, 0.75, 0.75)
+	if t == "main": _build()
+	else: _build_controls()
+
+# ---------- v0.9.0: вкладка «Управление»: переназначение, конфликты, сброс ----------
+var _capture: Array = []        # [id, slot, button] — ждём нажатия
+var _bind_btns := {}            # "id:slot" -> Button
+func _build_controls() -> void:
+	_bind_btns.clear()
+	var h := UIK.label(rows, "Нажмите на привязку и затем нужную клавишу или кнопку мыши. Esc — отмена, Delete — очистить. Красным — клавиша занята несколькими действиями.", 22, UIK.MUTED)
+	h.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var rb := UIK.button(rows, "Сбросить по умолчанию", func():
+		Controls.reset_defaults(); _after_rebind(), UIK.BUTTON, 28)
+	rb.name = "ResetControls"
+	for a in Controls.ACTIONS:
+		var r := _row(a[1])
+		for slot in 2:
+			var b := UIK.button(r, "", Callable(), UIK.BUTTON, 26)
+			b.name = "Bind_%s_%d" % [a[0], slot]
+			b.custom_minimum_size.x = 190
+			var id: String = a[0]
+			b.pressed.connect(func():
+				if DragScroll.dragging: return
+				_capture = [id, slot, b]; b.text = "Нажмите…")
+			_bind_btns["%s:%d" % [a[0], slot]] = b
+	_paint_binds()
+
+func _paint_binds() -> void:
+	var cf := Controls.conflicts()
+	for k in _bind_btns:
+		var b: Button = _bind_btns[k]
+		if not is_instance_valid(b): continue
+		var parts: PackedStringArray = k.split(":")
+		var code := int(Controls.binds[parts[0]][int(parts[1])])
+		b.text = Controls.code_name(code)
+		b.modulate = Color(1.0, 0.45, 0.4) if cf.has(code) else Color.WHITE
+		b.tooltip_text = "Конфликт: клавиша назначена на несколько действий" if cf.has(code) else ""
+
+func _after_rebind() -> void:
+	_paint_binds()
+	get_tree().call_group("hud_listeners", "refresh_key_hints")
+
+func _input(ev: InputEvent) -> void:
+	if _capture.is_empty(): return
+	var is_key: bool = ev is InputEventKey and ev.pressed and not ev.echo
+	var is_mb: bool = ev is InputEventMouseButton and ev.pressed and not (ev.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN])
+	if not (is_key or is_mb): return
+	get_viewport().set_input_as_handled()
+	var id: String = _capture[0]; var slot: int = _capture[1]
+	_capture = []
+	if is_key and (ev as InputEventKey).keycode == KEY_ESCAPE: _paint_binds(); return
+	if is_key and (ev as InputEventKey).keycode in [KEY_DELETE, KEY_BACKSPACE]:
+		Controls.rebind(id, slot, 0); _after_rebind(); return
+	Controls.rebind(id, slot, Controls.code_of(ev))
+	_after_rebind()
+
+## Для тестов: назначить без ввода
+func test_rebind(id: String, slot: int, code: int) -> void:
+	Controls.rebind(id, slot, code); _after_rebind()
 
 func close() -> void:
 	Game.save_settings()

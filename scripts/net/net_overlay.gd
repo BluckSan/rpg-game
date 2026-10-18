@@ -67,6 +67,6 @@ func _submit(text: String) -> void:
 	input.release_focus()
 
 func _unhandled_input(e: InputEvent) -> void:
-	if e is InputEventKey and e.pressed and not e.echo and e.keycode == KEY_ENTER and not input.visible:
+	if e is InputEventKey and e.pressed and not e.echo and Controls.action_of(e) == "chat" and not input.visible:
 		open_chat()
 		get_viewport().set_input_as_handled()

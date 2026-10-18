@@ -176,8 +176,6 @@ func _physics_process(delta: float) -> void:
 	else:
 		_coyote -= delta
 		velocity.y -= GRAVITY * delta
-	if Input.is_key_pressed(KEY_J): request_jump()
-	if Input.is_key_pressed(KEY_K): request_roll()
 	if _jump_buffer > 0:
 		_jump_buffer -= delta
 		if _coyote > 0 and _dash_time <= 0:

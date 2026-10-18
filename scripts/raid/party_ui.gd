@@ -52,7 +52,7 @@ func toggle() -> void:
 		UIK.pop_in(win)
 
 func _unhandled_input(e: InputEvent) -> void:
-	if e is InputEventKey and e.pressed and not e.echo and e.keycode == KEY_G:
+	if (e is InputEventKey or e is InputEventMouseButton) and e.pressed and not (e is InputEventKey and e.echo) and Controls.action_of(e) == "party":
 		var fo = get_viewport().gui_get_focus_owner()
 		if fo is LineEdit: return
 		toggle(); get_viewport().set_input_as_handled()

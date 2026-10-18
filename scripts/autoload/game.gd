@@ -332,14 +332,9 @@ func _make_music() -> AudioStreamWAV:
 func resolution_text() -> String:
 	return "%d×%d" % [resolution.x, resolution.y]
 
-## Клавиши ПК: WASD + стрелки
+## Клавиши ПК: v0.9.0 — переназначаемые (Controls, user://controls.cfg)
 func _setup_input_map() -> void:
-	var map := {"move_left": [KEY_A, KEY_LEFT], "move_right": [KEY_D, KEY_RIGHT], "move_up": [KEY_W, KEY_UP], "move_down": [KEY_S, KEY_DOWN]}
-	for a in map:
-		if not InputMap.has_action(a): InputMap.add_action(a, 0.2)
-		for k in map[a]:
-			var ev := InputEventKey.new(); ev.physical_keycode = k
-			InputMap.action_add_event(a, ev)
+	Controls.load_and_apply()
 
 # ---------- сохранения ----------
 func list_characters() -> Array:
