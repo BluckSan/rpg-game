@@ -99,7 +99,12 @@ func step(dt: float) -> void:
 	if urgent: mech_moves += 1
 	# 2) цель и атака
 	var tgt = _pick_target()
-	if tgt and not urgent:
+	var b0 = _boss()
+	if b0 != null and b0.brain and b0.brain.cast_name == "Песнь Бездны": tgt = b0   # все — к боссу, прервать песнь
+	var bb = _boss()
+	if not urgent and bb != null and not RaidDefs.in_arena(me) and zone.builder.gate_open() and zone.builder.packs_left() == 0:
+		mv = U.flat(RaidDefs.ARENA_C - me).normalized()   # решётка открыта — все на арену, пока не закрылась
+	elif tgt and not urgent:
 		var dist := U.flat_dist(tgt.global_position, me)
 		var want: float = (8.0 if ranged else 2.2 + tgt.radius)
 		if dist > want: mv = U.flat(tgt.global_position - me).normalized()
@@ -113,11 +118,14 @@ func step(dt: float) -> void:
 			if song and tgt != b:
 				p.face_towards(b.global_position)
 				tgt = b
-			if song or randf() < 0.5:
-				for s in [1, 2]:
-					if p.try_use(s):
-						if song: interrupts_tried += 1
-						break
+			# в Склепе умение 2 бережём для прерывания Песни Бездны (как сделал бы игрок)
+			var keep: bool = zone.raid != null and zone.raid.did == "crypt"
+			if song:
+				for s in [2, 1]:
+					if p.try_use(s): interrupts_tried += 1; break
+			elif randf() < 0.5:
+				for s in ([1] if keep else [1, 2]):
+					if p.try_use(s): break
 			p.try_use(0)
 	# 3) зелье
 	if p.hp < p.stats.max_hp * 0.4: p.use_potion()

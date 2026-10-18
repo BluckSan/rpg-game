@@ -59,7 +59,9 @@ func update_player(pid: int, pos: Vector3, hp: float) -> void:
 	if p == null: return
 	p.pos = Vector3(pos.x, 0, pos.z); p.hp = hp; p.alive = hp > 0.0
 
-func gate_closed() -> bool: return not gate_open or (engaged and not done)
+## Решётка: закрыта до зачистки коридора и во время боя (через 6 с после начала — успеть забежать всей группой)
+func gate_closed() -> bool: return not gate_open or (engaged and eng_t > GATE_GRACE and not done)
+const GATE_GRACE := 6.0
 
 # ---------------- урон от игроков ----------------
 ## Удар игрока pid по врагу eid. skill — умение (прерывает касты). Возвращает принятый урон.
@@ -184,7 +186,7 @@ func _enemy_ai(e: Dictionary, dt: float) -> void:
 	var is_boss: bool = e.id == boss_id
 	if e.role == "naiad":   # наяда стоит и лечит босса
 		var b = enemies.get(boss_id)
-		if b and b.alive and not b.get("hidden", false): b.hp = minf(b.mhp, b.hp + b.mhp * 0.004 * dt)
+		if b and b.alive and not b.get("hidden", false): b.hp = minf(b.mhp, b.hp + b.mhp * 0.0016 * dt)
 	if e.role == "trash" and not e.aggro:
 		for pid in _alive_players():
 			if U.flat_dist(players[pid].pos, e.pos) < 11.0: _aggro_pack(e); break
@@ -331,7 +333,7 @@ func _boss_tick(dt: float) -> void:
 		if gate_open and not inside.is_empty():
 			engaged = true; eng_t = 0.0
 			_reset_mech()
-			_warn("%s: «Вы пришли умереть.»" % b.name)
+			_warn("%s: «Вы пришли умереть.» Решётка закроется через 6 с!" % b.name)
 			_note("engage n=%d" % inside.size())
 			_emit(0, status())
 		return

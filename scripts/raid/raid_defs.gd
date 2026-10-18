@@ -52,7 +52,7 @@ static func hit_cap(lvl: int) -> float: return dps(lvl) * 14.0 + 60.0
 static func sec_cap(lvl: int) -> float: return dps(lvl) * 9.0 + 120.0
 
 static func in_arena(p: Vector3) -> bool:
-	return Vector2(p.x - ARENA_C.x, p.z - ARENA_C.z).length() < ARENA_R - 0.5 and p.z > GATE_Z + 0.5
+	return Vector2(p.x - ARENA_C.x, p.z - ARENA_C.z).length() < ARENA_R + 0.6 and p.z > GATE_Z + 1.0
 
 ## Проходимая область: коридор ∪ круг арены (для врагов сервера)
 static func clamp_pos(p: Vector3) -> Vector3:

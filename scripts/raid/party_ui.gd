@@ -11,6 +11,7 @@ var win: Panel
 var body: VBoxContainer
 var tab := "dungeons"
 var _t := 0.0
+static var preview := false   # снимки/тесты: показать рамки из Net.party без сервера
 
 func _ready() -> void:
 	layer = 41
@@ -66,7 +67,7 @@ func _process(delta: float) -> void:
 
 # ---------- рамки группы ----------
 func _frames() -> void:
-	var mem: Array = Net.party.get("members", []) if Net.in_game else []
+	var mem: Array = Net.party.get("members", []) if (Net.in_game or preview) else []
 	while frames.get_child_count() < mem.size(): _frame()
 	for i in frames.get_child_count():
 		var f: Control = frames.get_child(i)
