@@ -13,7 +13,7 @@ var teles := {}           # id -> {node, left, dur, fo, k, len}
 var sim: RaidSim          # офлайн: своя симуляция
 var my_pid := 1
 var done := false
-var stats := {"hurt": 0, "taken": 0.0, "lethal": 0, "warns": [], "loot": [], "kills": 0, "wipes": 0, "events": {}}
+var stats := {"hurt": 0, "taken": 0.0, "lethal": 0, "warns": [], "loot": [], "kills": 0, "wipes": 0, "events": {}, "src": {}}
 var _snap_t := 0.0
 var _pull := {}
 var ui: CanvasLayer
@@ -70,7 +70,7 @@ func _process(delta: float) -> void:
 			apply_snap(s[0], s[1])
 	_tele_tick(delta)
 	if p and not p.dead:
-		p.heal(p.stats.max_hp * 0.015 * delta)   # «благословение костра»: в подземельях группы нет лекаря
+		p.heal(p.stats.max_hp * 0.02 * delta)   # «благословение костра»: в подземельях группы нет лекаря
 		if not _pull.is_empty():
 			_pull.left = float(_pull.left) - delta
 			var to: Vector3 = U.flat(_pull.pos - p.global_position)
@@ -218,6 +218,8 @@ func _hurt(ev: Dictionary) -> void:
 		dmg = float(p.stats.max_hp) * 20.0
 		stats.lethal += 1
 	stats.hurt += 1; stats.taken += dmg
+	var src_n := str(ev.w)
+	stats.src[src_n] = float(stats.src.get(src_n, 0.0)) + float(ev.f)
 	p.take_damage(dmg, src)
 	if str(ev.w) != "" and float(ev.f) >= 0.2:
 		zone.float_text(p.global_position + Vector3.UP * 2.8, str(ev.w), Color(1, 0.6, 0.4))

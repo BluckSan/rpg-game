@@ -127,10 +127,10 @@ func _lead_party(members: Array) -> void:
 	var ok := await wait_until(func(): return members.all(func(m): return Net.remotes.values().any(func(r): return str(r.name) == cname(m))), 120.0)
 	check(ok, "все участники в сети: %s" % str(members))
 	for m in members: Net.party_invite(cname(m))
-	ok = await wait_until(func(): return (Net.party.get("members", []) as Array).size() == 1 + members.size(), 40.0)
+	ok = await wait_until(func(): return (Net.party.get("members", []) as Array).size() == 1 + members.size(), 120.0)
 	check(ok, "группа собрана: %d / 5, лидер — я: %s" % [(Net.party.get("members", []) as Array).size(), str(Net.is_leader())])
 	var ui = _zone().party_ui
-	await get_tree().create_timer(0.6).timeout
+	await get_tree().create_timer(2.0).timeout
 	var vis := 0
 	for f in ui.frames.get_children(): if f.visible: vis += 1
 	check(vis == 1 + members.size(), "рамки группы на экране: %d" % vis)

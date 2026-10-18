@@ -32,6 +32,7 @@ var _empty_t := 0.0
 var _enr_t := 0.0
 var _half_dead_t := -1.0
 var _boss_stun := 0.0
+var _reset_until := 0.0          # после вайпа босс 12 с не вступает в бой — группа успевает собраться
 
 const PHASES := {"ash": ["", "Пламя", "Пепел", "Пожар"], "crypt": ["", "Тишина", "Прилив", "Бездна"], "star": ["", "Свет", "Раскол", "Коллапс"]}
 
@@ -126,7 +127,7 @@ func _new_enemy(kind: String, pos: Vector3, hp: float, role: String, pack := -1)
 	var e := {"id": _next, "kind": kind, "name": str(def.name), "pos": pos, "home": pos, "yaw": PI, "hp": hp, "mhp": hp, "alive": true,
 		"role": role, "pack": pack, "speed": float(def.speed), "range": maxf(1.8, float(def.range) * (0.8 if role != "boss" else 1.0)),
 		"interval": float(def.interval), "atk_t": randf_range(0.5, 1.5), "ranged": float(def.range) > 5.0, "aggro": false, "threat": {},
-		"frac": 0.045 if role == "boss" else (0.035 if role in ["trash", "add"] else 0.04), "boss": bool(def.boss)}
+		"frac": 0.035 if role == "boss" else (0.03 if role in ["trash", "add"] else 0.035), "boss": bool(def.boss)}
 	_next += 1
 	enemies[e.id] = e
 	return e
@@ -186,7 +187,7 @@ func _enemy_ai(e: Dictionary, dt: float) -> void:
 	var is_boss: bool = e.id == boss_id
 	if e.role == "naiad":   # наяда стоит и лечит босса
 		var b = enemies.get(boss_id)
-		if b and b.alive and not b.get("hidden", false): b.hp = minf(b.mhp, b.hp + b.mhp * 0.0016 * dt)
+		if b and b.alive and not b.get("hidden", false): b.hp = minf(b.mhp, b.hp + b.mhp * 0.001 * dt)
 	if e.role == "trash" and not e.aggro:
 		for pid in _alive_players():
 			if U.flat_dist(players[pid].pos, e.pos) < 11.0: _aggro_pack(e); break
@@ -330,7 +331,7 @@ func _boss_tick(dt: float) -> void:
 	if b.is_empty() or not b.alive: return
 	var inside := _alive_players(true)
 	if not engaged:
-		if gate_open and not inside.is_empty():
+		if gate_open and not inside.is_empty() and t >= _reset_until:
 			engaged = true; eng_t = 0.0
 			_reset_mech()
 			_warn("%s: «Вы пришли умереть.» Решётка закроется через 6 с!" % b.name)
@@ -412,6 +413,7 @@ func _wipe() -> void:
 	_note("wipe")
 	_warn("Группа пала. %s восстанавливает силы" % _boss().name)
 	engaged = false; eng_t = 0.0; _empty_t = 0.0
+	_reset_until = t + 12.0
 	tele.clear()
 	for id in enemies.keys():
 		var e = enemies[id]
@@ -540,11 +542,11 @@ func _morwen(b: Dictionary) -> void:
 		_note("tide")
 		return
 	if phase >= 2 and mech.e <= 0.0:      # наяды-целительницы
-		mech.e = 35.0
+		mech.e = 40.0
 		var pts: Array = RaidDefs.POINTS.duplicate(); pts.shuffle()
 		for i in 2:
 			var e := _new_enemy("ra_naiad", pts[i], RaidDefs.trash_hp(level, n) * 1.2, "naiad")
-			e.aggro = true; e.frac = 0.03
+			e.aggro = true; e.frac = 0.02
 			_spawn_pub(e)
 		_warn("Наяды исцеляют Морвен — убейте их!")
 		_note("naiads")

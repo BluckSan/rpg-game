@@ -81,6 +81,7 @@ func _dungeon(did: String) -> void:
 	for l in sim.mlog: names[str(l[1]).get_slice(" ", 0) if not str(l[1]).begins_with("shield broken") and not str(l[1]).begins_with("split done") else str(l[1])] = true
 	print("    журнал: ", sim.mlog.slice(0, 60))
 	print("    по герою: ударов %d, урон %.0f (%.1f× здоровья), смертельных %d, уклонений механик (кадров) %d" % [d.raid.stats.hurt, d.raid.stats.taken, d.raid.stats.taken / maxf(1.0, p.stats.max_hp), d.raid.stats.lethal, bot.mech_moves])
+	print("    источники урона (доли здоровья): ", d.raid.stats.src)
 	check(names.has("gate"), "[%s] стражи перебиты — решётка поднялась" % did)
 	check(names.has("engage"), "[%s] бой с боссом начался" % did)
 	for m in EXPECT[did]:
