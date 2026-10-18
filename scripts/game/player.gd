@@ -366,7 +366,7 @@ func _on_hit_fx(e, dmg: float, crit: bool) -> void:
 	var z = zone()
 	if crit:
 		if fx.has("crit_heal"): heal(stats.max_hp * float(fx["crit_heal"]) / 100.0)
-		if fx.has("crit_mark") and is_instance_valid(e) and e.alive: e.curse(3.0)
+		if fx.has("crit_mark") and is_instance_valid(e) and e.alive and randf() * 100.0 < float(fx["crit_mark"]): e.curse(3.0)
 	if is_instance_valid(e) and e.alive:
 		if fx.has("proc_bleed") and randf() * 100.0 < float(fx["proc_bleed"]): e.add_dot(dmg * 0.6, 3.0, Color(0.8, 0.05, 0.05)); procs += 1
 		if fx.has("proc_poison") and randf() * 100.0 < float(fx["proc_poison"]): e.add_dot(dmg * 0.8, 4.0, Color(0.4, 0.9, 0.2)); procs += 1

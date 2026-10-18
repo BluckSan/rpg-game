@@ -75,8 +75,69 @@ func _ready() -> void:
 	check(str(again["equipped"][0].mods) == str(mc["equipped"][0].mods), "миграция идемпотентна")
 	var tip := Items.tooltip(mc, mc["equipped"][0], false)
 	check("рейтингу" in tip or "к урону" in tip, "подсказка показывает плоские числа")
+	paths_section()
 	print("=== BALANCE RESULT: %s (%d errors, %d checks) ===" % ["PASS" if errors == 0 else "FAIL", errors, checks])
 	get_tree().quit(1 if errors else 0)
+
+## v0.9.1: сравнение путей дерева талантов (tests/talent_paths.gd + talent_eval.gd).
+## Для каждого класса: 3 ветви класса, 3 боевых превращения и путь поддержки; сборка — кратчайшая дорога + путь + остаток.
+##  solo = урон × √живучесть (как у жадного выбора талантов); group — плюс вклад умений поддержки в группу из 3 союзников.
+func paths_section() -> void:
+	var TP = load("res://tests/talent_paths.gd")
+	var TE = load("res://tests/talent_eval.gd")
+	for lvl in [30, 45]:
+		var bl: int = lvl + 1
+		var tol: Array = [0.78, 1.25] if lvl == 30 else [0.7, 1.35]
+		print("--- пути талантов, ур. %d (допуск %.2f–%.2f от медианы превращений) ---" % [lvl, tol[0], tol[1]])
+		for cls in DB.CLASS_ORDER:
+			var rows := []
+			for p in TP.PATHS[cls]:
+				var b: Dictionary = TP.build(cls, p[0], p[1], lvl, bl)
+				var e: Dictionary = TE.eval(b.c, bl)
+				var tv: Dictionary = TE.team_value(b.c)
+				rows.append({"id": p[0], "role": p[1], "e": e, "tv": tv, "solo": float(e.off) * sqrt(float(e.def)), "road": int(b.road), "over": e.st.over})
+			var tr := []; var br := []; var dmg_off := 0.0; var nd := 0; var dmg_def := 0.0
+			for r in rows:
+				if DB.get_asc(r.id).is_empty(): br.append(r.solo)
+				elif r.role != "поддержка": tr.append(r.solo)
+				if r.role == "урон" and not DB.get_asc(r.id).is_empty():
+					dmg_off += float(r.e.off); dmg_def += float(r.e.def); nd += 1
+			tr.sort(); br.sort()
+			var med: float = tr[tr.size() / 2]
+			var bmean: float = (br[0] + br[1] + br[2]) / 3.0
+			dmg_off /= maxf(1, nd); dmg_def /= maxf(1, nd)
+			for r in rows:
+				var group: float = (float(r.e.off) + float(r.tv.dmg) * 3.0 * dmg_off) * sqrt(float(r.e.def) * (1.0 + float(r.tv.surv)))
+				print("  %s %-12s %-9s урон %5.0f  живуч. %4.0f  solo %6.0f  group %6.0f  дорога %d  сверх потолков %s" % [cls, r.id, r.role, r.e.off, r.e.def, r.solo, group, r.road, str(r.over)])
+				var waste := 0.0
+				for k in r.over: waste = maxf(waste, float(r.over[k]))
+				if lvl == 30: check(waste <= 6.0, "%s/%s: проценты почти не упираются в потолки (сгорает ≤6, есть %.1f)" % [cls, r.id, waste])
+				if DB.get_asc(r.id).is_empty():
+					if lvl == 30: check(r.solo / bmean > 0.8 and r.solo / bmean < 1.2, "%s/%s: ветвь класса ровно с остальными (%.2f от средней)" % [cls, r.id, r.solo / bmean])
+				elif r.role == "поддержка":
+					check(r.solo / med > 0.45, "%s/%s: поддержка справляется одна (%.2f от медианы > 0.45)" % [cls, r.id, r.solo / med])
+					check(group / med > 0.85 and group / med < 1.4, "%s/%s: в группе — наравне с боевыми путями (%.2f)" % [cls, r.id, group / med])
+					check(r.road <= 8, "%s/%s: путь поддержки рядом с классом (дорога %d узлов)" % [cls, r.id, r.road])
+				else:
+					check(r.solo / med > tol[0] and r.solo / med < tol[1], "%s/%s: сила пути %.2f от медианы превращений" % [cls, r.id, r.solo / med])
+					if r.role == "танк": check(float(r.e.def) > dmg_def * 1.5, "%s/%s: танк живучее боевых путей (%.0f против %.0f)" % [cls, r.id, r.e.def, dmg_def])
+	# потолки: всё дерево сразу — пассивы в FX_CAPS, ×2 вампиризма в пределах потолка
+	var c := DB.new_character("Потолки", "warrior", {})
+	c["level"] = 60; c["class_level"] = 60
+	for id in DB.tree_order:
+		if DB.tree_nodes[id]["type"] != "start":
+			c["talents"].append(id); c["ranks"][str(id)] = int(DB.tree_nodes[id]["max_rank"])
+	var st := DB.compute_stats(c)
+	var ok := true
+	for k in st.fx:
+		if DB.FX_CAPS.has(k) and float(st.fx[k]) > float(DB.FX_CAPS[k]) + 0.001: ok = false
+	check(ok and st.leech <= float(DB.PCT_CAPS["leech%"]) / 100.0 + 0.0001 and st.dr <= 0.75 and st.crit <= DB.CRIT_CAP / 100.0,
+		"всё дерево сразу: пассивы, вампиризм (%.1f%%), снижение урона (%.0f%%), крит (%.0f%%) — в потолках" % [st.leech * 100, st.dr * 100, st.crit * 100])
+	var dead := []
+	for id in DB.tree_order:
+		var n: Dictionary = DB.tree_nodes[id]
+		if n["type"] != "start" and n["mods"].is_empty() and n["fx"].is_empty(): dead.append(n["name"])
+	check(dead.is_empty(), "пустых узлов нет %s" % str(dead))
 
 func item_power(it: Dictionary) -> float:
 	var p := float(it.get("base", 0.0))

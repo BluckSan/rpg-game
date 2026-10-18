@@ -44,12 +44,17 @@ const FX_NAMES := {
 	"proc_bolt": "%s%% шанс молнии при ударе", "leech_x": "Похищение жизни ×2", "no_regen": "Нет регенерации здоровья",
 	"low_hp_dmg": "+%s%% урона при здоровье < 35%%", "chain_plus": "+%s отскок(а) цепных умений", "mana_cost": "+%s%% к стоимости умений",
 	"elem_ice": "Огненные снаряды → ледяные (замедление)", "aura_dmg": "Аура: %s%% урона/с врагам рядом", "aura_frost": "Аура замедляет врагов",
-	"mana_guard": "%s%% урона снимается с маны", "crit_mark": "Крит проклинает цель (+30% урона по ней)", "far_dmg": "+%s%% урона по дальним целям",
+	"mana_guard": "%s%% урона снимается с маны", "crit_mark": "%s%% шанс: крит проклинает цель (+30%% урона по ней)", "far_dmg": "+%s%% урона по дальним целям",
 	"extra_proj": "+%s снаряд(а)", "proj_dmg": "%s%% урона снарядов", "roll_stealth": "После кувырка — гарантированный крит",
 	"kill_explode": "%s%% шанс взрыва трупа", "kill_heal": "Убийство лечит %s%% здоровья", "kill_mana": "Убийство даёт %s%% маны",
-	"crit_heal": "Крит лечит %s%% здоровья",
+	"crit_heal": "Крит лечит %s%% здоровья", "sup_pow": "Умения поддержки сильнее на %s%%",
 }
-const TREE_VERSION := 2
+## v0.9.1: потолки пассивов (таланты + комплекты) — ни один ключевой узел не обходит потолки v0.8.0
+const FX_CAPS := {"thorns": 60.0, "proc_bleed": 50.0, "proc_poison": 50.0, "proc_burn": 50.0, "proc_bolt": 50.0,
+	"low_hp_dmg": 60.0, "far_dmg": 40.0, "aura_dmg": 60.0, "crit_heal": 4.0, "kill_heal": 10.0, "kill_mana": 15.0,
+	"mana_guard": 50.0, "extra_proj": 4.0, "chain_plus": 3.0, "kill_explode": 60.0, "aoe%": 50.0, "crit_mark": 60.0,
+	"mana_cost": 50.0, "sup_pow": 30.0, "combo_wave": 1.0, "leech_x": 1.0, "roll_stealth": 1.0, "elem_ice": 1.0, "aura_frost": 1.0, "no_regen": 1.0}
+const TREE_VERSION := 3   # v0.9.1: полный проход баланса — очки талантов возвращены (путь сохраняется)
 
 var CLASSES := {
 	"warrior": {
@@ -102,8 +107,8 @@ const CLASS_ORDER := ["warrior", "archer", "mage"]
 
 var ASCENDANCIES := [
 	{"id": "berserker", "name": "Берсерк", "color": Color(0.9,0.2,0.1),
-	 "desc": "Багровая ярость: тело растёт, глаза горят.\n+25% урона, +10% скорости атаки.",
-	 "mods": [["dmg%", 25], ["as%", 10]],
+	 "desc": "Багровая ярость: тело растёт, глаза горят.\n+20% урона, +8% скорости атаки.",
+	 "mods": [["dmg%", 20], ["as%", 8]],
 	 "skill": {"id": "asc_rage", "name": "Ярость", "desc": "8 сек: +50% урона и скорости атаки", "kind": "rage", "mult": 0.0, "cd": 20.0, "mana": 20.0, "radius": 0.0, "range": 0.0, "color": Color(1,0.2,0.1)}, "skills_extra": [{"id": "asc_bloodspin", "name": "Кровавый вихрь", "desc": "Широкий вихрь, лечит 3% здоровья за каждого задетого врага", "kind": "blood_spin", "mult": 2.2, "cd": 9.0, "mana": 18.0, "radius": 5.0, "range": 5.0, "color": Color(0.9,0.1,0.1), "lvl": 10},
 		{"id": "asc_quake", "name": "Землетрясение", "desc": "Три волны толчков вокруг героя", "kind": "quake", "mult": 1.4, "cd": 14.0, "mana": 25.0, "radius": 6.5, "range": 0.0, "color": Color(0.8,0.45,0.25), "lvl": 12}]},
 	{"id": "paladin", "name": "Паладин", "color": Color(1,0.85,0.3),
@@ -117,24 +122,24 @@ var ASCENDANCIES := [
 	 "skill": {"id": "asc_meteor", "name": "Метеор", "desc": "Огромный метеор по области", "kind": "meteor", "mult": 5.0, "cd": 16.0, "mana": 40.0, "radius": 6.0, "range": 15.0, "color": Color(1,0.4,0.1)}, "skills_extra": [{"id": "asc_storm", "name": "Буря", "desc": "8 ударов молний по врагам вокруг", "kind": "storm", "mult": 1.3, "cd": 13.0, "mana": 30.0, "radius": 10.0, "range": 0.0, "color": Color(0.7,0.85,1), "lvl": 10},
 		{"id": "asc_prison", "name": "Ледяная тюрьма", "desc": "Сковывает льдом врагов в области на 3 с", "kind": "ice_prison", "mult": 1.2, "cd": 15.0, "mana": 25.0, "radius": 4.5, "range": 14.0, "color": Color(0.6,0.95,1), "lvl": 12}]},
 	{"id": "necromancer", "name": "Некромант", "color": Color(0.55,0.3,0.8),
-	 "desc": "Бледная кожа, тёмная аура, парящие черепа.\n+20% урона чар, +3% похищения жизни.",
-	 "mods": [["spell%", 20], ["leech%", 3], ["dmg%", 10]],
+	 "desc": "Бледная кожа, тёмная аура, парящие черепа.\n+20% урона чар, +1% похищения жизни.",
+	 "mods": [["spell%", 20], ["leech%", 1.0], ["dmg%", 10]],
 	 "skill": {"id": "asc_summon", "name": "Поднять скелетов", "desc": "Призывает 2 скелетов на 25 сек", "kind": "summon", "mult": 0.6, "cd": 25.0, "mana": 35.0, "radius": 0.0, "range": 0.0, "color": Color(0.7,0.5,1)}, "skills_extra": [{"id": "asc_bones", "name": "Костяная буря", "desc": "Кольцо из 12 костяных осколков", "kind": "bone_nova", "mult": 1.2, "cd": 8.0, "mana": 18.0, "radius": 0.0, "range": 12.0, "color": Color(0.9,0.9,0.8), "lvl": 10},
 		{"id": "asc_curse", "name": "Проклятие", "desc": "Враги в области получают на 30% больше урона и замедлены 8 с", "kind": "curse", "mult": 0.0, "cd": 16.0, "mana": 20.0, "radius": 5.0, "range": 14.0, "color": Color(0.6,0.3,0.9), "lvl": 12}]},
 	{"id": "shadow", "name": "Тень", "color": Color(0.25,0.2,0.35),
-	 "desc": "Тело окутано дымом, движения бесшумны.\n+10% крита, +50% силы крита, +10% скорости.",
-	 "mods": [["crit", 10], ["critdmg%", 50], ["ms%", 10]],
+	 "desc": "Тело окутано дымом, движения бесшумны.\n+10% крита, +35% силы крита, +10% скорости.",
+	 "mods": [["crit", 10], ["critdmg%", 35], ["ms%", 10]],
 	 "skill": {"id": "asc_strike", "name": "Теневой удар", "desc": "Телепорт к врагу и гарантированный крит", "kind": "shadow_strike", "mult": 4.0, "cd": 10.0, "mana": 20.0, "radius": 0.0, "range": 14.0, "color": Color(0.5,0.3,0.7)}, "skills_extra": [{"id": "asc_knives", "name": "Веер кинжалов", "desc": "8 кинжалов во все стороны", "kind": "knife_fan", "mult": 1.3, "cd": 7.0, "mana": 14.0, "radius": 0.0, "range": 11.0, "color": Color(0.7,0.6,0.9), "lvl": 10},
 		{"id": "asc_vanish", "name": "Исчезновение", "desc": "1.5 с неуязвимости и +40% скорости на 4 с", "kind": "vanish", "mult": 0.0, "cd": 18.0, "mana": 15.0, "radius": 0.0, "range": 0.0, "color": Color(0.4,0.3,0.6), "lvl": 12}]},
 	{"id": "druid", "name": "Друид-зверь", "color": Color(0.35,0.6,0.25),
-	 "desc": "Облик медведя: огромное звериное тело.\n+30% здоровья, +15% урона, +3 регенерации.",
-	 "mods": [["hp%", 30], ["dmg%", 15], ["regen", 3]],
+	 "desc": "Облик медведя: огромное звериное тело.\n+25% здоровья, +15% урона, +3 регенерации.",
+	 "mods": [["hp%", 25], ["dmg%", 15], ["regen", 3]],
 	 "skill": {"id": "asc_roar", "name": "Рёв зверя", "desc": "Оглушает врагов вокруг и лечит", "kind": "beast_roar", "mult": 2.0, "cd": 14.0, "mana": 20.0, "radius": 6.0, "range": 0.0, "color": Color(0.5,0.9,0.3)}, "skills_extra": [{"id": "asc_maul", "name": "Размах когтей", "desc": "Сокрушительный удар лапами перед собой", "kind": "maul", "mult": 3.0, "cd": 8.0, "mana": 15.0, "radius": 4.0, "range": 4.0, "color": Color(0.6,0.85,0.35), "lvl": 10},
 		{"id": "asc_regrow", "name": "Восстановление", "desc": "Восстанавливает 40% здоровья за 6 с", "kind": "regrowth", "mult": 0.0, "cd": 20.0, "mana": 20.0, "radius": 0.0, "range": 0.0, "color": Color(0.4,1,0.5), "lvl": 12}]},
 	# ---------- v0.9.0: поддержка (только для своего класса) ----------
 	{"id": "herald", "name": "Знаменосец", "cls": "warrior", "support": true, "color": Color(0.95,0.45,0.2),
-	 "desc": "Поддержка воина: знамёна, кличи, ауры брони и урона, провокация.\n+15% здоровья, +20% брони; урона — меньше, чем у боевых путей.",
-	 "mods": [["hp%", 15], ["armor%", 20]],
+	 "desc": "Поддержка воина: знамёна, кличи, ауры брони и урона, провокация.\n+10% здоровья, +15% брони; урона — меньше, чем у боевых путей.",
+	 "mods": [["hp%", 10], ["armor%", 15]],
 	 "skill": {"id": "sp_banner", "name": "Боевое знамя", "desc": "Знамя: группа в радиусе 12 м получает +15% урона на 10 с", "kind": "support", "mult": 0.0, "cd": 18.0, "mana": 25.0, "radius": 12.0, "range": 0.0, "color": Color(1,0.35,0.2), "pow": 1.0, "sup": {"tgt": "aura", "buff": {"mods": [["dmg%", 15.0]], "dur": 10.0}}}, "skills_extra": [{"id": "sp_guard_banner", "name": "Знамя стойкости", "desc": "Группа в радиусе 12 м: +25% брони и +5% снижения урона на 10 с", "kind": "support", "mult": 0.0, "cd": 20.0, "mana": 25.0, "radius": 12.0, "range": 0.0, "color": Color(0.9,0.75,0.3), "pow": 1.0, "sup": {"tgt": "aura", "buff": {"mods": [["armor%", 25.0], ["dr%", 5.0]], "dur": 10.0}}, "lvl": 10},
 		{"id": "sp_rally", "name": "Клич сплочения", "desc": "Лечит группу рядом на 12% здоровья и даёт +10% скорости атаки на 6 с", "kind": "support", "mult": 0.0, "cd": 16.0, "mana": 22.0, "radius": 10.0, "range": 0.0, "color": Color(1,0.55,0.35), "pow": 1.0, "sup": {"tgt": "aura", "heal": 0.12, "buff": {"mods": [["as%", 10.0]], "dur": 6.0}}, "lvl": 10},
 		{"id": "sp_taunt", "name": "Вызов", "desc": "Враги в радиусе 7 м атакуют только вас 4 с; вы получаете +8% снижения урона", "kind": "support", "mult": 0.0, "cd": 12.0, "mana": 15.0, "radius": 7.0, "range": 0.0, "color": Color(1,0.7,0.25), "pow": 1.0, "sup": {"tgt": "self_area", "taunt": 4.0, "buff": {"mods": [["dr%", 8.0]], "dur": 4.0}}, "lvl": 11},
@@ -579,10 +584,20 @@ func skill_eff(c: Dictionary, s: Dictionary) -> Dictionary:
 	var e := s.duplicate()
 	e["rank"] = r
 	var k := float(r - 1)
-	if r == 1: return e
+	if r == 1: return _sup_boost(c, e)
 	var muls := {"mult": 1.0 + 0.12 * k, "cd": 1.0 - 0.04 * k, "mana": 1.0 + 0.05 * k, "pow": 1.0 + 0.1 * k}
 	for key in muls:
 		if e.has(key): e[key] = float(e[key]) * muls[key]
+	return _sup_boost(c, e)
+
+## v0.9.1: таланты пути поддержки (sup_pow) усиливают умения поддержки; потолки величин — в Support.resolve
+func _sup_boost(c: Dictionary, e: Dictionary) -> Dictionary:
+	if str(e.get("kind", "")) != "support": return e
+	var sp := 0.0
+	for id in c.get("talents", []):
+		var n = tree_nodes.get(int(id))
+		if n and n["fx"].has("sup_pow"): sp += float(n["fx"]["sup_pow"]) * rank(c, int(id))
+	if sp > 0.0: e["pow"] = float(e.get("pow", 1.0)) * (1.0 + minf(sp, float(FX_CAPS["sup_pow"])) / 100.0)
 	return e
 
 ## Перенос старых героев (до 0.9.0): умения, стоявшие в наборе, — изучены (ранг 1) бесплатно
@@ -710,6 +725,9 @@ func compute_stats(c: Dictionary, extra: Array = []) -> Dictionary:
 	raw["dmg%"] = raw.get("dmg%", 0.0) + minf((int(c["class_level"]) - 1) * 1.5, CLASS_MASTERY_CAP)
 	var g := func(k): return raw.get(k, 0.0)
 	var pc := func(k): return clampf(raw.get(k, 0.0), -90.0, float(PCT_CAPS.get(k, 1000.0)))   # проценты — с потолком
+	var over := {}   # v0.9.1: сколько процентов «сгорело» сверх потолка (для balance_test: мёртвые узлы)
+	for k in PCT_CAPS:
+		if raw.get(k, 0.0) > float(PCT_CAPS[k]) + 0.01: over[k] = raw[k] - float(PCT_CAPS[k])
 	var cls: Dictionary = CLASSES[c["class"]]
 	var L := int(c["level"]) - 1
 	var rpp := rating_per_pct(int(c["level"]))
@@ -736,9 +754,13 @@ func compute_stats(c: Dictionary, extra: Array = []) -> Dictionary:
 	s.resred = maxf(0.0, pc.call("resred"))
 	s.rpp = rpp
 	s.attrs = {"str": g.call("str"), "dex": g.call("dex"), "int": g.call("int"), "vit": g.call("vit")}
-	if fx.has("leech_x"): s.leech = minf(s.leech * 2.0, float(PCT_CAPS["leech%"]) / 100.0 * 1.5)
+	for k in fx.keys():
+		if FX_CAPS.has(k): fx[k] = minf(float(fx[k]), float(FX_CAPS[k]))
+	if fx.has("proj_dmg"): fx["proj_dmg"] = maxf(float(fx["proj_dmg"]), -40.0)
+	if fx.has("leech_x"): s.leech = minf(s.leech * 2.0, float(PCT_CAPS["leech%"]) / 100.0)   # v0.9.1: ×2, но в пределах потолка
 	if fx.has("no_regen"): s.regen = 0.0
 	s.fx = fx
+	s.over = over
 	return s
 
 # ---------------- Добыча ----------------

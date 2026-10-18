@@ -542,7 +542,9 @@ var buff_tip_text: RichTextLabel
 var _tip_icon: Control = null
 var _tip_touch := false
 var _tip_press_t := -1.0
+var _tip_press_ms := 0
 var _tip_press_icon: Control = null
+var _tip_mouse := Vector2(-1, -1)
 
 func buff_icon_at(p: Vector2) -> Control:
 	for ic in get_tree().get_nodes_in_group("buff_icon"):
@@ -588,11 +590,14 @@ func _update_buff_tip() -> void:
 ## каждый кадр: долгое нажатие (0.35 с) или наведение мыши
 func _tick_buff_tip(delta: float) -> void:
 	if _tip_press_icon != null:
-		_tip_press_t += delta
+		_tip_press_t = (Time.get_ticks_msec() - _tip_press_ms) / 1000.0   # реальное время (не зависит от замедлений)
 		if _tip_press_t >= 0.35 and _tip_icon != _tip_press_icon: show_buff_tip(_tip_press_icon)
 	elif not _tip_touch and (Game.desktop or not DisplayServer.is_touchscreen_available()):
-		var ic := buff_icon_at(get_viewport().get_mouse_position())
-		if ic != _tip_icon: show_buff_tip(ic)
+		var mp := get_viewport().get_mouse_position()
+		if mp != _tip_mouse:   # наведение — только когда мышь двигалась (не гасит показанную нажатием подсказку)
+			_tip_mouse = mp
+			var ic := buff_icon_at(mp)
+			if ic != _tip_icon: show_buff_tip(ic)
 	_update_buff_tip()
 
 func _over_top_button(p: Vector2) -> bool:
@@ -630,7 +635,7 @@ func _touch_down(idx: int, p: Vector2) -> void:
 	if bic != null:
 		touches[idx] = {"role": "buff"}
 		_tip_touch = idx != -1
-		_tip_press_icon = bic; _tip_press_t = 0.0
+		_tip_press_icon = bic; _tip_press_t = 0.0; _tip_press_ms = Time.get_ticks_msec()
 		if idx == -1: show_buff_tip(bic)
 		return
 	for i in skill_btns.size():
@@ -696,9 +701,7 @@ func _touch_move(idx: int, p: Vector2, rel: Vector2) -> void:
 	var t: Dictionary = touches[idx]
 	match t["role"]:
 		"buff":
-			_tip_press_icon = null; _tip_press_t = -1.0
-			if _tip_touch: show_buff_tip(null)
-			_tip_touch = false
+			pass   # палец на значке — подсказка остаётся до отпускания
 		"joy":
 			var v: Vector2 = (p - t["origin"]).limit_length(JOY_R)
 			_set_joy(t["origin"], v)
@@ -721,6 +724,10 @@ func _touch_up(idx: int) -> void:
 	if not touches.has(idx): return
 	var t: Dictionary = touches[idx]
 	match t["role"]:
+		"buff":
+			_tip_press_icon = null; _tip_press_t = -1.0
+			if _tip_touch: show_buff_tip(null)
+			_tip_touch = false
 		"joy":
 			player.move_input = Vector2.ZERO
 			_set_joy(joy_default, Vector2.ZERO)
