@@ -442,31 +442,43 @@ func _boss_dead() -> void:
 	_loot()
 	_emit(0, status())
 
-## Групповая добыча: каждый бросает 1–100 на свою долю (свой предмет комплекта гарантирован,
-## бросок ≥60 — второй, ≥90 — третий); лучший бросок группы получает ещё одну часть комплекта.
+## v0.9.1: общая добыча на земле — без бросков: вся добыча падает у босса, кто первым подберёт, тому и достанется
+## (онлайн подбор подтверждает сервер). Части комплекта: по одной на игрока (+1 за группу), классы — по составу
+## группы; обычные предметы, золото, материалы ремесла (материал этого босса и Пыль Эфира). Опыт — каждому.
+var drops: Array = []   # для тестов: последняя добыча
 func _loot() -> void:
-	var rolls := {}
-	var best_pid := -1; var best := -1
-	for pid in players:
-		var r := randi_range(1, 100)
-		rolls[players[pid].name] = r
-		if r > best: best = r; best_pid = pid
 	var ilvl := level + 3
 	var bxp := int(round(1800.0 * (1 + (level - 1) * 0.25)))
-	for pid in players:
-		var p = players[pid]
-		var r: int = rolls[p.name]
-		var items := [Items.roll_set(ilvl, p.cls, d.set)]
-		if r >= 60: items.append(Items.roll_set(ilvl, p.cls, d.set))
-		if r >= 90: items.append(Items.roll_set(ilvl, p.cls, d.set))
-		if pid == best_pid and players.size() > 1: items.append(Items.roll_set(ilvl, p.cls, d.set))
-		for it in items:   # рейдовые части сильнее обычных комплектов: +1 свойство, база ×1.15
-			Items._affixes(it, 1, 1.4); it.base = round(float(it.base) * 1.15)
-		items.append(Items.roll(ilvl, p.cls, 0.8))
-		for it in items: it.req = mini(int(it.req), int(p.lvl))   # надеть можно сразу
-		var gold := int(round(randi_range(4, 6) * (1 + level * 0.5) * 30))
-		_emit(pid, {"t": "loot", "items": items, "gold": gold, "roll": r, "rolls": rolls, "best": pid == best_pid, "xp": bxp})
-	_note("loot rolls %s" % str(rolls))
+	var classes: Array = []
+	for pid in players: classes.append(str(players[pid].cls))
+	if classes.is_empty(): classes = ["warrior"]
+	var n := players.size()
+	var list: Array = []
+	for i in n + 1:
+		var it := Items.roll_set(ilvl, classes[i % classes.size()], d.set)
+		Items._affixes(it, 1, 1.4); it.base = round(float(it.base) * 1.15)   # рейдовые части сильнее обычных
+		it.req = mini(int(it.req), level)
+		list.append(["item", 1, it])
+	if randf() < 0.5:
+		var it2 := Items.roll_set(ilvl, classes.pick_random(), d.set)
+		Items._affixes(it2, 1, 1.4); it2.base = round(float(it2.base) * 1.15); it2.req = mini(int(it2.req), level)
+		list.append(["item", 1, it2])
+	for i in n:
+		var ex := Items.roll(ilvl, classes[i % classes.size()], 0.8); ex.req = mini(int(ex.req), level)
+		list.append(["item", 1, ex])
+		list.append(["gold", int(round(randi_range(4, 6) * (1 + level * 0.5) * 30)), {}])
+	var mat: String = Items.BOSS_MAT.get(str(d.boss), "aether_dust")
+	for i in n + 1: list.append(["mat", 2 + level / 12, {"mat": mat}])
+	for i in n: list.append(["mat", 2 + level / 10, {"mat": "aether_dust"}])
+	var c: Vector3 = _boss().pos
+	drops.clear()
+	for k in list.size():
+		var a := TAU * k / list.size() + randf() * 0.3
+		var pos := c + Vector3(cos(a), 0, sin(a)) * randf_range(2.0, 4.5)
+		drops.append({"id": k + 1, "t": list[k][0], "n": int(list[k][1]), "it": list[k][2], "x": pos.x, "z": pos.z})
+	_emit(0, {"t": "drops", "list": drops})
+	for pid in players: _emit(pid, {"t": "reward", "xp": bxp})
+	_note("drops %d" % drops.size())
 
 # ---------------- Ворагос, Пепельный Король ----------------
 func _voragos(b: Dictionary) -> void:

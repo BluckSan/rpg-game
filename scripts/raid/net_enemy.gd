@@ -4,7 +4,6 @@ class_name NetEnemy
 ## но ИИ, здоровье и смерть — на сервере (RaidSim). Удары героя уходят на сервер (RaidClient.send_hit),
 ## позиция плавно следует за снимками сервера.
 
-var net_id := 0
 var srv_pos := Vector3.ZERO
 var srv_yaw := 0.0
 var client          # RaidClient

@@ -129,7 +129,8 @@ func handle(ev: Dictionary) -> void:
 		"warn": show_warn(str(ev.s))
 		"xp":
 			if zone.player: zone.player.gain_xp(int(ev.v))
-		"loot": _loot(ev)
+		"drops": _drops(ev)
+		"reward": _reward(ev)
 		"water": zone.builder.water_rise(float(ev.dur))
 		"pull": _pull = {"pos": Vector3(float(ev.x), 0, float(ev.z)), "s": float(ev.s), "left": float(ev.dur)}
 		"wipe":
@@ -230,24 +231,26 @@ func _hurt(ev: Dictionary) -> void:
 		zone.float_text(p.global_position + Vector3.UP * 2.8, str(ev.w), Color(1, 0.6, 0.4))
 
 # ---------- награды ----------
-func _loot(ev: Dictionary) -> void:
+## v0.9.1: добыча босса лежит на земле для всех (офлайн — сразу ваша; онлайн её раздаёт сервер: s_drop_add)
+func _drops(ev: Dictionary) -> void:
 	stats.loot.append(ev)
-	var p = zone.player
-	if p == null: return
-	var pos: Vector3 = p.global_position
-	for it in ev.items: Loot.spawn(zone, pos + Vector3(randf_range(-2, 2), 0, randf_range(1, 3)), "item", 1, it)
-	Loot.spawn(zone, pos + Vector3(0, 0, 1.5), "gold", int(ev.gold))
-	p.gain_xp(int(ev.get("xp", 0)))
-	var t := "[center][b]Броски добычи[/b][/center]\n"
-	var rolls: Dictionary = ev.rolls
-	var names := rolls.keys()
-	names.sort_custom(func(a, b): return int(rolls[a]) > int(rolls[b]))
-	for nm in names:
-		t += "%s — [color=#f2c46d]%d[/color]%s\n" % [nm, int(rolls[nm]), "  ★ лучший" if nm == names[0] and names.size() > 1 else ""]
-	t += "\nВаш бросок: [b]%d[/b] → предметов комплекта: %d" % [int(ev.roll), _set_count(ev.items)]
-	roll_label.text = t
+	if online(): return   # онлайн сервер сам присылает общую добычу (Net.s_drop_add) с номерами для подбора
+	for dr in ev.list:
+		Loot.spawn(zone, Vector3(float(dr.x), 0, float(dr.z)), str(dr.t), int(dr.n), dr.it)
+	_show_drops(ev.list)
+
+func _show_drops(list: Array) -> void:
+	var sets := 0; var mats := 0
+	for dr in list:
+		if str(dr.t) == "item" and str((dr.it as Dictionary).get("set", "")) != "": sets += 1
+		if str(dr.t) == "mat": mats += 1
+	roll_label.text = "[center][b]Добыча у босса[/b][/center]\nЧастей комплекта: [color=#f2c46d]%d[/color], материалов: %d, всего: %d.\nБез бросков: кто первым подберёт — тому и достанется." % [sets, mats, list.size()]
 	roll_label.get_parent().visible = true
-	_roll_t = 12.0
+	_roll_t = 10.0
+
+func _reward(ev: Dictionary) -> void:
+	var p = zone.player
+	if p: p.gain_xp(int(ev.get("xp", 0)))
 	zone.save()
 
 func _set_count(items: Array) -> int:

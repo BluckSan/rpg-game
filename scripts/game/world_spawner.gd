@@ -24,9 +24,18 @@ func _ready() -> void:
 
 static func now() -> float: return Time.get_ticks_msec() / 1000.0
 
+func net_def() -> Dictionary:
+	var d := super.net_def()
+	d.rank = rank; d.rname = rare_name; d.elite = elite_chance
+	return d
+
 func set_active(on: bool) -> void:
 	if on == active: return
 	active = on
+	if Net.shared_world():   # v0.9.1: онлайн — подписка на общих врагов логова
+		if on: _net_sub()
+		else: _net_unsub()
+		return
 	if on:
 		var t := now()
 		_respawn_at = _respawn_at.filter(func(x): return x > t)
@@ -53,6 +62,7 @@ func _spawn_one() -> void:
 func _on_death(e) -> void:
 	alive -= 1
 	mine.erase(e)
+	if _net_on: alive = maxi(0, alive); _respawn_at.clear()
 	if respawn_time > 0: _respawn_at.append(now() + respawn_time)
 	if kill_flag != "":
 		var w: Dictionary = zone.data.get("world", {})
@@ -63,7 +73,7 @@ func _on_death(e) -> void:
 		zone.save()
 
 func _process(_delta: float) -> void:
-	if not active or _respawn_at.is_empty(): return
+	if _net_on or not active or _respawn_at.is_empty(): return
 	var t := now()
 	for i in range(_respawn_at.size() - 1, -1, -1):
 		if _respawn_at[i] > t: continue

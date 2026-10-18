@@ -14,7 +14,7 @@ signal chat_received(from: String, text: String)
 signal roster_changed
 signal party_changed
 
-const PROTOCOL := 4   # v0.9.0: поддержка, баффы, выбор цели (v0.8.0 — 3)
+const PROTOCOL := 5   # v0.9.1: общие враги и добыча, ремесло, сброс умений и талантов (v0.9.0 — 4)
 const DEFAULT_HOST := "146.0.76.20"
 const AUTH_PORT := 7780
 const GAME_PORT := 7777
@@ -282,6 +282,7 @@ func _process(delta: float) -> void:
 			hp = clampf(float(p.hp) / maxf(1.0, float(p.stats.max_hp)), 0.0, 1.0)
 			mpf = clampf(float(p.mp) / maxf(1.0, float(p.stats.max_mp)), 0.0, 1.0)
 		c_state.rpc_id(1, str(Game.current.get("zone", "")), p.global_position, p.rotation.y, hp, mpf)
+	_wm_client_tick(delta)
 	# удалённые игроки — сглаживание
 	for id in remotes:
 		var r: Dictionary = remotes[id]
@@ -405,6 +406,7 @@ func _srv_connected(id: int) -> void:
 func _srv_disconnected(id: int) -> void:
 	var p = players.get(id)
 	if p != null and p.get("authed", false):
+		for sid in wm_spawners: if wm_spawners[sid].subs.has(id): _wm_unsub_peer(wm_spawners[sid], id)
 		_srv_raid_remove(id)
 		_srv_party_remove(id, "вышел из игры")
 	players.erase(id)
@@ -582,10 +584,12 @@ func _server_tick(delta: float) -> void:
 			for id in ids: s_snapshot.rpc_id(id, ids, data, zones)
 		for id in ids: _srv_flush(players[id])
 	_srv_raids_tick(delta)
+	_wm_server_tick(delta)
 	_party_t -= delta
 	if _party_t <= 0.0:
 		_party_t = 0.5
 		for pid in parties: _srv_party_send(pid)
+		_srv_lock_check()
 	_log_t -= delta
 	if _log_t <= 0.0:
 		_log_t = 300.0
@@ -883,6 +887,13 @@ func _srv_raids_tick(delta: float) -> void:
 		sim.tick(delta)
 		for e in sim.events:
 			var to: int = e[0]
+			if str(e[1].get("t", "")) == "drops":   # v0.9.1: добыча босса — общая, на землю (подбор — c_pick)
+				var zk := "%s#%d" % [inst.zone, int(iid)]
+				var out := []
+				for dr in e[1].list:
+					out.append(_srv_drop_new(zk, str(dr.t), int(dr.n), dr.it, Vector3(float(dr.x), 0.1, float(dr.z))))
+				for m in inst.members:
+					if players.has(m): s_drop_add.rpc_id(m, out)
 			if to == 0:
 				for m in inst.members:
 					if players.has(m): s_raid_ev.rpc_id(m, e[1])
@@ -914,6 +925,38 @@ func c_target(k: String, id: int) -> void:
 	var p = _authed(multiplayer.get_remote_sender_id())
 	if p == null or not (k in ["", "p", "e"]): return
 	p.target = [k, id]
+
+## v0.9.1: захват цели на сервере — снимается, только если враг погиб или дальше LOCK_RANGE
+## (атаки, умения и движение его не меняют). Сервер сам направляет по захвату поддержку и рейдовые ослабления.
+func _srv_enemy_pos(p: Dictionary, eid: int) -> Vector3:
+	if int(p.iid) != 0:
+		var inst = instances.get(int(p.iid))
+		if inst != null:
+			var e = inst.sim.enemies.get(eid)
+			if e != null and e.alive: return e.pos
+			return Vector3.INF
+	var m = _wm_by_nid(p, eid)
+	if m != null and m.alive: return m.pos
+	return Vector3.INF
+
+func _srv_lock_check() -> void:
+	for id in players:
+		var p = players[id]
+		if not p.authed: continue
+		var tg: Array = p.get("target", ["", 0])
+		if str(tg[0]) != "e": continue
+		var ep := _srv_enemy_pos(p, int(tg[1]))
+		if ep == Vector3.INF or (ep as Vector3).distance_to(p.pos) > TargetCtl.LOCK_RANGE + 4.0:
+			p.target = ["", 0]
+			s_target_drop.rpc_id(id, int(tg[1]))
+
+@rpc("authority", "call_remote", "reliable")
+func s_target_drop(eid: int) -> void:
+	_tg_sent = ["", 0]
+	var z = get_tree().current_scene
+	if z == null or not ("target_ctl" in z) or z.target_ctl == null: return
+	var t = z.target_ctl.target
+	if t != null and is_instance_valid(t) and "net_id" in t and int(t.net_id) == eid: z.target_ctl.clear()
 
 ## Данные участника группы по peer id (для рамки цели: мана, баффы) — {} если не в группе
 func party_member(id: int) -> Dictionary:
@@ -1002,3 +1045,416 @@ func s_support(payload: Dictionary) -> void:
 	if str(payload.src) != str(Game.current.get("name", "")):
 		Game.toast("%s: «%s»" % [payload.src, payload.n], 1.6)
 var support_received := 0
+
+# =====================================================================
+# v0.9.1: общие враги мира и общая добыча
+# =====================================================================
+## Долина и Земли Эфира онлайн: враги общие для всех игроков рядом. Сервер — хозяин состояния: какие враги
+## живы, их уровень, ранг, здоровье, смерть, возрождение и добыча. Движение и обычный ИИ считает один из игроков
+## рядом («ведущий», ближайший к логову; сервер передаёт ведение, если он ушёл), остальные видят копию по позициям.
+## Удары всех игроков идут на сервер (c_wm_hit: проверка дистанции и потолка урона), атаки врага по другим
+## игрокам — через сервер (c_wm_atk). Добыча падает на землю для всех: первым подобрал — твоё (c_pick).
+## Соло-склеп остаётся личным; групповые подземелья и так считает сервер (RaidSim), их добыча — тоже общая.
+const WM_ZONES := ["starter", "global"]
+const WM_RELAY_R := 140.0
+const DROP_TTL := 180.0
+var wm_spawners := {}     # сервер: "zone|skey" -> spawner
+var wm_mobs := {}         # сервер: nid -> mob
+var _wm_next := 1000001
+var _wm_t := 0.0
+var srv_drops := {}       # сервер: did -> {zk, t, n, it, pos, until}
+var _drop_next := 1
+var wm_stats := {"hits": 0, "rejected": 0, "kills": 0, "picks": 0, "pick_denied": 0}
+# клиент
+var wm_nodes := {}        # nid -> Enemy
+var wm_spawner_nodes := {} # skey -> Spawner
+var net_drops := {}       # did -> Loot
+var _wm_pos_t := 0.0
+
+func shared_world() -> bool:
+	return in_game and WM_ZONES.has(str(Game.current.get("zone", "")))
+
+static func wm_skey(zone_id: String, pos: Vector3) -> String:
+	return "%s:%d:%d" % [zone_id, roundi(pos.x), roundi(pos.z)]
+
+# ---------- клиент: вызовы ----------
+func wm_sub(sp: Node, def: Dictionary) -> void:
+	if not (shared_world() and _connected()): return
+	var key := wm_skey(str(Game.current.zone), sp.global_position)
+	wm_spawner_nodes[key] = sp
+	sp.set_meta("wm_key", key)
+	c_wm_sub.rpc_id(1, key, def)
+
+func wm_unsub(sp: Node) -> void:
+	var key := str(sp.get_meta("wm_key", ""))
+	if key == "": return
+	wm_spawner_nodes.erase(key)
+	for nid in wm_nodes.keys():
+		var e = wm_nodes[nid]
+		if not is_instance_valid(e) or e.get_meta("wm_key", "") == key:
+			if is_instance_valid(e):
+				e.zone.enemies.erase(e); e.queue_free()
+			wm_nodes.erase(nid)
+	if in_game and _connected(): c_wm_unsub.rpc_id(1, key)
+
+func wm_hit(nid: int, dmg: float) -> void:
+	if in_game and _connected(): c_wm_hit.rpc_id(1, nid, dmg)
+func wm_attack(nid: int, peer: int, dmg: float) -> void:
+	if in_game and _connected(): c_wm_atk.rpc_id(1, nid, peer, dmg)
+func pick_drop(did: int) -> void:
+	if in_game and _connected(): c_pick.rpc_id(1, did)
+
+## Клиент: ведущий шлёт позиции своих общих врагов (5 Гц)
+func _wm_client_tick(delta: float) -> void:
+	_wm_pos_t -= delta
+	if _wm_pos_t > 0.0: return
+	_wm_pos_t = 0.2
+	var ids := PackedInt32Array(); var data := PackedFloat32Array()
+	for nid in wm_nodes:
+		var e = wm_nodes[nid]
+		if not is_instance_valid(e) or not e.alive or not e.net_owner: continue
+		ids.append(int(nid)); data.append_array([e.global_position.x, e.global_position.y, e.global_position.z, e.rotation.y])
+	if not ids.is_empty() and _connected(): c_wm_pos.rpc_id(1, ids, data)
+
+func _wm_client_reset() -> void:
+	wm_nodes.clear(); wm_spawner_nodes.clear(); net_drops.clear()
+
+# ---------- сервер ----------
+func _wm_zk(p: Dictionary) -> String: return _srv_zone_key(p)
+
+func _wm_by_nid(p: Dictionary, nid: int):
+	var m = wm_mobs.get(nid)
+	if m == null: return null
+	var sp = wm_spawners.get(m.sp)
+	if sp == null or sp.zone != str(p.zone): return null
+	return m
+
+func _wm_pub(m: Dictionary, own: bool) -> Dictionary:
+	return {"id": m.nid, "k": m.kind, "lvl": m.lvl, "rk": m.rank, "nm": m.name, "aff": m.aff, "x": m.pos.x, "y": m.pos.y, "z": m.pos.z,
+		"yaw": m.yaw, "hp": m.hp, "mhp": m.mhp, "own": own}
+
+func _wm_new_mob(sp: Dictionary, slot: int) -> Dictionary:
+	var def: Dictionary = DB.ENEMIES[sp.kind]
+	var lvl := randi_range(int(sp.lo), int(sp.hi))
+	var r := Vector2.from_angle(randf() * TAU) * randf() * float(sp.r)
+	var pos: Vector3 = sp.pos + Vector3(r.x, 0, r.y)
+	var rank := str(sp.rank)
+	if rank == "normal" and randf() < float(sp.elite): rank = "elite"
+	var aff: Array = []
+	if rank in ["elite", "rare"]:
+		var pool: Array = Enemy.AFFIXES.keys(); pool.shuffle()
+		aff = pool.slice(0, 1 if rank == "elite" else 2)
+	var mhp: float = float(def.hp) * Combat.enemy_hp_mult(lvl) * {"elite": 2.0, "rare": 3.5}.get(rank, 1.0)
+	var m := {"nid": _wm_next, "sp": sp.id, "slot": slot, "kind": sp.kind, "lvl": lvl, "rank": rank, "name": str(sp.rname), "aff": aff,
+		"pos": pos, "home": pos, "yaw": randf() * TAU, "hp": mhp, "mhp": mhp, "alive": true, "respawn_at": 0.0, "parts": {}, "last_hit": 0.0, "killer": 0}
+	_wm_next += 1
+	wm_mobs[m.nid] = m
+	return m
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_wm_sub(key: String, def: Dictionary) -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null or not WM_ZONES.has(str(p.zone)) or not key.begins_with(str(p.zone) + ":") or key.length() > 64: return
+	var sid := key
+	var sp = wm_spawners.get(sid)
+	if sp == null:
+		var kind := str(def.get("kind", ""))
+		if not DB.ENEMIES.has(kind) or DB.ENEMIES[kind].get("raid", false): return
+		var pos: Vector3 = def.get("pos", Vector3.ZERO) if def.get("pos") is Vector3 else Vector3.ZERO
+		if not pos.is_finite() or pos.distance_to(p.pos) > 200.0: return
+		var rank := str(def.get("rank", "normal"))
+		if not (rank in ["normal", "rare", "boss"]): rank = "normal"
+		sp = {"id": sid, "zone": str(p.zone), "kind": kind, "lo": clampi(int(def.get("lo", 1)), 1, 80), "hi": clampi(int(def.get("hi", 1)), 1, 80),
+			"n": clampi(int(def.get("n", 1)), 1, 12), "r": clampf(float(def.get("r", 6.0)), 0.0, 20.0), "pos": pos, "rank": rank,
+			"rname": str(def.get("rname", "")).left(40), "elite": clampf(float(def.get("elite", 0.0)), 0.0, 0.3),
+			"respawn": clampf(float(def.get("respawn", 30.0)), 10.0, 900.0), "kflag": str(def.get("kflag", "")).left(40),
+			"subs": {}, "owner": 0, "mobs": []}
+		sp.hi = maxi(int(sp.hi), int(sp.lo))
+		wm_spawners[sid] = sp
+		for i in int(sp.n): sp.mobs.append(_wm_new_mob(sp, i).nid)
+	sp.subs[id] = true
+	if int(sp.owner) == 0 or not players.has(int(sp.owner)) or not sp.subs.has(int(sp.owner)): sp.owner = id
+	var list := []
+	for nid in sp.mobs:
+		var m = wm_mobs.get(nid)
+		if m != null and m.alive: list.append(_wm_pub(m, int(sp.owner) == id))
+	s_wm_spawn.rpc_id(id, sid, list)
+	# добыча, уже лежащая рядом
+	var near := []
+	for did in srv_drops:
+		var d: Dictionary = srv_drops[did]
+		if d.zk == _wm_zk(p) and (d.pos as Vector3).distance_to(sp.pos) < 60.0: near.append(_drop_pub(int(did), d))
+	if not near.is_empty(): s_drop_add.rpc_id(id, near)
+
+func _wm_unsub_peer(sp: Dictionary, id: int) -> void:
+	sp.subs.erase(id)
+	if int(sp.owner) == id: _wm_reassign(sp)
+
+func _wm_reassign(sp: Dictionary) -> void:
+	var best := 0; var bd := INF
+	for s in sp.subs:
+		if not players.has(s): continue
+		var d: float = (players[s].pos as Vector3).distance_to(sp.pos)
+		if d < bd: bd = d; best = s
+	var old := int(sp.owner)
+	sp.owner = best
+	if best == old: return
+	var ids := PackedInt32Array()
+	for nid in sp.mobs:
+		if wm_mobs.has(nid) and wm_mobs[nid].alive: ids.append(int(nid))
+	if ids.is_empty(): return
+	if old != 0 and players.has(old) and sp.subs.has(old): s_wm_owner.rpc_id(old, ids, false)
+	if best != 0: s_wm_owner.rpc_id(best, ids, true)
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_wm_unsub(key: String) -> void:
+	if not is_server: return
+	var sp = wm_spawners.get(key)
+	if sp != null: _wm_unsub_peer(sp, multiplayer.get_remote_sender_id())
+
+@rpc("any_peer", "call_remote", "unreliable_ordered")
+func c_wm_pos(ids: PackedInt32Array, data: PackedFloat32Array) -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null or data.size() != ids.size() * 4 or ids.size() > 200: return
+	var relay := {}   # spawner -> [ids, data]
+	for i in ids.size():
+		var m = wm_mobs.get(int(ids[i]))
+		if m == null or not m.alive: continue
+		var sp = wm_spawners.get(m.sp)
+		if sp == null or int(sp.owner) != id: continue
+		var np := Vector3(data[i * 4], data[i * 4 + 1], data[i * 4 + 2])
+		if not np.is_finite() or np.distance_to(m.home) > 80.0: continue   # враг не уходит далеко от логова
+		m.pos = np; m.yaw = data[i * 4 + 3]
+		if not relay.has(sp.id): relay[sp.id] = [PackedInt32Array(), PackedFloat32Array()]
+		relay[sp.id][0].append(int(ids[i])); relay[sp.id][1].append_array([np.x, np.y, np.z, m.yaw])
+	for sid in relay:
+		for s in wm_spawners[sid].subs:
+			if s != id and players.has(s): s_wm_pos.rpc_id(s, relay[sid][0], relay[sid][1])
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_wm_hit(nid: int, dmg: float) -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null: return
+	var m = _wm_by_nid(p, nid)
+	if m == null or not m.alive or not is_finite(dmg) or dmg <= 0.0: return
+	var st := _srv_stats(p)
+	var cap: float = maxf(60.0, float(st.get("damage", 10.0)) * float(st.get("dmg_mult", 1.0)) * float(st.get("spell_mult", 1.0)) * float(st.get("crit_mult", 2.0)) * 14.0)
+	if (p.pos as Vector3).distance_to(m.pos) > 48.0 or dmg > cap:
+		wm_stats.rejected += 1; return
+	wm_stats.hits += 1
+	m.hp = float(m.hp) - dmg
+	m.parts[id] = true; m.last_hit = _now(); m.killer = id
+	var sp: Dictionary = wm_spawners[m.sp]
+	if float(m.hp) <= 0.0:
+		_wm_kill(sp, m)
+		return
+	for s in sp.subs:
+		if players.has(s): s_wm_hp.rpc_id(s, nid, float(m.hp))
+
+func _wm_kill(sp: Dictionary, m: Dictionary) -> void:
+	m.alive = false; m.hp = 0.0
+	m.respawn_at = _now() + float(sp.respawn)
+	wm_stats.kills += 1
+	for s in sp.subs:
+		if players.has(s): s_wm_kill.rpc_id(s, int(m.nid), m.parts.has(s))
+	# добыча — на землю для всех; вещи — под класс добившего
+	var kp = players.get(int(m.killer))
+	var cls := str(kp.data.get("class", "warrior")) if kp != null else "warrior"
+	var hl := int(kp.data.get("level", 1)) if kp != null else int(m.lvl)
+	var list: Array = Loot.roll_boss_drops(int(m.lvl), cls) if DB.ENEMIES[m.kind].boss or str(m.rank) == "boss" else Loot.roll_drops(int(m.lvl), hl, cls, str(m.rank))
+	var zk := str(sp.zone)
+	var out := []
+	for dr in list:
+		var r := Vector2.from_angle(randf() * TAU) * randf_range(0.4, 1.6) * (2.0 if DB.ENEMIES[m.kind].boss else 1.0)
+		out.append(_srv_drop_new(zk, str(dr[0]), int(dr[1]), dr[2], m.pos + Vector3(r.x, 0, r.y)))
+	_srv_drop_send(zk, out, m.pos)
+
+func _srv_drop_new(zk: String, t: String, n: int, it: Dictionary, pos: Vector3) -> Dictionary:
+	var did := _drop_next; _drop_next += 1
+	srv_drops[did] = {"zk": zk, "t": t, "n": n, "it": it, "pos": pos, "until": _now() + DROP_TTL}
+	return _drop_pub(did, srv_drops[did])
+
+func _drop_pub(did: int, d: Dictionary) -> Dictionary:
+	return {"id": did, "t": d.t, "n": d.n, "it": d.it, "x": d.pos.x, "y": d.pos.y, "z": d.pos.z}
+
+func _srv_drop_send(zk: String, list: Array, at: Vector3) -> void:
+	if list.is_empty(): return
+	for s in players:
+		var q = players[s]
+		if q.authed and _wm_zk(q) == zk and (q.pos as Vector3).distance_to(at) < WM_RELAY_R: s_drop_add.rpc_id(s, list)
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_wm_atk(nid: int, peer: int, dmg: float) -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null or not players.has(peer) or not is_finite(dmg): return
+	var m = _wm_by_nid(p, nid)
+	if m == null or not m.alive: return
+	var sp: Dictionary = wm_spawners[m.sp]
+	if int(sp.owner) != id or not sp.subs.has(peer): return
+	var q = players[peer]
+	var rng: float = float(DB.ENEMIES[m.kind].range) + 6.0
+	if (q.pos as Vector3).distance_to(m.pos) > rng: return
+	# урон считает сервер: по виду и уровню врага (клиентское число — только как верхняя граница)
+	var base: float = float(DB.ENEMIES[m.kind].dmg) * Combat.enemy_dmg_mult(int(m.lvl)) * {"elite": 1.3, "rare": 1.5}.get(str(m.rank), 1.0) * Combat.enemy_dmg_factor(int(m.lvl), int(q.data.get("level", 1)))
+	s_wm_dmg.rpc_id(peer, minf(dmg, base * 1.6), m.pos)
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_pick(did: int) -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null: return
+	var d = srv_drops.get(did)
+	if d == null:
+		wm_stats.pick_denied += 1; s_drop_gone.rpc_id(id, did); return
+	if d.zk != _wm_zk(p) or U.flat_dist(p.pos, d.pos) > 7.0 or float(p.hp) <= 0.0:
+		wm_stats.pick_denied += 1; return
+	if d.t == "item" and (p.data.get("inventory", []) as Array).size() >= DB.INVENTORY_SIZE: return
+	srv_drops.erase(did)
+	wm_stats.picks += 1
+	# серверная копия героя: сразу с добычей (ремесло проверяет материалы и золото по ней)
+	match str(d.t):
+		"gold": p.data["gold"] = int(p.data.get("gold", 0)) + int(d.n)
+		"potion": p.data["potions"] = int(p.data.get("potions", 0)) + int(d.n)
+		"mat":
+			var mats: Dictionary = p.data.get("mats", {})
+			var mid := str((d.it as Dictionary).get("mat", "aether_dust"))
+			mats[mid] = int(mats.get(mid, 0)) + int(d.n); p.data["mats"] = mats
+		_: p.data["inventory"].append(d.it)
+	p.dirty = true
+	s_pick_ok.rpc_id(id, did, str(d.t), int(d.n), d.it)
+	for s in players:
+		if s != id and players[s].authed and _wm_zk(players[s]) == d.zk: s_drop_gone.rpc_id(s, did)
+
+func _wm_server_tick(delta: float) -> void:
+	_wm_t -= delta
+	if _wm_t > 0.0: return
+	_wm_t = 0.5
+	var now := _now()
+	for sid in wm_spawners:
+		var sp: Dictionary = wm_spawners[sid]
+		# подписчики, ушедшие из зоны или отключившиеся
+		for s in sp.subs.keys():
+			if not players.has(s) or str(players[s].zone) != sp.zone: _wm_unsub_peer(sp, s)
+		# ведущий далеко, а другой игрок рядом — передать ведение
+		if int(sp.owner) != 0 and players.has(int(sp.owner)):
+			var od: float = (players[int(sp.owner)].pos as Vector3).distance_to(sp.pos)
+			if od > 90.0:
+				for s in sp.subs:
+					if s != int(sp.owner) and (players[s].pos as Vector3).distance_to(sp.pos) < od - 25.0:
+						_wm_reassign(sp); break
+		var spawned := []
+		for nid in sp.mobs:
+			var m: Dictionary = wm_mobs[nid]
+			if m.alive:
+				# без ударов 10 с — враг вернулся к логову и восстановился
+				if float(m.hp) < float(m.mhp) and now - float(m.last_hit) > 10.0:
+					m.hp = m.mhp; m.parts = {}
+					for s in sp.subs: if players.has(s): s_wm_hp.rpc_id(s, int(nid), float(m.hp))
+			elif now >= float(m.respawn_at) and not sp.subs.is_empty():
+				var near := false
+				for s in sp.subs: if (players[s].pos as Vector3).distance_to(sp.pos) < float(sp.r) + 8.0: near = true
+				if near: continue
+				var nm := _wm_new_mob(sp, int(m.slot))
+				wm_mobs.erase(nid)
+				sp.mobs[sp.mobs.find(nid)] = nm.nid
+				spawned.append(nm)
+		if not spawned.is_empty():
+			for s in sp.subs:
+				if not players.has(s): continue
+				var list := []
+				for nm in spawned: list.append(_wm_pub(nm, int(sp.owner) == s))
+				s_wm_spawn.rpc_id(s, sid, list)
+	for did in srv_drops.keys():
+		if now > float(srv_drops[did].until):
+			var d: Dictionary = srv_drops[did]
+			srv_drops.erase(did)
+			for s in players: if players[s].authed and _wm_zk(players[s]) == d.zk: s_drop_gone.rpc_id(s, did)
+
+# ---------- RPC: сервер → клиент ----------
+@rpc("authority", "call_remote", "reliable")
+func s_wm_spawn(key: String, list: Array) -> void:
+	var z = get_tree().current_scene
+	var sp = wm_spawner_nodes.get(key)
+	if z == null or sp == null or not is_instance_valid(sp): return
+	for m in list:
+		var nid := int(m.id)
+		if wm_nodes.has(nid) and is_instance_valid(wm_nodes[nid]): continue
+		var e := Enemy.spawn(z, str(m.k), int(m.lvl), Vector3(float(m.x), float(m.y), float(m.z)), sp)
+		if str(m.rk) != "normal": e.make_rank(str(m.rk), str(m.nm), m.aff)
+		e.max_hp = float(m.mhp); e.hp = float(m.hp)
+		e.rotation.y = float(m.yaw)
+		e.set_net(nid, bool(m.own))
+		e.set_meta("wm_key", key)
+		if sp.has_method("_net_died"): e.on_death = sp._net_died
+		sp.alive += 1
+		wm_nodes[nid] = e
+
+@rpc("authority", "call_remote", "unreliable_ordered")
+func s_wm_pos(ids: PackedInt32Array, data: PackedFloat32Array) -> void:
+	for i in ids.size():
+		var e = wm_nodes.get(int(ids[i]))
+		if e != null and is_instance_valid(e): e.net_pos(Vector3(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]), data[i * 4 + 3])
+
+@rpc("authority", "call_remote", "reliable")
+func s_wm_hp(nid: int, hp: float) -> void:
+	var e = wm_nodes.get(nid)
+	if e != null and is_instance_valid(e) and e.alive: e.hp = minf(hp, e.max_hp)
+
+@rpc("authority", "call_remote", "reliable")
+func s_wm_kill(nid: int, participant: bool) -> void:
+	var e = wm_nodes.get(nid)
+	wm_nodes.erase(nid)
+	if e != null and is_instance_valid(e) and e.alive:
+		var sp = wm_spawner_nodes.get(str(e.get_meta("wm_key", "")))
+		if not participant and sp != null and is_instance_valid(sp): sp.alive = maxi(0, sp.alive - 1)
+		e.net_die(participant)
+
+@rpc("authority", "call_remote", "reliable")
+func s_wm_owner(ids: PackedInt32Array, own: bool) -> void:
+	for nid in ids:
+		var e = wm_nodes.get(int(nid))
+		if e != null and is_instance_valid(e): e.set_net(int(nid), own)
+
+@rpc("authority", "call_remote", "reliable")
+func s_wm_dmg(dmg: float, from: Vector3) -> void:
+	var z = get_tree().current_scene
+	if z and "player" in z and z.player and not z.player.dead: z.player.take_damage(dmg, from)
+
+@rpc("authority", "call_remote", "reliable")
+func s_drop_add(list: Array) -> void:
+	var z = get_tree().current_scene
+	if z == null or not ("fx_root" in z) or z.fx_root == null: return
+	for d in list:
+		var did := int(d.id)
+		if net_drops.has(did) and is_instance_valid(net_drops[did]): continue
+		var l := Loot.spawn(z, Vector3(float(d.x), float(d.y), float(d.z)), str(d.t), int(d.n), d.it)
+		l.net_id = did
+		net_drops[did] = l
+
+@rpc("authority", "call_remote", "reliable")
+func s_drop_gone(did: int) -> void:
+	var l = net_drops.get(did)
+	net_drops.erase(did)
+	if l != null and is_instance_valid(l): l.queue_free()
+
+@rpc("authority", "call_remote", "reliable")
+func s_pick_ok(did: int, t: String, n: int, it: Dictionary) -> void:
+	var l = net_drops.get(did)
+	net_drops.erase(did)
+	picks_ok += 1
+	if l != null and is_instance_valid(l):
+		l.grant(); return
+	var z = get_tree().current_scene
+	if z == null or not ("fx_root" in z): return
+	var tmp := Loot.spawn(z, z.player.global_position, t, n, it)
+	tmp.grant()
+var picks_ok := 0

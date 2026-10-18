@@ -23,7 +23,31 @@ static func create(z, parent: Node, pos: Vector3, k: String, lo: int, hi: int, n
 
 func _ready() -> void:
 	if clear_flag != "" and DB.zone_flag(zone.data, zone.data["zone"], clear_flag): return
+	if Net.shared_world(): _net_sub.call_deferred(); return   # v0.9.1: онлайн — общие враги от сервера
 	for i in count: _spawn_one()
+
+## v0.9.1: онлайн-логово — описание уходит на сервер, враги (общие для всех рядом) приходят от него
+func net_def() -> Dictionary:
+	return {"kind": kind, "lo": min_level, "hi": max_level, "n": count, "r": radius, "pos": global_position, "rank": "normal",
+		"rname": "", "elite": 0.0, "respawn": respawn_time, "kflag": kill_flag}
+
+var _net_on := false
+func _net_sub() -> void:
+	if _net_on or not is_inside_tree(): return
+	_net_on = true
+	Net.wm_sub(self, net_def())
+
+func _net_unsub() -> void:
+	if not _net_on: return
+	_net_on = false
+	Net.wm_unsub(self)
+
+func _exit_tree() -> void:
+	if _net_on: _net_unsub()
+
+## Общий враг погиб (герой участвовал): флаги убийства (тролль, боссы зон)
+func _net_died(e) -> void:
+	_on_death(e)
 
 ## Точка появления не внутри стен/препятствий (до 16 попыток, затем — центр точки)
 func free_point() -> Vector3:
@@ -58,6 +82,7 @@ func _on_death(e) -> void:
 		if zone.builder and zone.builder.has_method("update_seal"): zone.builder.update_seal()
 
 func _process(delta: float) -> void:
+	if _net_on: return
 	for i in range(_pending.size() - 1, -1, -1):
 		_pending[i] -= delta
 		if _pending[i] <= 0:

@@ -71,6 +71,63 @@ const SETS := {
 		"b2": [["spell%", 15], ["dmg%", 8]], "b4": [["cdr%", 10], ["critdmg%", 30]], "b6": {"fx": {"proc_bolt": 30, "chain_plus": 2, "crit_mark": 1}, "desc": "30% шанс молнии, цепи +2; крит проклинает цель"}},
 }
 
+# ---------------- v0.9.1: материалы комплектов и ремесло ----------------
+## Боссы подземелий (соло-склеп и групповые) роняют материалы; из них у верстака (окно «Ремесло»)
+## делают часть любого доступного комплекта в выбранный слот. Цена растёт с уровнем героя.
+const MATS := {
+	"aether_dust": {"name": "Пыль Эфира", "icon": "magic-swirl", "col": Color(0.65, 0.8, 1.0), "desc": "Хранитель Эфира и все боссы подземелий. Для обычных комплектов."},
+	"ash_ember": {"name": "Пепельный уголь", "icon": "small-fire", "col": Color(1.0, 0.5, 0.2), "desc": "Ворагос (Пепельная Цитадель). Для «Регалий Пепельного Короля»."},
+	"tide_pearl": {"name": "Жемчуг бездны", "icon": "drop", "col": Color(0.35, 0.9, 0.85), "desc": "Морвен (Затопленный Склеп). Для «Покрова Утопленницы»."},
+	"star_shard": {"name": "Звёздный осколок", "icon": "crystal-ball", "col": Color(0.85, 0.7, 1.0), "desc": "Аэтерон (Звёздное Святилище). Для «Осколков Звезды»."},
+}
+const SET_MAT := {"r_ash": "ash_ember", "r_tide": "tide_pearl", "r_star": "star_shard"}
+const BOSS_MAT := {"rb_voragos": "ash_ember", "rb_morwen": "tide_pearl", "rb_aeteron": "star_shard"}
+
+static func mat_of_set(set_id: String) -> String: return str(SET_MAT.get(set_id, "aether_dust"))
+
+## Комплекты, доступные герою для ремесла: своего класса (или общие), тир не выше уровня; рейдовые — всегда
+static func craftable_sets(c: Dictionary) -> Array:
+	var out := []
+	var lvl := int(c.get("level", 1))
+	for sid in SETS:
+		var sd: Dictionary = SETS[sid]
+		if str(sd.cls) != "" and str(sd.cls) != str(c.get("class", "")): continue
+		if not sd.get("raid", false) and int(sd.lvl) > lvl: continue
+		out.append(sid)
+	return out
+
+## Цена: материал комплекта (2 + ур/8, рейдовые 3 + ур/8) и золото (30·ур, рейдовые 60·ур)
+static func craft_cost(set_id: String, lvl: int) -> Dictionary:
+	var raid: bool = SETS.get(set_id, {}).get("raid", false)
+	return {"mat": mat_of_set(set_id), "n": (3 if raid else 2) + lvl / 8, "gold": (60 if raid else 30) * maxi(1, lvl)}
+
+static func craft_block(c: Dictionary, set_id: String, piece: int) -> String:
+	if not SETS.has(set_id): return "Нет такого комплекта"
+	if not craftable_sets(c).has(set_id): return "Комплект недоступен (класс или уровень)"
+	var pieces: Array = SETS[set_id].pieces
+	if piece < 0 or piece >= pieces.size(): return "Нет такой части"
+	var cost := craft_cost(set_id, int(c.get("level", 1)))
+	var have := int((c.get("mats", {}) as Dictionary).get(cost.mat, 0))
+	if have < int(cost.n): return "Нужно: %s ×%d (есть %d)" % [MATS[cost.mat].name, int(cost.n), have]
+	if int(c.get("gold", 0)) < int(cost.gold): return "Нужно %d золота" % int(cost.gold)
+	if (c.get("inventory", []) as Array).size() >= DB.INVENTORY_SIZE: return "Инвентарь полон"
+	return ""
+
+## Изготовить (проверка, списание, предмет в инвентарь). {} — нельзя
+static func craft(c: Dictionary, set_id: String, piece: int) -> Dictionary:
+	if craft_block(c, set_id, piece) != "": return {}
+	var lvl := int(c.get("level", 1))
+	var cost := craft_cost(set_id, lvl)
+	c["mats"][cost.mat] = int(c["mats"][cost.mat]) - int(cost.n)
+	c["gold"] = int(c["gold"]) - int(cost.gold)
+	var raid: bool = SETS[set_id].get("raid", false)
+	var it := roll_set(lvl + (3 if raid else 1), str(c.get("class", "")), set_id, piece)
+	if raid: _affixes(it, 1, 1.4); it.base = round(float(it.base) * 1.15)
+	it["req"] = mini(int(it.req), lvl)
+	it["crafted"] = true
+	c["inventory"].append(it)
+	return it
+
 static func tier_of(ilvl: int) -> int: return clampi(ilvl / 9, 0, 2)
 static func req_level(ilvl: int) -> int: return clampi(ilvl, 1, 60)
 

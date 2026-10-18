@@ -16,16 +16,35 @@ static func drop_for(z, e) -> void:
 	if boss:
 		_boss_drop(z, e)
 		return
-	# враги намного ниже героя: меньше золота и предметов (Combat.reward_factor)
-	var rf := Combat.reward_factor(int(z.data["level"]), lvl)
-	spawn(z, pos + _rand(), "gold", maxi(1, int(round(randi_range(2, 5) * (1 + lvl * 0.5) * rf))))
-	if randf() > rf: return
-	if randf() < 0.1: spawn(z, pos + _rand(), "potion", 1)
-	# добыча для всех классов; элиты/редкие — больше и лучше, иногда комплекты
 	var rank: String = e.rank if "rank" in e else "normal"
-	if rank != "normal": spawn(z, pos + _rand(), "gold", int(round(randi_range(4, 8) * (1 + lvl * 0.5) * (2 if rank == "elite" else 4))))
-	for it in Items.drop_items(lvl, z.data["class"], rank):
-		spawn(z, pos + _rand(), "item", 1, it)
+	for d in roll_drops(lvl, int(z.data["level"]), str(z.data["class"]), rank):
+		spawn(z, pos + _rand(), d[0], d[1], d[2])
+
+## v0.9.1: добыча обычного врага списком [[тип, количество, предмет]] — одна формула для офлайна
+## и для сервера (общие враги онлайн: сервер бросает добычу и кладёт её на землю для всех)
+static func roll_drops(lvl: int, hero_lvl: int, cls: String, rank: String) -> Array:
+	var out := []
+	# враги намного ниже героя: меньше золота и предметов (Combat.reward_factor)
+	var rf := Combat.reward_factor(hero_lvl, lvl)
+	out.append(["gold", maxi(1, int(round(randi_range(2, 5) * (1 + lvl * 0.5) * rf))), {}])
+	if randf() > rf: return out
+	if randf() < 0.1: out.append(["potion", 1, {}])
+	# добыча для всех классов; элиты/редкие — больше и лучше, иногда комплекты
+	if rank != "normal": out.append(["gold", int(round(randi_range(4, 8) * (1 + lvl * 0.5) * (2 if rank == "elite" else 4))), {}])
+	for it in Items.drop_items(lvl, cls, rank): out.append(["item", 1, it])
+	return out
+
+## Босс мира (тролль долины) онлайн: та же добыча, что и офлайн (без уникальных Хранителя)
+static func roll_boss_drops(lvl: int, cls: String, first := false) -> Array:
+	var out := [["gold", int(round(randi_range(3, 5) * (1 + lvl * 0.5) * 20)), {}], ["potion", 1, {}], ["potion", 1, {}]]
+	for i in 4:
+		var it := Items.roll(lvl + 1, cls, 0.5)
+		if i == 0: while it.rarity < 2: it = Items.roll(lvl + 1, cls, 0.5)
+		if i == 1 and first: while it.rarity < 3: it = Items.roll(lvl + 1, cls, 0.9)
+		out.append(["item", 1, it])
+	for it in Items.drop_items(lvl, cls, "boss"):
+		if int(it.get("rarity", 0)) == Items.SET_RARITY: out.append(["item", 1, it])
+	return out
 
 ## Босс: много золота, 2 зелья, 4 предмета (минимум один редкий), при первой победе — гарантированный уникальный
 static func _boss_drop(z, e) -> void:
@@ -60,6 +79,8 @@ static func _boss_drop(z, e) -> void:
 			uniq = u.name
 			if not got.has(key): got.append(key)
 			d["warden_uniques"] = got
+	# v0.9.1: материалы для ремесла комплектов
+	if e.kind == "warden": spawn(z, pos + _rand(2.0), "mat", 3 + lvl / 10, {"mat": "aether_dust"})
 	z.last_boss_drop = {"first": first, "count": 7, "unique": uniq}
 
 static func _rand(rad := 1.2) -> Vector3:
@@ -78,6 +99,12 @@ static func spawn(z, pos: Vector3, t: String, n: int, it := {}) -> Loot:
 		"potion":
 			U.prim("sphere", l.holder, Vector3.ZERO, Vector3.ONE * 0.35, Color(0.9, 0.15, 0.25), 0.2, 1.0)
 			U.prim("cylinder", l.holder, Vector3(0, 0.22, 0), Vector3(0.1, 0.04, 0.1), Color(0.6, 0.4, 0.2))
+		"mat":
+			var mc: Color = Items.MATS.get(str(it.get("mat", "")), {"col": Color.WHITE}).col
+			U.prim("sphere", l.holder, Vector3.ZERO, Vector3.ONE * 0.32, mc, 0.5, 1.5)
+			var mb := U.prim("cylinder", l, Vector3.UP * 2.0, Vector3(0.1, 2.0, 0.1), mc)
+			mb.material_override = U.fx_mat(Color(mc.r, mc.g, mc.b, 0.35))
+			mb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_:
 			var c: Color = DB.RARITY_COLORS[int(it.rarity)]
 			U.prim("box", l.holder, Vector3.ZERO, Vector3.ONE * 0.45, c, 0.4, 1.2 if int(it.rarity) > 0 else 0.2).rotation_degrees = Vector3(45, 0, 45)
@@ -103,12 +130,34 @@ func _process(delta: float) -> void:
 		return
 	collect()
 
-## Подобрать (в инвентарь/золото/зелья). false — инвентарь полон
+## Подобрать (в инвентарь/золото/зелья). false — инвентарь полон.
+## v0.9.1: общая добыча онлайн (net_id ≠ 0) — сначала запрос серверу: кто первым подобрал, тому и достаётся
+var net_id := 0
+var _ask_t := 0.0
 func collect() -> bool:
+	var p = zone.player
+	if p == null: return false
+	if net_id != 0:
+		if type == "item" and p.data["inventory"].size() >= DB.INVENTORY_SIZE:
+			Game.toast("Инвентарь полон!", 1.5); age = -2.0; return false
+		if Time.get_ticks_msec() / 1000.0 - _ask_t < 1.5: return false
+		_ask_t = Time.get_ticks_msec() / 1000.0
+		Net.pick_drop(net_id)
+		return false
+	return grant()
+
+## Выдать герою (офлайн — сразу, онлайн — по подтверждению сервера)
+func grant() -> bool:
 	var p = zone.player
 	if p == null: return false
 	var d: Dictionary = p.data
 	match type:
+		"mat":
+			var mid := str(item.get("mat", "aether_dust"))
+			if not d.has("mats") or not (d["mats"] is Dictionary): d["mats"] = {}
+			d["mats"][mid] = int(d["mats"].get(mid, 0)) + amount
+			var md: Dictionary = Items.MATS.get(mid, {"name": mid, "col": Color.WHITE, "icon": "magic-swirl"})
+			zone.hud.pickup("+%d %s" % [amount, md.name], md.col, md.icon)
 		"gold":
 			d["gold"] += amount
 			zone.hud.pickup("+%d золота" % amount, Color(1, 0.85, 0.35), "two-coins")

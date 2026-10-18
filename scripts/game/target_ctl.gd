@@ -15,6 +15,7 @@ var ring: MeshInstance3D
 var _mat: StandardMaterial3D
 var _t := 0.0
 const CYCLE_RANGE := 26.0
+const LOCK_RANGE := 40.0        # v0.9.1: дальше — захват цели снимается
 const PICK_PX := 70.0
 
 func setup(z) -> void:
@@ -75,7 +76,7 @@ func _sync() -> void:
 	var k := ""; var id := 0
 	if target is RemotePlayer: k = "p"; id = int(target.peer_id)
 	elif target is Player: k = "p"; id = Net.my_id
-	elif target is NetEnemy: k = "e"; id = int(target.net_id)
+	elif target is Enemy and int(target.net_id) != 0: k = "e"; id = int(target.net_id)   # подземелье или общий враг мира
 	Net.send_target(k, id)
 
 ## Следующий враг: ближние — первыми, по кругу
@@ -126,6 +127,13 @@ func enemy_in_range(from: Vector3, rng: float):
 	if kind == "enemy" and _valid(target) and from.distance_to(target.global_position) <= rng * 1.15 + float(target.radius): return target
 	return null
 
+## v0.9.1: захват цели — выбранный враг остаётся целью всех атак и умений (герой разворачивается к нему),
+## пока его не сбросят (Esc, ×, касание пустой земли на телефоне, Tab/цикл), он не погибнет или не уйдёт
+## дальше LOCK_RANGE. Атаки, умения, движение и автонаведение цель не меняют.
+func locked_enemy():
+	if kind == "enemy" and _valid(target): return target
+	return null
+
 ## Союзник для умения поддержки (выбранный или null — тогда «на себя»)
 func ally():
 	if kind == "ally" and _valid(target): return target
@@ -135,6 +143,9 @@ func _process(delta: float) -> void:
 	if target != null and not _valid(target):
 		clear(); return
 	if target == null: return
+	var pl = zone.player
+	if pl and target != pl and pl.global_position.distance_to(target.global_position) > LOCK_RANGE:
+		clear(); Game.toast("Цель слишком далеко — захват снят", 1.2); return
 	_t += delta
 	var gp := target.global_position
 	ring.global_position = Vector3(gp.x, gp.y + 0.06, gp.z)

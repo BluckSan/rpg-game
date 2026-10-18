@@ -598,7 +598,9 @@ func _touch_down(idx: int, p: Vector2) -> void:
 		# ЛКМ по миру — атака (удержание — серия ударов)
 		if window == null and not _over_ui(p):
 			# v0.9.0: клик по врагу/союзнику — выбор цели; по пустой земле — сброс цели (и обычная атака)
-			var picked = zone.target_ctl.tap(p) if zone.target_ctl else null
+			# v0.9.1: ЛКМ на ПК — это атака: клик по пустой земле захват цели НЕ снимает (Esc / × / Tab)
+			var picked = zone.target_ctl.pick(p) if zone.target_ctl else null
+			if picked != null: zone.target_ctl.select(picked)
 			if picked != null and not (picked is Enemy): return   # союзник выбран — без атаки
 			touches[idx] = {"role": "skill", "slot": 0}
 			_hold_time[0] = 0.0

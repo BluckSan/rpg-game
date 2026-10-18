@@ -503,7 +503,7 @@ func try_use(slot: int) -> bool:
 func find_target(rng: float):
 	var tc = zone().target_ctl if "target_ctl" in zone() else null
 	if tc != null:
-		var sel = tc.enemy_in_range(global_position, rng)   # v0.9.0: выбранная цель — в приоритете
+		var sel = tc.locked_enemy()   # v0.9.1: захваченная цель — всегда (атаки и умения идут в неё)
 		if sel != null: return sel
 	var best = null
 	var best_score := INF

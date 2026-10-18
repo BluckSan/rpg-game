@@ -391,6 +391,13 @@ func normalize(c: Dictionary) -> Dictionary:
 		DB.migrate_skills(c)
 		if DB.skill_points_spent(c) > DB.skill_points_total(c): DB.reset_skills(c)
 	if not c.has("zones") or not (c["zones"] is Dictionary): c["zones"] = {}
+	# v0.9.1: материалы ремесла {id: количество}
+	var mats := {}
+	var mraw = c.get("mats", {})
+	if mraw is Dictionary:
+		for k in mraw:
+			if Items.MATS.has(str(k)): mats[str(k)] = clampi(int(mraw[k]), 0, 9999)
+	c["mats"] = mats
 	var look: Dictionary = c.get("look", {})
 	for k in ["gender", "skin", "face", "hair", "hair_color", "eye_color"]:
 		look[k] = int(look.get(k, 0))
