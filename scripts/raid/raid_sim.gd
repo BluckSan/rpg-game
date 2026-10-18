@@ -290,7 +290,7 @@ func _resolve_tele(dt: float) -> void:
 			var need := mini(int(z.get("need", 1)), maxi(1, _alive_players(true).size()))
 			var k := maxi(1, inside.size())
 			var f: float = float(z.base) * float(need) / float(k)
-			for pid in inside: _hurt(pid, f, z.pos, f >= 1.4, z.get("what", ""))
+			for pid in inside: _hurt(pid, f, z.pos, f >= 1.15, z.get("what", ""))
 			_note("stack %d/%d" % [inside.size(), need])
 			if inside.size() < need: _warn("Плиту приняли не все — урон удвоен!")
 		else:
@@ -478,14 +478,14 @@ func _voragos(b: Dictionary) -> void:
 		return
 	if mech.b <= 0.0:                     # метеоры: метка на каждом — разойдитесь
 		mech.b = 22.0 if phase < 3 else 16.0
-		for pid in inside: _tele("disc", players[pid].pos, 4.0, 5.0, 0.32, {"follow": pid, "mode": "spread", "what": "Метеор", "col": "orange"})
+		for pid in inside: _tele("disc", players[pid].pos, 4.0, 5.0, 0.25, {"follow": pid, "mode": "spread", "what": "Метеор", "col": "orange"})
 		_warn("Метеоры! Разойдитесь друг от друга")
 		_note("meteors")
 		return
 	if phase >= 2 and mech.c <= 0.0 and not inside.is_empty():   # плита: соберитесь под меткой
 		mech.c = 26.0
 		var pid = inside.pick_random()
-		_tele("disc", players[pid].pos, 3.6, 5.5, 0.0, {"follow": pid, "mode": "stack", "base": 0.6, "need": 3, "what": "Плита пепла", "col": "yellow"})
+		_tele("disc", players[pid].pos, 3.6, 5.5, 0.0, {"follow": pid, "mode": "stack", "base": 0.4, "need": 3, "what": "Плита пепла", "col": "yellow"})
 		_warn("Плита пепла на %s — встаньте вместе!" % players[pid].name)
 		_note("slab")
 		return
@@ -583,7 +583,7 @@ func _aeteron(b: Dictionary) -> void:
 	if phase >= 2 and mech.c <= 0.0:      # гравитация: соберитесь
 		mech.c = 26.0
 		var pid = inside.pick_random()
-		_tele("disc", players[pid].pos, 3.6, 5.5, 0.0, {"follow": pid, "mode": "stack", "base": 0.6, "need": 3, "what": "Гравитация", "col": "yellow"})
+		_tele("disc", players[pid].pos, 3.6, 5.5, 0.0, {"follow": pid, "mode": "stack", "base": 0.4, "need": 3, "what": "Гравитация", "col": "yellow"})
 		_warn("Гравитация на %s — соберитесь!" % players[pid].name)
 		_note("gravity")
 

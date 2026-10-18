@@ -90,7 +90,7 @@ func step(dt: float) -> void:
 							if d > t.r * 0.5: mv += to_c.normalized() * 2.0; urgent = true
 						else:
 							urgent = true   # стоим — к нам бегут
-					elif t.m == "spread" and t.fo == my_pid:
+					elif t.m == "spread":   # метки на всех — расходимся от любого союзника
 						for a in allies:
 							var ad := U.flat_dist(a, me)
 							if ad < t.r * 2.0 + 1.0: mv += U.flat(me - a).normalized() * 1.5; urgent = true
