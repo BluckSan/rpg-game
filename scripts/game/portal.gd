@@ -7,6 +7,7 @@ var target_zone := "global"
 var arrive := ""
 var collect_loot := false   # портал возврата: подобрать всю добычу перед переходом
 var used := 0
+var to_start := false       # v0.9.2: портал после победы — к начальной точке локации
 var _cd := 0.0
 
 func _process(delta: float) -> void:
@@ -30,4 +31,5 @@ func _process(delta: float) -> void:
 		var n := Loot.collect_all(zone)
 		if n > 0: Game.toast("Добыча собрана: %d" % n, 2.0)
 	zone.save()
-	Game.travel(target_zone, arrive)
+	if to_start: Game.travel_start(target_zone)
+	else: Game.travel(target_zone, arrive)

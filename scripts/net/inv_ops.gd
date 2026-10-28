@@ -4,7 +4,7 @@ class_name InvOps
 ## у себя (сразу видно) и шлёт на сервер, где та же операция выполняется над серверной копией героя.
 ## Сервер — владелец инвентаря: после операции присылает своё состояние (s_inv), клиент принимает его как есть.
 
-const KEYS := ["inventory", "equipped", "stash", "buyback", "gold", "potions", "dust", "mats", "shop", "craft_n"]
+const KEYS := ["inventory", "equipped", "stash", "buyback", "gold", "potions", "dust", "mats", "shop", "craft_n", "dng_done"]
 const OPS := ["equip", "unequip", "sell", "dismantle", "to_stash", "from_stash", "buy", "buyback", "potion_buy", "potion_use",
 	"restock", "restock_dust", "upgrade", "shop_sync"]
 

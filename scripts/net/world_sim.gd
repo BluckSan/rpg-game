@@ -24,6 +24,7 @@ var tele: Array = []   # зоны урона
 var sched: Array = []  # отложенные действия [t, Callable]
 var t := 0.0
 var stats := {"ticks": 0, "awake": 0, "ai_ms": 0.0, "paths": 0, "hurt": 0, "atk": 0, "tele": 0, "kills": 0}
+var lv_off := 0                # v0.9.2: сдвиг уровня врагов (Склеп — по уровню группы)
 var kills_cb: Callable        # (sp, m) — добыча/награды (Net)
 
 func _init(key: String, zid: String, n: ServerNav) -> void:
@@ -43,7 +44,7 @@ func ensure_spawner(key: String):
 func _new_mob(sp: Dictionary, slot: int, kind := "", lvl := -1, pos := Vector3.INF, add_of := 0) -> Dictionary:
 	if kind == "": kind = str(sp.kind)
 	var def: Dictionary = DB.ENEMIES[kind]
-	if lvl < 0: lvl = randi_range(int(sp.lo), int(sp.hi))
+	if lvl < 0: lvl = maxi(1, randi_range(int(sp.lo), int(sp.hi)) + lv_off)
 	if pos == Vector3.INF:
 		var r := Vector2.from_angle(randf() * TAU) * randf() * float(sp.r)
 		pos = nav.snap(sp.key, sp.pos + Vector3(r.x, 0, r.y))

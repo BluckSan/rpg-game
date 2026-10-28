@@ -24,6 +24,7 @@ var door_vis: Node3D
 var door_closed := false
 var packs: Array = []
 var boss_spawner: Spawner
+var lv_off := 0
 var exit_point := Vector3(0, 0, -2.2)
 const CHECKPOINTS := {"": Vector3(0, 0.1, 3), "cp_lever": Vector3(0, 0.1, 62), "cp_boss": Vector3(0, 0.1, 84)}
 
@@ -61,13 +62,15 @@ func build(z) -> void:
 	_lever_hall()
 	_flush_batches()
 	# группы врагов (после зачистки не возвращаются)
+	# v0.9.2: уровень Склепа — по герою в пределах DB.DUNGEON_LV (номинал 10); на сервере — номинал (сдвиг — в WorldSim)
+	lv_off = 0 if Net.is_server else DB.dungeon_level("dungeon", int(zone.data.get("level", 1))) - 10
 	packs.append(_pack(Vector3(0, 0, 33), "skeleton", 9, 10, 3, 2.5, "pack1"))
 	packs.append(_pack(Vector3(0, 0, 36), "ether_guard", 9, 9, 1, 1.0, "pack1b"))
 	packs.append(_pack(Vector3(0, 0, 53), "ether_guard", 9, 10, 2, 3.0, "pack2"))
 	packs.append(_pack(Vector3(-8, 0, 46), "skeleton_archer", 9, 10, 2, 2.0, "pack2b"))
 	packs.append(_pack(Vector3(0, 0, 80), "skeleton", 10, 10, 3, 2.0, "pack3"))
 	packs.append(_pack(Vector3(0, 0, 82), "ether_guard", 10, 10, 1, 1.0, "pack3b"))
-	boss_spawner = Spawner.create(z, enemies_root, arena_center, "warden", 10, 10, 1, 0.3, -1.0)
+	boss_spawner = Spawner.create(z, enemies_root, arena_center, "warden", 10 + lv_off, 10 + lv_off, 1, 0.3, -1.0)
 	boss_spawner.kill_flag = "boss_warden_killed"
 	arena_point = arena_center
 	portal_point = exit_point
@@ -77,7 +80,7 @@ func build(z) -> void:
 	bake_nav.call_deferred()
 
 func _pack(pos: Vector3, k: String, lo: int, hi: int, n: int, r: float, f: String) -> Spawner:
-	var s := Spawner.create(zone, enemies_root, pos, k, lo, hi, n, r, -1.0)
+	var s := Spawner.create(zone, enemies_root, pos, k, lo + lv_off, hi + lv_off, n, r, -1.0)
 	s.clear_flag = f
 	return s
 
@@ -356,6 +359,9 @@ func _watch_boss() -> void:
 	var boss = boss_enemy()
 	if boss != null: _boss_seen = true; return
 	if return_portal == null and (_boss_seen or flag("boss_warden_killed")):
+		if _boss_seen and not Net.shared_world():   # v0.9.2: офлайн прохождение считает сам герой (онлайн — сервер)
+			var left := DB.dungeon_complete(zone.data, "dungeon")
+			Game.toast("Склеп пройден! Осталось прохождений: %d из %d" % [left, DB.DUNGEON_RUNS], 4.0)
 		spawn_return_portal()
 
 ## Появляется на каждой победе (и в повторных забегах): арка, вспышка, свет, подсказка на экране
@@ -375,7 +381,8 @@ func spawn_return_portal() -> void:
 	return_portal = Portal.new()
 	return_portal.zone = zone
 	return_portal.target_zone = "starter"
-	return_portal.arrive = "dungeon"
+	return_portal.arrive = ""
+	return_portal.to_start = true
 	return_portal.collect_loot = true
 	return_portal._cd = 1.5
 	add_child(return_portal)

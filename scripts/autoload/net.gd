@@ -651,6 +651,8 @@ func in_party() -> bool: return not party.is_empty()
 ## Вход в подземелье: онлайн — через сервер (лидер ведёт всю группу), офлайн — сразу соло-забег
 func raid_enter(did: String) -> void:
 	if not RaidDefs.DUNGEONS.has(did): return
+	var why := DB.dungeon_lock(Game.current, did)   # v0.9.2: онлайн то же проверит сервер
+	if why != "": Game.toast(why, 3.0); return
 	if in_game:
 		if _connected(): c_raid_enter.rpc_id(1, did)
 		return
@@ -847,8 +849,19 @@ func c_raid_enter(did: String) -> void:
 					if players.has(m) and int(players[m].iid) != iid:
 						_srv_raid_remove(m); players[m].iid = iid; s_raid_start.rpc_id(m, did, iid)
 				return
+	# v0.9.2: уровень и лимит прохождений — у каждого; не прошедшие проверку не входят
+	var ok := []
+	for m in members:
+		if not players.has(m): continue
+		var why := DB.dungeon_lock(players[m].data, did)
+		if why == "": ok.append(m); continue
+		s_notice.rpc_id(m, why)
+		if m != id: s_notice.rpc_id(id, "%s: %s" % [players[m].name, why])
+	if not ok.has(id): return
+	members = ok
 	var lvl := 1
 	for m in members: lvl = maxi(lvl, int(players[m].data.get("level", 1)))
+	lvl = DB.dungeon_level(did, lvl)
 	var sim := RaidSim.new()
 	sim.setup(did, lvl, members.size())
 	var iid := _next_iid; _next_iid += 1
@@ -918,6 +931,9 @@ func _srv_raids_tick(delta: float) -> void:
 			var p = players.get(m)
 			if p and str(p.zone) == inst.zone: sim.update_player(m, p.pos, float(p.hp))
 		sim.tick(delta)
+		if sim.done and not inst.get("counted", false):   # v0.9.2: прохождение засчитано тем, кто внутри
+			inst["counted"] = true
+			for m in inst.members: _dng_count(m, str(inst.did))
 		for e in sim.events:
 			var to: int = e[0]
 			if str(e[1].get("t", "")) == "drops":   # v0.9.1: добыча босса — общая, на землю (подбор — c_pick)
@@ -1190,6 +1206,13 @@ func _wm_sim(p: Dictionary) -> WorldSim:
 		print("server: навмеш «%s»: логов %d, %d мс" % [z, nav.spawners.size(), Time.get_ticks_msec() - t0])
 	sim = WorldSim.new(zk, z, nav)
 	sim.kills_cb = _wm_on_kill
+	if z == "dungeon":   # v0.9.2: уровень Склепа — по сильнейшему из группы в пределах DB.DUNGEON_LV (номинал 10)
+		var lvl := int(p.data.get("level", 1))
+		var pt = parties.get(int(p.get("party", 0)))
+		if pt != null:
+			for m in pt.members: if players.has(m): lvl = maxi(lvl, int(players[m].data.get("level", 1)))
+		sim.lv_off = DB.dungeon_level("dungeon", lvl) - 10
+		print("server: склеп %s — ур. %d" % [zk, 10 + sim.lv_off])
 	wsims[zk] = sim
 	sim.set_meta("empty_t", 0.0)
 	return sim
@@ -1205,6 +1228,11 @@ func c_wm_sub(key: String) -> void:
 	var id := multiplayer.get_remote_sender_id()
 	var p = _authed(id)
 	if p == null or not WM_ZONES.has(str(p.zone)) or not key.begins_with(str(p.zone) + ":") or key.length() > 64: return
+	if str(p.zone) == "dungeon" and str(p.get("wm_zk", "")) != _wm_zk(p):
+		var old := str(p.get("wm_zk", ""))
+		if wsims.has(old): wsims[old].remove_player(id)
+		p["wm_zk"] = _wm_zk(p)
+		if not _dng_admit(id, p): return
 	var sim := _wm_sim(p)
 	if sim == null: return
 	var sp = sim.ensure_spawner(key)   # описание логова — только серверное (ServerNav), клиентскому не верим
@@ -1270,6 +1298,8 @@ func c_wm_cc(nid: int, kind: String, v: float, dur: float, dir: Vector3) -> void
 ## Враг погиб (решение WorldSim): участникам — опыт и флаги, добыча — на землю для всех
 func _wm_on_kill(sim: WorldSim, sp, m: Dictionary) -> void:
 	wm_stats.kills += 1
+	if sim.zone_id == "dungeon" and str(m.kind) == "warden" and int(m.add_of) == 0:
+		for pid in sim.players: _dng_count(pid, "dungeon")
 	var subs: Dictionary = sp.subs if sp != null else {}
 	for s in sim.players:
 		if players.has(s) and (subs.has(s) or m.parts.has(s)): s_wm_kill.rpc_id(s, int(m.nid), m.parts.has(s))
@@ -1376,6 +1406,7 @@ func _wm_feed() -> void:
 		if old != zk:
 			if wsims.has(old): wsims[old].remove_player(id)
 			p["wm_zk"] = zk
+			if str(p.zone) == "dungeon" and not _dng_admit(id, p): continue
 		if zk == "" or not wsims.has(zk): continue
 		var st := _srv_stats(p)
 		var mhp := float(st.get("max_hp", 100.0))
@@ -1751,3 +1782,34 @@ func _mkt_int(it: Dictionary) -> void:
 func s_mkt(op: String, r: Dictionary) -> void:
 	market_result.emit(op, r)
 
+
+
+# ---------- v0.9.2: прохождения подземелий (не больше DB.DUNGEON_RUNS) — считает только сервер ----------
+func _dng_count(pid: int, did: String) -> void:
+	var p = players.get(pid)
+	if p == null or not p.get("authed", false): return
+	var left := DB.dungeon_complete(p.data, did)
+	p.dirty = true
+	s_inv.rpc_id(pid, "sync", InvOps.pub(p.data), {"err": ""})
+	s_notice.rpc_id(pid, "«%s» пройдено! Осталось прохождений: %d из %d" % [DB.dungeon_name(did), left, DB.DUNGEON_RUNS])
+	print("server: %s прошёл «%s» (осталось %d)" % [p.name, did, left])
+
+## Сервер не впустил в Склеп — клиент возвращается в долину к началу
+@rpc("authority", "call_remote", "reliable")
+func s_dng_kick(why: String) -> void:
+	Game.toast(why, 4.0)
+	if str(Game.current.get("zone", "")) == "dungeon": Game.travel_start("starter")
+
+## Вход в экземпляр Склепа (p.wm_zk уже выставлен): проверка уровня и лимита; новый забег — свежий экземпляр
+func _dng_admit(id: int, p: Dictionary) -> bool:
+	var zk := str(p.wm_zk)
+	var why := DB.dungeon_lock(p.data, "dungeon")
+	if why != "":
+		p["wm_zk"] = ""
+		if _now() > float(p.get("dng_kick_t", 0.0)):
+			p["dng_kick_t"] = _now() + 3.0
+			s_dng_kick.rpc_id(id, why)
+		return false
+	if wsims.has(zk) and wsims[zk].players.is_empty():
+		wsims.erase(zk); print("server: склеп %s — новый забег" % zk)
+	return true

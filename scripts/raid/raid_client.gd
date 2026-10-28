@@ -35,7 +35,7 @@ func setup(z, dungeon: String) -> void:
 	else:
 		my_pid = 1
 		sim = RaidSim.new()
-		sim.setup(did, int(z.data.get("level", 1)), 1)
+		sim.setup(did, DB.dungeon_level(did, int(z.data.get("level", 1))), 1)
 		sim.add_player(1, {"name": z.data.get("name", "?"), "cls": z.data.get("class", "warrior"), "lvl": z.data.get("level", 1)})
 		_drain()
 
@@ -48,7 +48,9 @@ func send_hit(id: int, dmg: float, skill: bool) -> void:
 func leave() -> void:
 	if Net.in_game: Net.raid_leave()
 	zone.save()
-	Game.travel_back("starter")
+	# v0.9.2: пройдено — к началу локации, откуда вошли; вышли раньше — туда же, где вошли
+	if done: Game.travel_start("starter")
+	else: Game.travel_back("starter")
 
 func _drain() -> void:
 	var evs := sim.events.duplicate()
@@ -121,6 +123,9 @@ func handle(ev: Dictionary) -> void:
 				var k: Dictionary = zone.data.get("raid_kills", {})
 				k[did] = int(k.get(did, 0)) + 1
 				zone.data["raid_kills"] = k
+				if sim != null:   # офлайн — считает сам герой (онлайн — сервер, s_inv)
+					var left := DB.dungeon_complete(zone.data, did)
+					Game.toast("Пройдено! Осталось прохождений: %d из %d" % [left, DB.DUNGEON_RUNS], 4.0)
 		"tele": _make_tele(ev)
 		"hurt": _hurt(ev)
 		"atk":

@@ -943,6 +943,15 @@ func _update_cast() -> void:
 		enrage_label.text = "Ярость через %d:%02d" % [int(left) / 60, int(left) % 60] if left > 0 else "ЯРОСТЬ!"
 
 func _objective() -> String:
+	var o := _objective0()
+	var did := DB.dungeon_of_zone(str(zone.data.get("zone", "")))   # v0.9.2: уровень и остаток прохождений
+	if did != "": o += "\n" + DB.dungeon_info(zone.data, did)
+	elif zone.builder is StarterZoneBuilder and DB.zone_flag(zone.data, "starter", "boss_troll_killed"):
+		var lk := DB.dungeon_lock(zone.data, "dungeon")
+		o += "\nСклеп Эфира: " + (DB.dungeon_info(zone.data, "dungeon") if lk == "" else lk)
+	return o
+
+func _objective0() -> String:
 	if zone.builder is PartyDungeonBuilder: return zone.builder.objective()
 	if zone.builder is WorldBuilder:
 		var lv := int(zone.data["level"])
@@ -954,7 +963,7 @@ func _objective() -> String:
 	if zone.is_dungeon():
 		var b = zone.builder
 		if b.boss_enemy() == null and b.return_portal != null:
-			return "Хранитель повержен! Войдите в золотой портал на арене — он вернёт в долину"
+			return "Хранитель повержен! Войдите в золотой портал на арене — он вернёт к началу долины"
 		if not b.gate_open():
 			if b.packs_left() > 0 and zone.player.global_position.z < 40: return "Цель: пройти коридор ловушек (шипы — по таймингу или прыжком)"
 			return "Цель: рычаги в порядке с таблички у решётки (Пламя → Лёд → Тень)"

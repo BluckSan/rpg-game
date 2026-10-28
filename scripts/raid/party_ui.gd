@@ -242,6 +242,10 @@ func _dungeon_tab() -> void:
 		var p := UIK.panel(body, Color(0.1, 0.08, 0.12, 0.85), 10)
 		p.custom_minimum_size = Vector2(0, 200)
 		var t := UIK.label(p, "%s   [побед: %d]" % [d.name, int(kills.get(did, 0))], 30, UIK.ACCENT)
+		var cd: Dictionary = zone.data if zone else Game.current
+		var lk := DB.dungeon_lock(cd, did)
+		var inf := UIK.label(p, DB.dungeon_info(cd, did) if lk == "" else lk, 21, UIK.GOLD if lk == "" else UIK.RED)   # v0.9.2
+		UIK.rect(inf, Vector2(560, 14), Vector2(500, 32))
 		UIK.rect(t, Vector2(20, 8), Vector2(800, 44))
 		var ds := UIK.label(p, String(d.desc), 22)
 		UIK.rect(ds, Vector2(20, 54), Vector2(820, 136))
@@ -251,7 +255,7 @@ func _dungeon_tab() -> void:
 		var can := not Net.in_game or not Net.in_party() or Net.is_leader()
 		var b := UIK.button(p, ("Войти группой" if Net.in_party() else "Войти соло") if can else "Ведёт лидер", _enter.bind(did), UIK.GREEN, 26)
 		UIK.rect(b, Vector2(856, 60), Vector2(210, 80))
-		b.disabled = not can
+		b.disabled = not can or lk != ""
 
 func _enter(did: String) -> void:
 	close()

@@ -462,6 +462,14 @@ func travel_back(fallback := "starter") -> void:
 	if not DB.ZONES.has(zid) or is_dungeon_zone(zid): zid = fallback
 	travel(zid, "")
 
+## v0.9.2: подземелье пройдено — к начальной точке локации, из которой вошли (без возврата к месту входа)
+func travel_start(fallback := "starter") -> void:
+	var r = current.get("ret", {})
+	var zid: String = str(r.get("zone", fallback)) if r is Dictionary else fallback
+	if not DB.ZONES.has(zid) or is_dungeon_zone(zid): zid = fallback
+	current.erase("ret")
+	travel(zid, "")
+
 ## Если есть запись о точке входа в эту зону — поставить героя туда (и стереть запись)
 static func apply_return(c: Dictionary) -> bool:
 	var r = c.get("ret", {})

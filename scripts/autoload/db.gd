@@ -823,7 +823,56 @@ func zone_lock_reason(c: Dictionary, zone_id: String) -> String:
 	if int(c["level"]) < int(z["min_level"]): return "Нужен %d уровень" % z["min_level"]
 	var req: Array = z.get("requires", [])
 	if req.size() == 2 and not zone_flag(c, req[0], req[1]): return "Печать держится. Победите Древнего тролля"
+	if zone_id == "dungeon": return dungeon_lock(c, "dungeon")
 	return ""
+
+# ---------------- v0.9.2: уровни подземелий и лимит прохождений ----------------
+## [от, до] — рекомендуемые уровни; враги и босс — на уровне подземелья (уровень героя/группы в этих пределах);
+## войти можно не ниже «от − DUNGEON_GRACE»
+const DUNGEON_LV := {"dungeon": [8, 12], "ash": [12, 20], "crypt": [16, 24], "star": [20, 30]}
+const DUNGEON_GRACE := 2
+const DUNGEON_RUNS := 5    # прохождений (убит босс) на героя; неудачные попытки не считаются
+
+static func dungeon_of_zone(zone_id: String) -> String:
+	if zone_id == "dungeon": return "dungeon"
+	return RaidDefs.by_zone(zone_id)
+
+static func dungeon_name(did: String) -> String:
+	return "Склеп Эфира" if did == "dungeon" else str(RaidDefs.DUNGEONS.get(did, {}).get("name", did))
+
+static func dungeon_level(did: String, lvl: int) -> int:
+	var r: Array = DUNGEON_LV.get(did, [1, 60])
+	return clampi(lvl, int(r[0]), int(r[1]))
+
+static func dungeon_min_level(did: String) -> int:
+	return maxi(1, int(DUNGEON_LV.get(did, [1, 60])[0]) - DUNGEON_GRACE)
+
+static func dungeon_done(c: Dictionary, did: String) -> int:
+	var d = c.get("dng_done", {})
+	return int(d.get(did, 0)) if d is Dictionary else 0
+
+static func dungeon_left(c: Dictionary, did: String) -> int: return maxi(0, DUNGEON_RUNS - dungeon_done(c, did))
+
+## Засчитать прохождение (сервер онлайн / сам герой офлайн). Возвращает остаток
+static func dungeon_complete(c: Dictionary, did: String) -> int:
+	var d = c.get("dng_done", {})
+	if not (d is Dictionary): d = {}
+	d[did] = mini(DUNGEON_RUNS, int(d.get(did, 0)) + 1)
+	c["dng_done"] = d
+	return dungeon_left(c, did)
+
+## "" — можно войти; иначе причина (уровень, лимит прохождений)
+static func dungeon_lock(c: Dictionary, did: String) -> String:
+	var r: Array = DUNGEON_LV.get(did, [1, 60])
+	if int(c.get("level", 1)) < dungeon_min_level(did):
+		return "«%s»: нужен %d уровень (рекомендуется %d–%d)" % [dungeon_name(did), dungeon_min_level(did), int(r[0]), int(r[1])]
+	if dungeon_left(c, did) <= 0:
+		return "«%s» пройдено %d из %d раз — больше нельзя" % [dungeon_name(did), DUNGEON_RUNS, DUNGEON_RUNS]
+	return ""
+
+static func dungeon_info(c: Dictionary, did: String) -> String:
+	var r: Array = DUNGEON_LV.get(did, [1, 60])
+	return "Ур. %d–%d · прохождений осталось: %d из %d" % [int(r[0]), int(r[1]), dungeon_left(c, did), DUNGEON_RUNS]
 
 func describe_item(it: Dictionary) -> String:
 	var s := "%s · %s · ур. %d\n" % [SLOT_NAMES[int(it.slot)], RARITY_NAMES[int(it.rarity)], int(it.ilvl)]
