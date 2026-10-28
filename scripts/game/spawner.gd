@@ -22,6 +22,7 @@ static func create(z, parent: Node, pos: Vector3, k: String, lo: int, hi: int, n
 	return s
 
 func _ready() -> void:
+	if Net.is_server: return   # v0.9.2: на сервере логово — только описание (враги — в WorldSim)
 	if clear_flag != "" and DB.zone_flag(zone.data, zone.data["zone"], clear_flag): return
 	if Net.shared_world(): _net_sub.call_deferred(); return   # v0.9.1: онлайн — общие враги от сервера
 	for i in count: _spawn_one()

@@ -244,7 +244,8 @@ func take_damage(dmg: float, crit: bool, elem := "phys") -> float:
 	if elem != "true" and p != null and "stats" in p and p.stats is Dictionary and not p.stats.is_empty():
 		dmg *= Combat.player_vs_enemy(self, elem, int(p.data["level"]), float(p.stats.get("pen", 0.0)), float(p.stats.get("resred", 0.0)), float(p.stats.get("pen_flat", 0.0)))
 	if net_shared:
-		Net.wm_hit(net_id, dmg)   # здоровье — на сервере (s_wm_hp / s_wm_kill)
+		Net.wm_hit(net_id, dmg)   # здоровье — на сервере (WorldSim); здесь — только предсказание
+		hp = maxf(1.0, hp - dmg)
 	else:
 		hp -= dmg
 	hits_taken += 1
@@ -256,27 +257,54 @@ func take_damage(dmg: float, crit: bool, elem := "phys") -> float:
 	if hp <= 0 and not net_shared: _die()
 	return dmg
 
-## v0.9.1: общий враг мира онлайн (номер от сервера; own — этот клиент ведёт ИИ)
-func set_net(nid: int, own: bool) -> void:
+## v0.9.2: общий враг мира онлайн — ИИ целиком на сервере (WorldSim), клиент только показывает
+func set_net(nid: int, _own := false) -> void:
 	net_id = nid; net_shared = true
-	net_owner = own
-	if own and brain == null and def.boss and not (self is NetEnemy):
-		brain = WardenBrain.new() if kind == "warden" else BossBrain.new()
-		brain.setup(self)
-	if not own:
-		busy = false
-		_npos = global_position; _nyaw = rotation.y
+	net_owner = false
+	busy = false
+	if def.boss and not (self is NetEnemy): brain = RaidBrain.new()   # фаза/каст/ярость — от сервера (событие st)
+	_npos = global_position; _nyaw = rotation.y
+	_nbuf.clear()
+
+const INTERP_DELAY := 0.12   # показ с задержкой между двумя снимками сервера (10 Гц)
+var _nbuf: Array = []        # [время, позиция, поворот]
 
 func net_pos(p: Vector3, yaw: float) -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	p.y = zone.ground_y(p) if zone else p.y
+	_nbuf.append([now, p, yaw])
+	if _nbuf.size() > 6: _nbuf.pop_front()
 	_npos = p; _nyaw = yaw
 
-## Копия чужого ИИ: плавно к позиции сервера, анимация шага
+## Копия врага сервера: интерполяция по буферу снимков, высота — по рельефу зоны
 func _puppet(delta: float) -> void:
 	if _npos == Vector3.INF: return
-	var to := _npos - global_position
-	if to.length() > 25.0: global_position = _npos
-	else: global_position = global_position.lerp(_npos, minf(1.0, delta * 8.0))
-	rotation.y = lerp_angle(rotation.y, _nyaw, minf(1.0, delta * 10.0))
+	var rt := Time.get_ticks_msec() / 1000.0 - INTERP_DELAY
+	var goal := _npos; var gyaw := _nyaw
+	if _nbuf.size() >= 2:
+		var i := _nbuf.size() - 1
+		while i > 0 and float(_nbuf[i - 1][0]) > rt: i -= 1
+		if i > 0:
+			var a: Array = _nbuf[i - 1]; var b: Array = _nbuf[i]
+			var k := clampf((rt - float(a[0])) / maxf(0.001, float(b[0]) - float(a[0])), 0.0, 1.0)
+			goal = (a[1] as Vector3).lerp(b[1], k); gyaw = lerp_angle(float(a[2]), float(b[2]), k)
+		else:
+			goal = _nbuf[0][1]; gyaw = float(_nbuf[0][2])
+	if goal.distance_to(global_position) > 25.0: global_position = goal
+	else: global_position = global_position.lerp(goal, minf(1.0, delta * 15.0))
+	rotation.y = lerp_angle(rotation.y, gyaw, minf(1.0, delta * 12.0))
+
+## Атака по команде сервера: только анимация и снаряд для вида (урон решает сервер)
+func net_attack(ranged: bool, target_pos: Vector3, a := "") -> void:
+	if not alive: return
+	_lunge = 0.25
+	match a:
+		"slam", "charge", "rock", "summon", "breath", "spores", "nova", "roar": _model_action("attack2" if a != "rock" else "throw")
+		"cast": _model_action("attack")
+		_: _model_action("attack" if randf() < 0.7 else "attack2")
+	if ranged and def.has("proj") and target_pos != Vector3.INF:
+		var origin := global_position + Vector3.UP * float(def.get("shot_h", 1.3))
+		Tele.bolt(zone.fx_root, origin, target_pos + Vector3.UP, def.get("proj", Color(0.6, 0.9, 1)), 0.22, 0.07)
 
 ## Смерть по решению сервера: опыт и счётчики — участникам; добычу сервер кладёт на землю сам
 func net_die(participant: bool) -> void:
@@ -300,6 +328,7 @@ func net_die(participant: bool) -> void:
 ## Отбрасывание при попадании (босс почти не сдвигается) + «упругий» отклик модели
 func knockback(dir: Vector3, force: float) -> void:
 	if not alive: return
+	if net_shared: Net.wm_cc(net_id, "kb", force, 0.0, dir)
 	var k := 0.08 if def.boss else (0.5 if kind in ["troll", "goblin"] else 1.0)
 	_kb += U.flat(dir).normalized() * force * k
 	# «упругий» отклик — только у обычных врагов и всегда от исходного масштаба (раньше масштаб брался
@@ -319,7 +348,10 @@ func add_debuff(k: String, v: float, dur: float) -> void:
 	buffs[k] = {"id": k, "v": nv, "t": maxf(dur, float(cur.get("t", 0.0))), "dur": dur, "icon": Support.debuff_icon(k), "col": Support.debuff_color(k),
 		"name": Support.debuff_name(k), "good": false, "st": mini(9, int(cur.get("st", 0)) + 1)}
 	if k == "slow": slow(1.0 - nv, dur)
-	if k == "taunt": _aggro = true
+	if k == "weaken" and net_shared: Net.wm_cc(net_id, "weaken", nv, dur, Vector3.ZERO)
+	if k == "taunt":
+		_aggro = true
+		if net_shared: Net.wm_cc(net_id, "taunt", 1.0, dur, Vector3.ZERO)
 
 func _tick_debuffs(delta: float) -> void:
 	for k in buffs.keys():
@@ -330,9 +362,11 @@ func _tick_debuffs(delta: float) -> void:
 
 func slow(factor: float, t: float) -> void:
 	_slow_factor = factor; _slow_timer = t
+	if net_shared: Net.wm_cc(net_id, "slow", factor, t, Vector3.ZERO)
 
 func stun(t: float) -> void:
 	_stun_timer = t * 0.3 if def.boss else t
+	if net_shared: Net.wm_cc(net_id, "stun", 0.0, t, Vector3.ZERO)
 
 func _die() -> void:
 	if net_shared: return   # общий враг погибает только по решению сервера (net_die)
@@ -370,19 +404,13 @@ func _choose_target() -> Node3D:
 		var d := U.flat_dist(m.global_position, global_position)
 		if d < best_d * 0.8:
 			best_d = d; best = m
-	# v0.9.1: общий враг онлайн (этот клиент ведёт ИИ) нападает и на других игроков рядом
-	if net_shared and net_owner:
-		for r in get_tree().get_nodes_in_group("remote_players"):
-			if not r.is_inside_tree() or not r.visible or float(r.hp_frac) <= 0.0: continue
-			var d := U.flat_dist(r.global_position, global_position)
-			if d < best_d:
-				best_d = d; best = r
 	return best
 
 func _process(delta: float) -> void:
 	if not alive: return
-	if net_shared and not net_owner:
+	if net_shared:
 		if not buffs.is_empty(): _tick_debuffs(delta)
+		if brain is RaidBrain: brain.step(delta)
 		_puppet(delta)
 		_animate(delta)
 		return
@@ -451,16 +479,7 @@ func _attack() -> void:
 	if ai == "exploder":
 		_fuse(); return
 	_model_action("attack" if randf() < 0.7 else "attack2")
-	if def.ranged and target is RemotePlayer:
-		# по другому игроку: снаряд — для вида, урон — через сервер по времени полёта
-		var o := global_position + Vector3.UP * float(def.get("shot_h", 1.3)) + global_basis.z * 0.4
-		var tp2: Vector3 = target.global_position + Vector3.UP * 1.0
-		var spd := float(def.get("proj_speed", 13.0))
-		Projectile.fire(zone, o, (tp2 - o).normalized(), spd, o.distance_to(tp2), def.get("proj", Color(0.6, 0.9, 1)), 0.25, false, Callable(), 0.0)
-		var tr = target; var dm := _damage()
-		await get_tree().create_timer(o.distance_to(tp2) / spd, false).timeout
-		if alive and is_instance_valid(tr): Net.wm_attack(net_id, int(tr.peer_id), dm)
-	elif def.ranged:
+	if def.ranged:
 		var origin := global_position + Vector3.UP * float(def.get("shot_h", 1.3)) + global_basis.z * 0.4
 		# в 3D — в центр цели (герой на склоне выше/ниже)
 		var tp: Vector3 = target.global_position + Vector3.UP * 1.0
@@ -479,7 +498,6 @@ func _deal_to(t: Node3D, dmg: float) -> void:
 	if affixes.has("vampire") and alive:
 		hp = minf(max_hp, hp + dmg * 0.5)
 	if t is Player: t.take_damage(dmg, global_position)
-	elif t is RemotePlayer: Net.wm_attack(net_id, int(t.peer_id), dmg)
 	elif t.has_method("take_damage"): t.take_damage(dmg)
 
 ## Движение со столкновениями: скольжение вдоль стен (две итерации), высота — по рельефу зоны

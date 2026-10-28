@@ -419,7 +419,7 @@ static func gen_chunk(k: Vector2i, lod: int, quality: int) -> Dictionary:
 					out.solid.append([Vector3(lx, y, lz), rad, kind])
 	# трава-травинки (ветер) — только ближние чанки, Высокое+: плотность по весу слоя травы
 	var gcount := 0
-	if lod == 0: gcount = [1000, 1800, 3000, 4200, 5600][clampi(quality, 0, 4)]   # v0.6.0: трава-карточки на всех пресетах
+	if lod == 0 and quality >= 0: gcount = [1000, 1800, 3000, 4200, 5600][clampi(quality, 0, 4)]   # quality −1 — сервер (только стволы и камни)   # v0.6.0: трава-карточки на всех пресетах
 	if gcount > 0:
 		var gr := RandomNumberGenerator.new(); gr.seed = hash(k) ^ 0x6a55
 		for i in gcount:

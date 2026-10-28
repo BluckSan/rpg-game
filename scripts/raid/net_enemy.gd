@@ -81,7 +81,7 @@ func net_die(quiet := false) -> void:
 	tw.tween_property(self, "position:y", -1.2 if not def.boss else -3.0, 1.2)
 	tw.tween_callback(queue_free)
 
-func net_attack(ranged: bool, target_pos: Vector3) -> void:
+func net_attack(ranged: bool, target_pos: Vector3, _a := "") -> void:
 	if not alive: return
 	_lunge = 0.25
 	_model_action("attack" if randf() < 0.7 else "attack2")
