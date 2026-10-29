@@ -229,14 +229,15 @@ func _build_menu() -> void:
 	menu_panel.add_theme_stylebox_override("panel", UIK.frame("tooltip", Color(1, 1, 1, 0.97), 16))
 	root.add_child(menu_panel)
 	menu_panel.anchor_left = 1; menu_panel.anchor_right = 1
-	menu_panel.offset_right = menu_btn.offset_right; menu_panel.offset_left = menu_btn.offset_right - (520 if Game.desktop else 600)
+	menu_panel.offset_right = menu_btn.offset_right; menu_panel.offset_left = menu_btn.offset_right - (640 if Game.desktop else 600)
 	menu_panel.offset_top = 112
+	menu_panel.z_index = 20   # поверх названия зоны и подсказок
 	var grid := GridContainer.new(); grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 10); grid.add_theme_constant_override("v_separation", 10)
 	menu_panel.add_child(grid)
 	for it in MENU_ITEMS:
 		var b := UIK.button(grid, it[1], _menu_pick.bind(it[0]), UIK.BUTTON, 26 if Game.desktop else 30, it[2])
-		b.name = "Menu_" + it[0]; b.custom_minimum_size = Vector2(240 if Game.desktop else 280, 64 if Game.desktop else 84)
+		b.name = "Menu_" + it[0]; b.custom_minimum_size = Vector2(300 if Game.desktop else 280, 64 if Game.desktop else 84)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		menu_items[it[0]] = b
 		if it[0] in ["talents", "skills"]:
