@@ -94,11 +94,13 @@ func _dungeon(did: String) -> void:
 	check(d.raid.stats.loot.size() == 1, "[%s] бросок добычи получен" % did)
 	if d.raid.stats.loot.size() > 0:
 		var ev: Dictionary = d.raid.stats.loot[0]
+		var items := []
+		for dr in ev.list: if str(dr.t) == "item": items.append(dr.it)
 		var sets := 0
-		for it in ev.items: if str(it.get("set", "")) == RaidDefs.DUNGEONS[did].set: sets += 1
-		check(sets >= 1 and int(ev.roll) >= 1 and int(ev.roll) <= 100, "[%s] бросок %d → частей «%s»: %d, всего предметов %d" % [did, int(ev.roll), Items.SETS[RaidDefs.DUNGEONS[did].set].name, sets, ev.items.size()])
+		for it in items: if str(it.get("set", "")) == RaidDefs.DUNGEONS[did].set: sets += 1
+		check(sets >= 1, "[%s] добыча на земле: частей «%s»: %d, всего предметов %d" % [did, Items.SETS[RaidDefs.DUNGEONS[did].set].name, sets, items.size()])
 		var req_ok := true
-		for it in ev.items: if int(it.req) > lvl: req_ok = false
+		for it in items: if int(it.get("req", 0)) > lvl: req_ok = false
 		check(req_ok, "[%s] вся добыча надевается сразу (требование ≤ ур. героя)" % did)
 	check(int(d.data.get("raid_kills", {}).get(did, 0)) == 1, "[%s] победа записана в героя" % did)
 	check(d.builder.arena_exit != null, "[%s] портал выхода на арене" % did)
