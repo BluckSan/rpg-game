@@ -148,12 +148,14 @@ func _ready() -> void:
 		p.data["skill_bonus"] = 0
 		p.data["skill_bonus"] = maxi(0, DB.skill_points_spent(p.data) - DB.skill_points_total(p.data))
 		z.hud.refresh_skill_buttons()
+		p.god_mode = true   # v0.9.4: проверяем умения, а не выживание (окрестные мобы успевали убить героя 1 ур.)
 		for slot in 3:
 			p.cooldowns[slot] = 0
 			p.mp = p.stats.max_mp
 			var ok: bool = p.try_use(slot)
 			check(ok, "[%s] умение %d (%s)%s" % [c["class"], slot, p.get_skill(slot).name, "" if ok else " — " + p.last_fail])
 			await frames(40)
+		p.god_mode = false
 		# опыт и уровни
 		p.gain_xp(20000)
 		check(p.data["level"] >= 10, "[%s] уровень после опыта: %d" % [c["class"], p.data["level"]])
@@ -189,7 +191,8 @@ func _ready() -> void:
 	var pl: Player = z2.player
 	for a in DB.ASCENDANCIES:
 		if str(a.get("cls", pl.data["class"])) != str(pl.data["class"]):   # пути поддержки — только своего класса
-			check(DB.asc_block_reason(pl.data, a).begins_with("Только для класса"), "путь «%s» закрыт другим классам" % a["name"])
+			var cc: Dictionary = pl.data.duplicate(); cc["ascendancy"] = ""
+			check(DB.asc_block_reason(cc, a).begins_with("Только для класса"), "путь «%s» закрыт другим классам" % a["name"])
 			continue
 		DB.reset_talents(pl.data)
 		pl.data["level"] = 40
