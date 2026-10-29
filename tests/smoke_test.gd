@@ -346,7 +346,7 @@ func _skill_ext_tests(z, p: Player, cls: String) -> void:
 	check(w._can_drop_slot(Vector2.ZERO, {"skill": a0, "from": -1}, 3), "[%s] слот принимает перетаскивание" % cls)
 	w._drop_bg(Vector2.ZERO, {"skill": hi_id, "from": 0})
 	check(str(p.data["loadout"][0]) == "", "[%s] перетаскивание со слота наружу — снять" % cls)
-	w._reset()
+	w._reset(); w._reset()   # «Сбросить все» — с подтверждением (2 нажатия)
 	check(DB.skill_points_free(p.data) == pts0 and (p.data["loadout"] as Array).count("") == 8, "[%s] сброс умений возвращает очки" % cls)
 	z.hud.close_window()
 	p.data["skill_bonus"] = 60
@@ -390,6 +390,18 @@ func _layout_tests(z, p: Player, cls: String) -> void:
 	var h = z.hud
 	var def := "pc" if Game.desktop else "mobile"
 	if cls == "warrior": check(Game.default_skill_layout() == def and Game.skill_layout in ["pc", "mobile"], "раскладка по умолчанию: %s (сейчас %s)" % [Game.default_skill_layout(), Game.skill_layout])
+	if Game.desktop:
+		# v0.9.3: на ПК вместо круглых кнопок — панели ярлыков L2 (подробно — l2ui_test)
+		await frames(2)
+		check(h.bars != null and h.bars.root != null and h.bars.root.visible and not h.skill_btns[2].visible, "[%s] ПК: панели ярлыков вместо круглых кнопок" % cls)
+		h.bars.page(0, 0)
+		h.bars.set_slot(0, 1, {"k": "skill", "id": str(p.data["loadout"][1])})
+		var sc: Dictionary = h.bars.get_slot(0, 1)
+		check(str(sc.get("id", "")) == str(p.data["loadout"][1]) and str(sc.id) != "", "[%s] ПК: ячейка 2 панели = умение слота 2 (%s)" % [cls, str(sc)])
+		p.cooldowns[2] = 0; p.mp = p.stats.max_mp
+		h.bars.activate(0, 1)
+		check(p.cooldowns[2] > 0, "[%s] ПК: ячейка 2 применяет умение" % cls)
+		return
 	var was: String = Game.skill_layout
 	for lay in ["pc", "mobile"]:
 		Game.skill_layout = lay
@@ -536,7 +548,7 @@ func _talent_v2_tests(z, p: Player) -> void:
 	var dummy := Enemy.spawn(z, "slime", 1, p.global_position + p.forward() * 2.0, z.fx_root)
 	dummy.max_hp = 999999; dummy.hp = 999999
 	dummy.def = dummy.def.duplicate(); dummy.def.aggro = 0.0
-	p.fx = {"aura_dmg": 40.0, "aura_frost": 1.0, "proc_bolt": 100.0, "proc_poison": 100.0, "crit_mark": 1.0}
+	p.fx = {"aura_dmg": 40.0, "aura_frost": 1.0, "proc_bolt": 100.0, "proc_poison": 100.0, "crit_mark": 100.0}
 	Projectile.player_fx = {}
 	var a0 := p.aura_ticks
 	var hp0: float = dummy.hp
@@ -598,7 +610,9 @@ func _talent_v2_tests(z, p: Player) -> void:
 	tw.set_filter("key")
 	var all_keys := true
 	for id in tw.matches: if DB.tree_nodes[id]["type"] != "keystone": all_keys = false
-	check(tw.matches.size() == 33 and all_keys, "фильтр «Ключевые»: %d" % tw.matches.size())
+	var nkey := 0
+	for id in DB.tree_nodes: if DB.tree_nodes[id]["type"] == "keystone": nkey += 1
+	check(tw.matches.size() == nkey and nkey >= 33 and all_keys, "фильтр «Ключевые»: %d" % tw.matches.size())
 	tw.set_filter("avail")
 	check(tw.matches.size() >= 2, "фильтр «Можно»: %d" % tw.matches.size())
 	tw.set_filter("all")
@@ -897,6 +911,8 @@ func _desktop_tests(z, p: Player) -> void:
 	h.close_window(); await frames(2)
 	# ЛКМ по миру — атака
 	var c: Vector2 = h._screen() * Vector2(0.5, 0.45)
+	if h.hint_panel: h.hint_panel.visible = false
+	print("  (ЛКМ: окно=%s, над UI=%s, над панелями=%s)" % [h.window != null, h._over_ui(c), h.bars != null and h.bars.over(c)])
 	h._touch_down(-1, c)
 	check(p.attack_held, "ЛКМ по миру — атака")
 	h._touch_up(-1)

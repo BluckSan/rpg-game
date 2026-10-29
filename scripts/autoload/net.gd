@@ -14,7 +14,7 @@ signal chat_received(from: String, text: String)
 signal roster_changed
 signal party_changed
 
-const PROTOCOL := 8   # v0.9.2: враги и боссы на сервере, лимит и уровни подземелий (v0.9.1 — 6)
+const PROTOCOL := 8   # v0.9.3: опыт считает сервер (s_wm_kill с xp); v0.9.2 — 7
 const DEFAULT_HOST := "146.0.76.20"
 const AUTH_PORT := 7780
 const GAME_PORT := 7777
