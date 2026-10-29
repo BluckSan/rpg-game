@@ -55,6 +55,7 @@ func _new_mob(sp: Dictionary, slot: int, kind := "", lvl := -1, pos := Vector3.I
 		var pool: Array = Enemy.AFFIXES.keys(); pool.shuffle()
 		aff = pool.slice(0, 1 if rank == "elite" else 2)
 	var hp_k: float = {"elite": 2.0, "rare": 3.5}.get(rank, 1.0)
+	if def.boss and kind != "warden" and not def.get("raid", false) and add_of == 0: hp_k *= WORLD_BOSS_HP_K   # v0.9.4: боссы локаций заметно крепче
 	var mhp: float = float(def.hp) * Combat.enemy_hp_mult(lvl) * hp_k
 	var m := {"nid": _next_nid, "sp": sp.key, "slot": slot, "kind": kind, "def": def, "lvl": lvl, "rank": rank, "name": str(sp.rname) if add_of == 0 else "",
 		"aff": aff, "pos": Vector3(pos.x, 0, pos.z), "home": Vector3(pos.x, 0, pos.z), "yaw": randf() * TAU, "hp": mhp, "mhp": mhp, "alive": true,
@@ -457,6 +458,11 @@ func _summon_aff(m: Dictionary) -> void:
 		_emit(0, {"t": "spawn", "sp": m.sp, "e": [pub(a)]}, m.pos)
 
 # ---------------- боссы ----------------
+const WORLD_BOSS_HP_K := 4.0     # v0.9.4: HP боссов локаций ×4
+const WORLD_BOSS_ENRAGE := 210.0 # с этого момента боя — ярость (урон ×1.6, частые приёмы)
+## v0.9.4: фирменный приём каждого босса локации (кроме общих slam/rock/charge/…)
+const SIGNATURE := {"troll": "quake", "boss_ogron": "quake", "boss_root": "roots", "boss_urgal": "firerain",
+	"boss_gnil": "bog", "boss_hyalm": "blizzard", "boss_seraph": "judgment"}
 func _boss_state(m: Dictionary) -> Dictionary:
 	var warden: bool = m.kind == "warden"
 	return {"warden": warden, "ph": 1, "busy": 0.0, "inv": false, "rg": false, "en": false, "spec": 3.0 if warden else 4.0, "summ": 0.0,
@@ -492,7 +498,10 @@ func _troll(m: Dictionary, dt: float) -> void:
 	var b: Dictionary = m.boss
 	var tp = _target(m)
 	if tp == null:
-		if float(m.hp) >= float(m.mhp) and b.en: b.en = false; _st(m)
+		if b.en and float(m.hp) < float(m.mhp) and not m.ret:   # все ушли/погибли — домой и лечиться
+			m.ret = true; m.aggro = false; m.threat.clear()
+		if float(m.hp) >= float(m.mhp) and b.en:
+			m.boss = _boss_state(m); _st(m)   # v0.9.4: сброс боя — фазы, ярость и таймер с нуля
 		return
 	if not b.en: b.en = true; _st(m)
 	var f: float = float(m.hp) / maxf(1.0, float(m.mhp))
@@ -507,13 +516,20 @@ func _troll(m: Dictionary, dt: float) -> void:
 		_later(1.6, func(): if mobs.has(nid): mobs[nid].boss.inv = false; mobs[nid].boss.spec = 1.5; mobs[nid].boss.summ = 0.0; _st(mobs[nid]))
 		_st(m)
 		return
+	b.ft = float(b.ft) + dt
+	if float(b.ft) >= WORLD_BOSS_ENRAGE and not b.berserk:
+		b.berserk = true; b.rg = true; b.dmgm = float(b.dmgm) * 1.6; b.spdm = maxf(float(b.spdm), 1.35)
+		_warn("%s впадает в неистовство! Урон резко вырос" % str(m.def.name), m.pos); _st(m)
 	if float(b.busy) > 0.0: return
-	b.spec = float(b.spec) - dt; b.summ = float(b.summ) - dt
+	b.spec = float(b.spec) - dt; b.summ = float(b.summ) - dt; b.sig = float(b.get("sig", 8.0)) - dt
 	if float(b.spec) > 0.0: return
-	b.spec = [0.0, 6.5, 5.0, 3.8][int(b.ph)]
+	b.spec = [0.0, 6.5, 5.0, 3.8][int(b.ph)] * (0.7 if b.berserk else 1.0)
 	var moves: Array = m.def.get("moves", ["slam", "rock", "charge"])
 	var options: Array = moves.slice(0, 2)
 	if int(b.ph) >= 2: options = moves.duplicate() + [moves[0]]
+	if SIGNATURE.has(m.kind) and float(b.sig) <= 0.0:
+		b.sig = [0.0, 16.0, 12.0, 9.0][int(b.ph)]
+		options = [SIGNATURE[m.kind]]
 	if int(b.ph) >= 2 and float(b.summ) <= 0.0 and _alive_adds(m) < 3: options = ["summon"]
 	_boss_move(m, options.pick_random(), tp)
 
@@ -574,6 +590,51 @@ func _boss_move(m: Dictionary, kind: String, tp: int) -> void:
 			for i in n:
 				var c: Vector3 = tpos + (Vector3.ZERO if i == 0 else Vector3(randf_range(-5, 5), 0, randf_range(-5, 5)))
 				_tele("disc", c, 2.4, 1.3, func(pid): _hurt(pid, base * 1.2, c, "Споры"), {"owner": nid, "col": "green"})
+		"quake":   # разлом: цепочка ударов по линии к цели, затем ударная волна
+			var n := 5 if ph < 3 else 7
+			b.busy = 0.9 + n * 0.28
+			_warn("%s раскалывает землю! Уходите с линии разлома" % str(m.def.name), m.pos)
+			for i in n:
+				var c: Vector3 = m.pos + fwd * (3.0 + i * 2.4)
+				_tele("disc", c, 2.3, 1.0 + i * 0.28, func(pid): _hurt(pid, base * 1.5, c, "Разлом", false, 0.0, 6.0), {"owner": nid, "col": "orange"})
+		"roots":   # корни под каждым игроком рядом + исцеление, если хоть кто-то попался
+			b.busy = 1.9
+			_warn("%s пускает корни — отойдите с отметки!" % str(m.def.name), m.pos)
+			for pid in _alive_near(m.pos, 20.0):
+				var c: Vector3 = players[pid].pos
+				_tele("disc", c, 2.6, 1.6, func(q):
+					_hurt(q, base * 1.4, c, "Корни")
+					var mm = mobs.get(nid)
+					if mm != null and mm.alive: mm.hp = minf(float(mm.mhp), float(mm.hp) + float(mm.mhp) * 0.02), {"owner": nid, "col": "green"})
+		"firerain":   # огненный дождь вокруг босса + дыхание в цель
+			var n := 8 if ph < 3 else 12
+			b.busy = 2.4
+			_warn("%s обрушивает огненный дождь!" % str(m.def.name), m.pos)
+			for i in n:
+				var ang := randf() * TAU; var rr := randf_range(3.0, 11.0)
+				var c: Vector3 = m.pos + Vector3(cos(ang) * rr, 0, sin(ang) * rr)
+				_tele("disc", c, 2.4, 1.4 + randf() * 0.9, func(pid): _hurt(pid, base * 1.3, c, "Огненный дождь"), {"owner": nid, "col": "orange"})
+		"bog":   # трясина: кольцо вокруг (безопасно — вплотную к боссу), затем общий выброс яда
+			b.busy = 2.6
+			var c: Vector3 = m.pos
+			_warn("%s извергает трясину — держитесь вплотную!" % str(m.def.name), m.pos)
+			_tele("ring", c, 12.0, 1.9, func(pid): _hurt(pid, base * 2.0, c, "Трясина"), {"owner": nid, "inner": 3.5, "col": "green"})
+		"blizzard":   # буран: три волны колец от центра наружу — нужно перешагивать
+			b.busy = 3.0
+			var c: Vector3 = m.pos
+			_warn("%s поднимает буран!" % str(m.def.name), m.pos)
+			for i in 3:
+				var r_in := 2.0 + i * 4.0
+				_tele("ring", c, r_in + 3.0, 1.2 + i * 0.7, func(pid): _hurt(pid, base * 1.3, c, "Буран", false, 0.0, 4.0), {"owner": nid, "inner": r_in, "col": "blue"})
+		"judgment":   # приговор: крест из лучей + метка под каждым игроком
+			b.busy = 2.2
+			_warn("%s выносит приговор! Уходите с лучей" % str(m.def.name), m.pos)
+			for k in 4:
+				var yw: float = m.yaw + k * PI / 2.0 + (PI / 4.0 if ph >= 3 else 0.0)
+				_tele("line", m.pos, 18.0, 1.5, func(pid): _hurt(pid, base * 1.6, m.pos, "Приговор"), {"owner": nid, "yaw": yw, "ang": 3.0, "col": "purple"})
+			for pid in _alive_near(m.pos, 22.0):
+				var c: Vector3 = players[pid].pos
+				_tele("disc", c, 2.2, 1.8, func(q): _hurt(q, base * 1.2, c, "Кара"), {"owner": nid, "col": "purple"})
 		"nova":
 			var tl := 1.3 if ph < 3 else 1.05
 			b.busy = tl + 0.5

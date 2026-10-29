@@ -262,7 +262,7 @@ func open_menu() -> void:
 	menu_panel.pivot_offset = Vector2(menu_panel.size.x, 0)
 	menu_panel.scale = Vector2(0.85, 0.85); menu_panel.modulate.a = 0.0
 	if _menu_tw: _menu_tw.kill()
-	_menu_tw = create_tween().set_parallel().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_menu_tw = create_tween().set_ignore_time_scale(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).set_parallel().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	_menu_tw.tween_property(menu_panel, "scale", Vector2.ONE, 0.18)
 	_menu_tw.tween_property(menu_panel, "modulate:a", 1.0, 0.14)
 
@@ -270,11 +270,13 @@ func close_menu(instant := false) -> void:
 	if not menu_open: return
 	menu_open = false
 	if _menu_tw: _menu_tw.kill()
-	if instant: menu_panel.visible = false; return
-	_menu_tw = create_tween().set_parallel().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	if instant:
+		menu_panel.visible = false
+		return
+	_menu_tw = create_tween().set_ignore_time_scale(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).set_parallel().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	_menu_tw.tween_property(menu_panel, "scale", Vector2(0.9, 0.9), 0.12)
 	_menu_tw.tween_property(menu_panel, "modulate:a", 0.0, 0.12)
-	_menu_tw.chain().tween_callback(func(): if not menu_open: menu_panel.visible = false)
+	_menu_tw.chain().tween_callback(menu_panel.hide)
 
 func _menu_pick(what: String) -> void:
 	close_menu(true)
@@ -417,7 +419,9 @@ func _hotkey_ev(ev: InputEvent) -> bool:
 		if esc or (act != "" and WINDOW_ACTIONS.get(String(window.name), "") == act):
 			close_window(); return true
 		return false
-	if esc and menu_open: close_menu(); return true
+	if esc and menu_open:
+		close_menu()
+		return true
 	if esc:
 		if zone.target_ctl and zone.target_ctl.has_target():   # Esc сначала сбрасывает цель, затем — меню
 			zone.target_ctl.clear(); return true
@@ -706,7 +710,8 @@ func _tick_buff_tip(delta: float) -> void:
 
 func _over_top_button(p: Vector2) -> bool:
 	if menu_open and not (menu_panel.get_global_rect().has_point(p) or menu_btn.get_global_rect().has_point(p)):
-		close_menu(); return true   # клик мимо открытого меню — закрыть (клик поглощается)
+		close_menu()
+		return true   # клик мимо открытого меню — закрыть (клик поглощается)
 	for b in top_buttons + blockers:
 		if b.is_visible_in_tree() and b.get_global_rect().has_point(p): return true
 	return false

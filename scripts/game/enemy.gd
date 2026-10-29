@@ -86,6 +86,7 @@ static func spawn(z, k: String, lvl: int, pos: Vector3, parent: Node) -> Enemy:
 	e.ai = String(e.def.get("ai", "ranged" if e.def.ranged else "melee"))
 	e.radius = e.def.radius
 	e.max_hp = e.def.hp * Combat.enemy_hp_mult(lvl)
+	if e.def.boss and k != "warden" and not e.def.get("raid", false): e.max_hp *= WorldSim.WORLD_BOSS_HP_K   # v0.9.4: боссы локаций крепче (и офлайн)
 	e.hp = e.max_hp
 	e.home = pos
 	e._wander_target = pos
