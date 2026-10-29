@@ -899,10 +899,11 @@ func _process(delta: float) -> void:
 			if k > 0 and _hold_time[k] > 0.55 and _tip_slot != k:
 				show_skill_tooltip(k); _tip_slot = k
 	var it: Dictionary = zone.nearest_interactable()
-	interact_btn.visible = window == null and (zone.near_merchant() or not it.is_empty())
+	var near_loot: bool = it.is_empty() and not zone.near_merchant() and Loot.nearest(zone) != null
+	interact_btn.visible = window == null and (zone.near_merchant() or not it.is_empty() or near_loot)
 	if interact_btn.visible:
-		interact_btn.text = ("Торговать" if zone.near_merchant() else str(it["text"])) + _key_e
-		interact_btn.icon = UIK.icon("shop" if zone.near_merchant() else str(it.get("icon", "cog")))
+		interact_btn.text = ("Торговать" if zone.near_merchant() else ("Подобрать" if near_loot else str(it["text"]))) + _key_e
+		interact_btn.icon = UIK.icon("shop" if zone.near_merchant() else ("chest" if near_loot else str(it.get("icon", "cog"))))
 	_update_cast()
 	var d: Dictionary = zone.data
 	joy_default = Vector2(260, _screen().y - 240)
@@ -1011,7 +1012,10 @@ func interact() -> bool:
 	if zone.near_merchant():
 		_open("shop"); return true
 	var it: Dictionary = zone.nearest_interactable()
-	if it.is_empty(): return false
+	if it.is_empty():
+		var l := Loot.nearest(zone)   # v0.9.4.1: «Взаимодействие» рядом с добычей — подобрать
+		if l == null: return false
+		l.manual_pick(); return true
 	it["cb"].call()
 	return true
 

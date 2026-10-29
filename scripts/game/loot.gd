@@ -121,7 +121,7 @@ func _process(delta: float) -> void:
 	var p = zone.player
 	if p == null or p.dead or age < 0.4: return
 	var dist := U.flat_dist(p.global_position, global_position)
-	if dist > 4.5: return
+	if dist > 4.5 or not auto_pick: return
 	if dist > 1.2:
 		# притягивание добычи к герою
 		var to: Vector3 = p.global_position - global_position; to.y = 0
@@ -133,21 +133,27 @@ func _process(delta: float) -> void:
 ## Подобрать (в инвентарь/золото/зелья). false — инвентарь полон.
 ## v0.9.1: общая добыча онлайн (net_id ≠ 0) — сначала запрос серверу: кто первым подобрал, тому и достаётся
 var net_id := 0
-var _ask_t := 0.0
-func collect() -> bool:
+var _ask_t := -10.0
+## тест/настройка: false — без притягивания, только вручную (клик, касание, клавиша)
+static var auto_pick := true
+const MANUAL_R := 3.2   # подбор вручную: на таком расстоянии от героя
+
+func _ready() -> void: add_to_group("loot")
+
+func collect(manual := false) -> bool:
 	var p = zone.player
 	if p == null: return false
 	if net_id != 0:
 		if type == "item" and p.data["inventory"].size() >= DB.INVENTORY_SIZE:
-			Game.toast("Инвентарь полон!", 1.5); age = -2.0; return false
-		if Time.get_ticks_msec() / 1000.0 - _ask_t < 1.5: return false
+			Game.toast("Инвентарь полон! Продайте или разберите вещи", 1.8); age = -2.0; return false
+		if Time.get_ticks_msec() / 1000.0 - _ask_t < (0.4 if manual else 1.5): return false
 		_ask_t = Time.get_ticks_msec() / 1000.0
 		Net.pick_drop(net_id)
 		return false
 	return grant()
 
 ## Выдать герою (офлайн — сразу, онлайн — по подтверждению сервера)
-func grant() -> bool:
+func grant(from_server := false) -> bool:
 	var p = zone.player
 	if p == null: return false
 	var d: Dictionary = p.data
@@ -165,7 +171,8 @@ func grant() -> bool:
 			d["potions"] += amount
 			zone.hud.pickup("+1 зелье лечения", Color(1, 0.4, 0.4), "health-potion")
 		_:
-			if d["inventory"].size() >= DB.INVENTORY_SIZE:
+			# подтверждение сервера — предмет уже у героя на сервере: не терять его и у себя
+			if d["inventory"].size() >= DB.INVENTORY_SIZE and not from_server:
 				Game.toast("Инвентарь полон!", 1.5)
 				age = -2.0
 				return false
@@ -178,6 +185,50 @@ func grant() -> bool:
 ## Собрать всю лежащую добычу зоны (портал возврата — ничего не теряется). Возвращает число подобранного
 static func collect_all(z) -> int:
 	var n := 0
+	var net := false
 	for c in z.fx_root.get_children():
-		if c is Loot and not c.is_queued_for_deletion() and c.collect(): n += 1
+		if not (c is Loot) or c.is_queued_for_deletion(): continue
+		if c.net_id != 0: net = true; n += 1; continue
+		if c.collect(): n += 1
+	if net: Net.pick_all()   # v0.9.4.1: общую добычу собирает сервер (раньше отказ по расстоянию — терялась)
 	return n
+
+## Отказ сервера: понятное сообщение вместо бесконечных молчаливых попыток
+func denied(why: String) -> void:
+	match why:
+		"full": Game.toast("Инвентарь полон! Продайте или разберите вещи", 1.8); age = -2.0
+		"far": Game.toast("Подойдите ближе", 1.0); _ask_t = -10.0
+		"dead": pass
+		_: queue_free()   # чужая зона/экземпляр — это не наша добыча
+
+## Подбор вручную (клик/касание по добыче или клавиша «Взаимодействие»)
+func manual_pick() -> bool:
+	var p = zone.player
+	if p == null or p.dead: return false
+	if U.flat_dist(p.global_position, global_position) > MANUAL_R:
+		Game.toast("Подойдите ближе", 1.0); return false
+	age = maxf(age, 0.4)
+	return collect(true) or net_id != 0
+
+## Ближайшая добыча рядом с героем (или null)
+static func nearest(z, r := MANUAL_R) -> Loot:
+	if z == null or z.player == null: return null
+	var best: Loot = null; var bd := r
+	for l in z.get_tree().get_nodes_in_group("loot"):
+		if l.is_queued_for_deletion() or l.zone != z: continue
+		var d: float = U.flat_dist(z.player.global_position, l.global_position)
+		if d <= bd: bd = d; best = l
+	return best
+
+## Добыча под точкой экрана (клик мышью или касание)
+static func at_screen(z, screen: Vector2, px := 70.0) -> Loot:
+	var cam: Camera3D = z.get_viewport().get_camera_3d()
+	if cam == null: return null
+	var best: Loot = null; var bd := INF
+	for l in z.get_tree().get_nodes_in_group("loot"):
+		if l.is_queued_for_deletion() or l.zone != z: continue
+		var wp: Vector3 = l.global_position + Vector3.UP * 0.4
+		if cam.is_position_behind(wp) or cam.global_position.distance_to(wp) > 40.0: continue
+		var d: float = cam.unproject_position(wp).distance_to(screen)
+		if d < px and d < bd: bd = d; best = l
+	return best

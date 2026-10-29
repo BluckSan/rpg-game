@@ -117,6 +117,9 @@ func pick(screen: Vector2):
 
 ## Нажатие/клик по миру: выбрать то, что под пальцем, иначе — сбросить. Возвращает выбранное (или null)
 func tap(screen: Vector2):
+	var l := Loot.at_screen(zone, screen)   # v0.9.4.1: клик/касание по добыче — подобрать
+	if l != null:
+		l.manual_pick(); return null
 	var n = pick(screen)
 	if n == null: clear()
 	else: select(n)

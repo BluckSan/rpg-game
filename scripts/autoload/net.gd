@@ -14,7 +14,7 @@ signal chat_received(from: String, text: String)
 signal roster_changed
 signal party_changed
 
-const PROTOCOL := 9   # v0.9.3: опыт считает сервер (s_wm_kill с xp) + проверка готовности (c_rc_answer/s_rc_*); v0.9.2 — 7
+const PROTOCOL := 10   # v0.9.4.1: s_pick_fail, c_pick_all, c_party_promote; v0.9.4 — 9; v0.9.3: опыт считает сервер (s_wm_kill с xp) + проверка готовности (c_rc_answer/s_rc_*); v0.9.2 — 7
 const DEFAULT_HOST := "146.0.76.20"
 const AUTH_PORT := 7780
 const GAME_PORT := 7777
@@ -1246,6 +1246,17 @@ func wm_cc(nid: int, kind: String, v: float, dur: float, dir: Vector3) -> void:
 
 func pick_drop(did: int) -> void:
 	if in_game and _connected(): c_pick.rpc_id(1, did)
+func pick_all() -> void:
+	if in_game and _connected(): c_pick_all.rpc_id(1)
+var pick_fails := {}   # причина -> сколько раз (для тестов)
+
+## v0.9.4.1: сервер отказал в подборе — объясняем игроку (раньше отказ был молчаливым)
+@rpc("authority", "call_remote", "reliable")
+func s_pick_fail(did: int, why: String) -> void:
+	pick_fails[why] = int(pick_fails.get(why, 0)) + 1
+	var l = net_drops.get(did)
+	if l != null and is_instance_valid(l): l.denied(why)
+	elif why == "full": Game.toast("Инвентарь полон! Часть добычи осталась на земле", 2.0)
 
 func _wm_client_ensure() -> void:
 	var z = get_tree().current_scene
@@ -1417,9 +1428,37 @@ func c_pick(did: int) -> void:
 	var d = srv_drops.get(did)
 	if d == null:
 		wm_stats.pick_denied += 1; s_drop_gone.rpc_id(id, did); return
-	if d.zk != _wm_zk(p) or U.flat_dist(p.pos, d.pos) > 7.0 or float(p.hp) <= 0.0:
-		wm_stats.pick_denied += 1; return
-	if d.t == "item" and (p.data.get("inventory", []) as Array).size() >= DB.INVENTORY_SIZE: return
+	var why := _pick_why(p, d, 7.0)
+	if why != "":
+		wm_stats.pick_denied += 1; s_pick_fail.rpc_id(id, did, why); return
+	_srv_give(id, p, did, d)
+
+## v0.9.4.1: ключ добычи — как у зоны игрока (в групповых подземельях с номером экземпляра «pd_crypt#7»).
+## Раньше сравнивалось с _wm_zk (без номера) — добычу боссов подземелий нельзя было подобрать вовсе.
+func _pick_why(p: Dictionary, d: Dictionary, max_d: float) -> String:
+	if str(d.zk) != _srv_zone_key(p): return "zone"
+	if float(p.hp) <= 0.0: return "dead"
+	if U.flat_dist(p.pos, d.pos) > max_d: return "far"
+	if d.t == "item" and (p.data.get("inventory", []) as Array).size() >= DB.INVENTORY_SIZE: return "full"
+	return ""
+
+## Собрать всю добычу рядом (выход из подземелья, портал): ничего не теряется. Предметы — пока есть место
+@rpc("any_peer", "call_remote", "reliable")
+func c_pick_all() -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null: return
+	var full := 0
+	for did in srv_drops.keys():
+		var d = srv_drops.get(did)
+		if d == null: continue
+		var why := _pick_why(p, d, 45.0)
+		if why == "full": full += 1
+		if why == "": _srv_give(id, p, did, d)
+	if full > 0: s_pick_fail.rpc_id(id, 0, "full")
+
+func _srv_give(id: int, p: Dictionary, did: int, d: Dictionary) -> void:
 	srv_drops.erase(did)
 	wm_stats.picks += 1
 	# серверная копия героя: сразу с добычей (ремесло проверяет материалы и золото по ней)
@@ -1434,7 +1473,7 @@ func c_pick(did: int) -> void:
 	p.dirty = true
 	s_pick_ok.rpc_id(id, did, str(d.t), int(d.n), d.it)
 	for s in players:
-		if s != id and players[s].authed and _wm_zk(players[s]) == d.zk: s_drop_gone.rpc_id(s, did)
+		if s != id and players[s].authed and _srv_zone_key(players[s]) == d.zk: s_drop_gone.rpc_id(s, did)
 
 ## Шаг серверной симуляции мира: фиксированные 20 Гц; события — пачкой каждому игроку; позиции врагов —
 ## 10 Гц и только тем, кто ближе AOI_R (и только сдвинувшиеся / с изменившимся здоровьем, раз в 1 с — все)
@@ -1474,7 +1513,7 @@ func _wm_server_tick(delta: float) -> void:
 		if now > float(srv_drops[did].until):
 			var d: Dictionary = srv_drops[did]
 			srv_drops.erase(did)
-			for s in players: if players[s].authed and _wm_zk(players[s]) == d.zk: s_drop_gone.rpc_id(s, did)
+			for s in players: if players[s].authed and _srv_zone_key(players[s]) == d.zk: s_drop_gone.rpc_id(s, did)
 
 func _wm_feed() -> void:
 	for id in players:
@@ -1642,11 +1681,11 @@ func s_pick_ok(did: int, t: String, n: int, it: Dictionary) -> void:
 	net_drops.erase(did)
 	picks_ok += 1
 	if l != null and is_instance_valid(l):
-		l.grant(); return
+		l.grant(true); return
 	var z = get_tree().current_scene
-	if z == null or not ("fx_root" in z): return
+	if z == null or not ("fx_root" in z) or z.player == null: return
 	var tmp := Loot.spawn(z, z.player.global_position, t, n, it)
-	tmp.grant()
+	tmp.grant(true)
 var picks_ok := 0
 
 # ---------- v0.9.1: таланты, умения и ремесло — с проверкой на сервере ----------
@@ -1725,8 +1764,15 @@ var inv_syncs := 0
 func inv(op: String, args: Array = [], local := true) -> Dictionary:
 	var r := {"err": ""}
 	if local or not (in_game and _connected()): r = InvOps.apply(Game.current, op, args)
-	if in_game and _connected(): c_inv.rpc_id(1, op.left(20), args.slice(0, 120))
+	if in_game and _connected():
+		inv_pending += 1; _inv_sent_t = _now()
+		c_inv.rpc_id(1, op.left(20), args.slice(0, 120))
 	return r
+## v0.9.4.1: сколько операций ещё без ответа сервера. Пока они в пути, ответ на старую операцию
+## не затирает уже применённые у себя новые (раньше быстрые переодевания «откатывались» и мигали)
+var inv_pending := 0
+var _inv_sent_t := 0.0
+var inv_flicker := 0   # тест: сколько раз состояние сервера откатило бы более новое локальное
 
 @rpc("any_peer", "call_remote", "reliable")
 func c_inv(op: String, args: Array) -> void:
@@ -1737,7 +1783,8 @@ func c_inv(op: String, args: Array) -> void:
 	var now := _now()
 	if now - float(p.get("invop_t", 0.0)) > 1.0: p["invop_t"] = now; p["invop_n"] = 0
 	p["invop_n"] = int(p.get("invop_n", 0)) + 1
-	if int(p.invop_n) > 30: return   # не больше 30 операций в секунду
+	if int(p.invop_n) > 30:   # не больше 30 операций в секунду; отказ — с состоянием сервера (клиент выровняется)
+		s_inv.rpc_id(id, op, InvOps.pub(p.data), {"err": "Слишком быстро — подождите секунду"}); return
 	if p.get("mkt_busy", false):
 		s_inv.rpc_id(id, op, InvOps.pub(p.data), {"err": "Подождите: идёт сделка на рынке"}); return
 	var r := InvOps.apply(p.data, op, args)
@@ -1750,6 +1797,12 @@ func c_inv(op: String, args: Array) -> void:
 func s_inv(op: String, state: Dictionary, r: Dictionary) -> void:
 	var c: Dictionary = Game.current
 	if c.is_empty(): return
+	if op != "sync": inv_pending = maxi(0, inv_pending - 1)
+	if inv_pending > 0 and _now() - _inv_sent_t > 5.0: inv_pending = 0   # страховка: ответ потерялся
+	if inv_pending > 0 and str(r.get("err", "")) == "":
+		# впереди ещё ответы — их состояние новее; это не применяем (иначе вещи «прыгают» назад)
+		if not InvOps.same(c, state): inv_flicker += 1
+		inv_result.emit(op, r); return
 	for k in state: c[k] = state[k]
 	Game.normalize(c)
 	inv_syncs += 1
