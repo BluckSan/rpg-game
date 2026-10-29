@@ -32,8 +32,9 @@ func _ready() -> void:
 			var base := _party(lvl, "")
 			seed(1000 + did.length() * 7 + sc.length())
 			var with := _party(lvl, sc)
-			var ra := _run(did, lvl, base)
-			var rb := _run(did, lvl, with)
+			# v0.9.4: бой стохастичен — сравниваем сумму 3 прогонов с одинаковыми сидами (одиночный прогон давал «смертей 1» случайно)
+			var ra := _runs(did, lvl, base, 3)
+			var rb := _runs(did, lvl, with, 3)
 			var tag := "%s: 3 боевых — %s; с поддержкой «%s» — %s" % [did, _fmt(ra), DB.get_asc(SUP_ASC[sc]).name, _fmt(rb)]
 			var faster: bool = rb.done and (not ra.done or rb.t < ra.t * 0.97)
 			var safer: bool = rb.deaths < ra.deaths or (rb.deaths <= ra.deaths and rb.wipes <= ra.wipes and rb.taken < ra.taken * 0.85)
@@ -49,8 +50,20 @@ func _ready() -> void:
 	print("=== SUPPORT RESULT: %s (%d errors, %d checks) ===" % ["PASS" if errors == 0 else "FAIL", errors, checks])
 	get_tree().quit(1 if errors else 0)
 
+func _runs(did: String, lvl: int, party: Array, n: int) -> Dictionary:
+	var acc := {}
+	for k in n:
+		seed(4242 + k * 101 + did.length())
+		var r := _run(did, lvl, party)
+		if acc.is_empty(): acc = r.duplicate(); acc.t = 0.0; acc.deaths = 0; acc.wipes = 0; acc.taken = 0.0; acc.sup_casts = 0; acc.sup_effects = 0
+		acc.done = acc.done and r.done if k > 0 else r.done
+		acc.t += r.t / n; acc.taken += r.taken / n
+		acc.deaths += r.deaths; acc.wipes += r.wipes
+		acc.sup_casts += r.sup_casts; acc.sup_effects += r.sup_effects
+	return acc
+
 func _fmt(r: Dictionary) -> String:
-	return "%s за %.0f с, смертей %d, вайпов %d, урона получено %.1f HP-долей" % ["убит" if r.done else "НЕ убит", r.t, r.deaths, r.wipes, r.taken]
+	return "%s за %.0f с (ср.), смертей %d, вайпов %d, урона получено %.1f HP-долей" % ["убит" if r.done else "НЕ убит", r.t, r.deaths, r.wipes, r.taken]
 
 ## Потолки: баффы не пробивают потолки v0.8.0, ослабления — свои потолки
 func _static_checks(lvl: int) -> void:

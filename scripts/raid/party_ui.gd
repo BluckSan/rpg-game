@@ -58,6 +58,7 @@ func _ready() -> void:
 	dbtn.custom_minimum_size = Vector2(0, 48)
 	dbtn.anchor_top = 0.3; dbtn.anchor_bottom = 0.3
 	dbtn.offset_left = btn.offset_right + 10; dbtn.offset_right = dbtn.offset_left + 220; dbtn.offset_bottom = 52
+	btn.visible = false; dbtn.visible = false   # v0.9.4: открываются из общего «Меню» HUD (и клавишей G)
 	frames = VBoxContainer.new()
 	frames.add_theme_constant_override("separation", 6)
 	frames.anchor_top = 0.36; frames.anchor_bottom = 0.36

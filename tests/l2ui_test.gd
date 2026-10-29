@@ -71,7 +71,7 @@ func _ready() -> void:
 	check(bars.slots[0][0].key_hint == "Z", "после переназначения подсказка ячейки = Z (сразу)")
 	Controls.rebind("skills", 0, KEY_K + 0 if false else KEY_O)
 	get_tree().call_group("hud_listeners", "refresh_key_hints")
-	check(z.hud.top_buttons[2].text.contains("[O]"), "верхнее меню: подсказка «Умения [O]» обновилась (%s)" % z.hud.top_buttons[2].text)
+	check(z.hud.menu_items["skills"].text.contains("[O]"), "меню: подсказка «Умения [O]» обновилась (%s)" % z.hud.menu_items["skills"].text)
 	z.player.cooldowns.fill(0.0); await w(0.6)
 	key(z, KEY_Z); await w(0.2)
 	check(z.player.cooldowns[1] > 0.0, "новая клавиша Z применяет умение")

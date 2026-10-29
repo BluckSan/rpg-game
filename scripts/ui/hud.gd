@@ -111,22 +111,8 @@ func setup(z) -> void:
 	objective.offset_left = -640; objective.offset_right = -20; objective.offset_top = 278; objective.offset_bottom = 340
 	if zone.builder is WorldBuilder: objective.offset_top = 306; objective.offset_bottom = 368   # под названием зоны
 
-	# --- верхние кнопки (слева от карты) ---
-	var b_tal := _top_button("Таланты", _open.bind("talents"), Color(0.42, 0.28, 0.5), 0, 240, "book-cover")
-	talent_badge = UIK.label(b_tal, "", 24, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-	var badge_bg := UIK.panel(b_tal, Color(0.85, 0.2, 0.2), 22)
-	UIK.rect(badge_bg, Vector2(206, -14), Vector2(44, 44))
-	badge_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	talent_badge.reparent(badge_bg); UIK.full(talent_badge)
-	_top_button("Герой", _open.bind("hero"), UIK.BUTTON, 1, 210, "person")
-	var b_sk := _top_button("Умения", _open.bind("skills"), Color(0.32, 0.25, 0.5), 3, 230, "book-cover")
-	skill_badge = UIK.label(b_sk, "", 24, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-	var sbg := UIK.panel(b_sk, Color(0.25, 0.6, 0.25), 22)
-	UIK.rect(sbg, Vector2(196, -14), Vector2(44, 44))
-	sbg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	sbg.name = "SkillBadge"
-	skill_badge.reparent(sbg); UIK.full(skill_badge)
-	_top_button("Меню", _open.bind("pause"), Color(0.3, 0.3, 0.32), 2, 190, "cog")
+	# --- v0.9.4: одна кнопка «Меню» (слева от карты) вместо ряда кнопок; панель со всеми окнами ---
+	_build_menu()
 
 	# --- боевые кнопки (координаты от правого нижнего угла) ---
 	var cls: Dictionary = DB.CLASSES[zone.data["class"]]
@@ -223,6 +209,84 @@ func setup(z) -> void:
 	blockers.append(ok)
 	hint_panel.visible = false
 
+## v0.9.4: раскрывающееся меню. Пункты: [действие окна, подпись, иконка, клавиша Controls]
+const MENU_ITEMS := [["hero", "Герой", "person", "hero"], ["skills", "Умения", "book-cover", "skills"], ["talents", "Таланты", "book-cover", "talents"],
+	["map", "Карта", "treasure-map", "map"], ["party", "Группа", "three-friends", "party"], ["dungeons", "Подземелья", "crossed-swords", ""],
+	["market", "Рынок", "shop", ""], ["craft", "Ремесло", "thor-hammer", ""], ["pause", "Настройки", "cog", ""]]
+var menu_btn: Button
+var menu_panel: PanelContainer
+var menu_items := {}
+var menu_open := false
+var _menu_tw: Tween
+
+func _build_menu() -> void:
+	menu_btn = _top_button("Меню", toggle_menu, Color(0.22, 0.2, 0.3), 0, 220, "hamburger-menu")
+	menu_btn.name = "MenuBtn"
+	var bg := UIK.panel(menu_btn, Color(0.85, 0.2, 0.2), 22); bg.name = "MenuBadge"
+	UIK.rect(bg, Vector2(186, -14), Vector2(44, 44)); bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var ml := UIK.label(bg, "!", 24, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER); UIK.full(ml)
+	bg.visible = false
+	menu_panel = PanelContainer.new(); menu_panel.name = "MenuPanel"
+	menu_panel.add_theme_stylebox_override("panel", UIK.frame("tooltip", Color(1, 1, 1, 0.97), 16))
+	root.add_child(menu_panel)
+	menu_panel.anchor_left = 1; menu_panel.anchor_right = 1
+	menu_panel.offset_right = menu_btn.offset_right; menu_panel.offset_left = menu_btn.offset_right - (520 if Game.desktop else 600)
+	menu_panel.offset_top = 112
+	var grid := GridContainer.new(); grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10); grid.add_theme_constant_override("v_separation", 10)
+	menu_panel.add_child(grid)
+	for it in MENU_ITEMS:
+		var b := UIK.button(grid, it[1], _menu_pick.bind(it[0]), UIK.BUTTON, 26 if Game.desktop else 30, it[2])
+		b.name = "Menu_" + it[0]; b.custom_minimum_size = Vector2(240 if Game.desktop else 280, 64 if Game.desktop else 84)
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		menu_items[it[0]] = b
+		if it[0] in ["talents", "skills"]:
+			var bb := UIK.panel(b, Color(0.85, 0.2, 0.2) if it[0] == "talents" else Color(0.25, 0.6, 0.25), 22)
+			UIK.rect(bb, Vector2(b.custom_minimum_size.x - 50, 10), Vector2(40, 40)); bb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			if it[0] == "skills": bb.name = "SkillBadge"
+			var bl := UIK.label(bb, "", 22, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER); UIK.full(bl)
+			if it[0] == "talents": talent_badge = bl
+			else: skill_badge = bl
+	menu_panel.visible = false
+	blockers.append(menu_panel)
+
+func toggle_menu() -> void:
+	if menu_open: close_menu()
+	else: open_menu()
+
+func open_menu() -> void:
+	if window != null: return
+	menu_open = true
+	refresh_key_hints()
+	menu_panel.visible = true
+	menu_panel.pivot_offset = Vector2(menu_panel.size.x, 0)
+	menu_panel.scale = Vector2(0.85, 0.85); menu_panel.modulate.a = 0.0
+	if _menu_tw: _menu_tw.kill()
+	_menu_tw = create_tween().set_parallel().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_menu_tw.tween_property(menu_panel, "scale", Vector2.ONE, 0.18)
+	_menu_tw.tween_property(menu_panel, "modulate:a", 1.0, 0.14)
+
+func close_menu(instant := false) -> void:
+	if not menu_open: return
+	menu_open = false
+	if _menu_tw: _menu_tw.kill()
+	if instant: menu_panel.visible = false; return
+	_menu_tw = create_tween().set_parallel().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_menu_tw.tween_property(menu_panel, "scale", Vector2(0.9, 0.9), 0.12)
+	_menu_tw.tween_property(menu_panel, "modulate:a", 0.0, 0.12)
+	_menu_tw.chain().tween_callback(func(): if not menu_open: menu_panel.visible = false)
+
+func _menu_pick(what: String) -> void:
+	close_menu(true)
+	var pui = zone.party_ui
+	match what:
+		"party": if pui: pui.open_tab("party")
+		"dungeons": if pui: pui.open_dungeons()
+		"map":
+			if zone.builder is WorldBuilder: _open("map")
+			else: minimap.toggle_big()
+		_: _open(what)
+
 func _top_button(t: String, cb: Callable, c: Color, idx: int, w: float, ic := "") -> Button:
 	var b := UIK.button(root, t, cb, c, 28, ic)
 	b.anchor_left = 1; b.anchor_right = 1
@@ -298,11 +362,9 @@ func refresh_key_hints() -> void:
 	_key_e = " [%s]" % Controls.key_hint("interact")
 	for b in skill_btns + [potion_btn, target_btn]: b.queue_redraw()
 	if bars != null and bars.root != null: bars.refresh_keys()
-	var tops := [["Таланты", "talents"], ["Герой", "hero"], ["Умения", "skills"]]
-	for k in mini(3, top_buttons.size()):
-		top_buttons[k].text = "%s  [%s]" % [tops[k][0], Controls.key_hint(tops[k][1])]
-		top_buttons[k].add_theme_font_size_override("font_size", 23)
-	if top_buttons.size() > 3: top_buttons[3].text = "Меню"; top_buttons[3].tooltip_text = "Esc"
+	for it in MENU_ITEMS:
+		if menu_items.has(it[0]):
+			menu_items[it[0]].text = it[1] + ("  [%s]" % Controls.key_hint(it[3]) if it[3] != "" else ("  [Esc]" if it[0] == "pause" else ""))
 	var help = root.find_child("KeyHelp", false, false)
 	if help:
 		var K := func(a): return Controls.key_hint(a)
@@ -355,6 +417,7 @@ func _hotkey_ev(ev: InputEvent) -> bool:
 		if esc or (act != "" and WINDOW_ACTIONS.get(String(window.name), "") == act):
 			close_window(); return true
 		return false
+	if esc and menu_open: close_menu(); return true
 	if esc:
 		if zone.target_ctl and zone.target_ctl.has_target():   # Esc сначала сбрасывает цель, затем — меню
 			zone.target_ctl.clear(); return true
@@ -396,6 +459,7 @@ func _hotkey_ev(ev: InputEvent) -> bool:
 
 # ---------------- окна ----------------
 func _open(which: String) -> void:
+	if menu_btn: close_menu(true)
 	if window: window.queue_free()
 	_hide_tooltip()
 	match which:
@@ -641,6 +705,8 @@ func _tick_buff_tip(delta: float) -> void:
 	_update_buff_tip()
 
 func _over_top_button(p: Vector2) -> bool:
+	if menu_open and not (menu_panel.get_global_rect().has_point(p) or menu_btn.get_global_rect().has_point(p)):
+		close_menu(); return true   # клик мимо открытого меню — закрыть (клик поглощается)
 	for b in top_buttons + blockers:
 		if b.is_visible_in_tree() and b.get_global_rect().has_point(p): return true
 	return false
@@ -713,6 +779,7 @@ func _touch_down(idx: int, p: Vector2) -> void:
 			# v0.9.0: клик по врагу/союзнику — выбор цели; по пустой земле — сброс цели (и обычная атака)
 			# v0.9.1: ЛКМ на ПК — это атака: клик по пустой земле захват цели НЕ снимает (Esc / × / Tab)
 			var picked = zone.target_ctl.pick(p) if zone.target_ctl else null
+			if picked == player: picked = null   # v0.9.4: свой герой под курсором (камера за спиной) — не «союзник», это атака
 			if picked != null: zone.target_ctl.select(picked)
 			if picked != null and not (picked is Enemy): return   # союзник выбран — без атаки
 			touches[idx] = {"role": "skill", "slot": 0}
@@ -846,6 +913,7 @@ func _process(delta: float) -> void:
 	var sfree := DB.skill_points_free(d)
 	skill_badge.get_parent().visible = sfree > 0
 	skill_badge.text = str(sfree)
+	if menu_btn: menu_btn.get_node("MenuBadge").visible = free > 0 or sfree > 0
 	for i in range(1, skill_btns.size()):
 		var lock: String = player.lock_reason(i)
 		var mx := player.max_cooldown(i)

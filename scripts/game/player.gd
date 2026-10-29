@@ -481,9 +481,12 @@ func use_potion() -> void:
 	visual.play_action("drink")
 	zone().fx("burst", global_position + Vector3.UP, 1.5, Color(1, 0.2, 0.3), 0.5)
 
+var last_fail := ""   # причина последнего отказа try_use (диагностика тестов)
 func try_use(slot: int) -> bool:
-	if dead or cooldowns[slot] > 0: return false
+	if dead or cooldowns[slot] > 0:
+		last_fail = "dead" if dead else "cd %.2f" % cooldowns[slot]; return false
 	if lock_reason(slot) != "":
+		last_fail = "lock " + lock_reason(slot)
 		if slot > 0:
 			var sk = get_skill(slot)
 			if sk == null: Game.toast("Слот пуст — изучите умение и поставьте его в слот в окне «Умения»")
@@ -492,8 +495,10 @@ func try_use(slot: int) -> bool:
 	var s = get_skill(slot)
 	var cost: float = float(s.mana) * (1.0 + float(fx.get("mana_cost", 0.0)) / 100.0)
 	if mp < cost:
+		last_fail = "mana %.1f < %.1f" % [mp, cost]
 		Game.toast("Не хватает маны", 1.0)
 		return false
+	last_fail = ""
 	mp -= cost
 	cooldowns[slot] = max_cooldown(slot)
 	_cur_slot = slot

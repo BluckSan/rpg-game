@@ -152,7 +152,7 @@ func _ready() -> void:
 			p.cooldowns[slot] = 0
 			p.mp = p.stats.max_mp
 			var ok: bool = p.try_use(slot)
-			check(ok, "[%s] умение %d (%s)" % [c["class"], slot, p.get_skill(slot).name])
+			check(ok, "[%s] умение %d (%s)%s" % [c["class"], slot, p.get_skill(slot).name, "" if ok else " — " + p.last_fail])
 			await frames(40)
 		# опыт и уровни
 		p.gain_xp(20000)
@@ -375,7 +375,7 @@ func _skill_ext_tests(z, p: Player, cls: String) -> void:
 		dummy.global_position = dummy.home
 		var hp0: float = dummy.hp
 		if p.try_use(1): used += 1
-		else: print("    не сработало: ", s.id, " ", p.lock_reason(1))
+		else: print("    не сработало: ", s.id, " ", p.last_fail)
 		await secs(1.3)
 		if dummy.hp < hp0 or dummy.curse_timer > 0: hurt += 1
 	check(used == pool.size(), "[%s] все умения применены: %d/%d" % [cls, used, pool.size()])
@@ -400,7 +400,7 @@ func _layout_tests(z, p: Player, cls: String) -> void:
 		check(str(sc.get("id", "")) == str(p.data["loadout"][1]) and str(sc.id) != "", "[%s] ПК: ячейка 2 панели = умение слота 2 (%s)" % [cls, str(sc)])
 		p.cooldowns[2] = 0; p.mp = p.stats.max_mp
 		h.bars.activate(0, 1)
-		check(p.cooldowns[2] > 0, "[%s] ПК: ячейка 2 применяет умение" % cls)
+		check(p.cooldowns[2] > 0, "[%s] ПК: ячейка 2 применяет умение%s" % [cls, "" if p.cooldowns[2] > 0 else " — " + p.last_fail])
 		return
 	var was: String = Game.skill_layout
 	for lay in ["pc", "mobile"]:
