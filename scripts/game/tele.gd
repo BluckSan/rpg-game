@@ -83,6 +83,7 @@ static func free_later(t: Node3D, delay := 0.0) -> void:
 
 ## Ломаная молния между двумя точками
 static func bolt(parent: Node, a: Vector3, b: Vector3, c: Color, dur := 0.25, width := 0.09) -> void:
+	Vfx.lightning(parent, a, b, c, dur); return   # v0.9.3: ветвистая молния
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var n := 8

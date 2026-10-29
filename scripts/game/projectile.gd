@@ -15,6 +15,41 @@ var pierce := false
 var _hit_set := {}
 var color := Color.WHITE
 var glow := false
+var elem := "phys"
+
+## v0.9.3: вид снаряда по стихии — стрела, пламя, ледяной осколок, сгусток молнии/света (вместо сферы)
+func _core(c: Color, sz: float) -> void:
+	if elem == "phys" or (sz <= 0.3 and elem in ["nature", "holy"]):
+		# стрела: древко + наконечник + оперение
+		U.prim("box", self, Vector3(0, 0, -0.2), Vector3(0.035, 0.035, 0.75), Color(0.45, 0.32, 0.2), 0.8, 0.0).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		U.prim("box", self, Vector3(0, 0, 0.2), Vector3(0.07, 0.07, 0.14), c.lightened(0.2), 0.3, 0.6).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		U.prim("box", self, Vector3(0, 0, -0.55), Vector3(0.12, 0.02, 0.12), Color(0.9, 0.9, 0.85), 0.8, 0.0).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		return
+	var h := MeshInstance3D.new()
+	var q := QuadMesh.new(); q.size = Vector2.ONE * sz * 2.2
+	h.mesh = q
+	var hm: StandardMaterial3D = CombatFX._mat(c.lightened(0.35)).duplicate()
+	hm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED; hm.vertex_color_use_as_albedo = false
+	h.material_override = hm; h.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(h)
+	match elem:
+		"ice":
+			var sh := MeshInstance3D.new(); var pm := PrismMesh.new(); pm.size = Vector3(sz * 0.7, sz * 3.2, sz * 0.7)
+			var m := StandardMaterial3D.new(); m.albedo_color = Color(0.8, 0.95, 1, 0.9); m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			m.emission_enabled = true; m.emission = Color(0.45, 0.8, 1.0); m.emission_energy_multiplier = 1.6
+			pm.material = m; sh.mesh = pm; sh.rotation.x = deg_to_rad(90)
+			sh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(sh)
+		"fire":
+			var f := CPUParticles3D.new(); f.amount = maxi(4, int(20 * Game.particle_mul)); f.lifetime = 0.35; f.local_coords = false
+			var fq := QuadMesh.new(); fq.size = Vector2.ONE * sz * 1.6; fq.material = CombatFX._mat(Color(1, 0.55, 0.15)); f.mesh = fq
+			f.spread = 180; f.initial_velocity_max = 0.8; f.gravity = Vector3(0, 2.5, 0); f.scale_amount_curve = Vfx._shrink()
+			var g := Gradient.new(); g.set_color(0, Color(1, 0.9, 0.6, 1)); g.set_color(1, Color(0.6, 0.15, 0.05, 0)); f.color_ramp = g
+			f.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(f)
+		"lightning", "arcane":
+			var tw := h.create_tween().set_loops()
+			tw.tween_property(h, "scale", Vector3.ONE * 1.35, 0.05); tw.tween_property(h, "scale", Vector3.ONE * 0.8, 0.05)
 
 ## Пассивы игрока для снарядов (из дерева талантов): extra_proj, proj_dmg, elem_ice. Задаёт Player.recalc.
 static var player_fx := {}
@@ -48,8 +83,8 @@ static func _make(z, origin: Vector3, d: Vector3, spd: float, rng: float, c: Col
 	p.from_player = player_owned; p.on_hit = cb; p.damage = dmg; p.color = c
 	z.fx_root.add_child(p)
 	p.global_position = origin
-	var mi := U.prim("sphere", p, Vector3.ZERO, Vector3(sz, sz, sz * (3.0 if sz < 0.3 else 1.0)), c, 0.5, 2.0)
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	p.elem = Vfx.elem_of(c)
+	p._core(c, sz)
 	p.rotation.y = atan2(p.dir.x, p.dir.z)
 	p.rotation.x = -asin(clampf(p.dir.y, -1, 1))   # наклон по направлению полёта
 	p.follow_terrain = absf(p.dir.y) < 0.05
@@ -169,7 +204,6 @@ func _check_targets(pos: Vector3) -> bool:
 func _impact(pos: Vector3, k := 1.0) -> void:
 	if zone == null: return
 	if glow:
-		CombatFX.burst(zone.fx_root, pos, color, int(18 * k), 5.0, 0.12, 0.4, Vector3.UP, 180, -2.0)
-		CombatFX.flash(zone.fx_root, pos, color, size * 5.0 * k, 0.18)
+		Vfx.impact(zone.fx_root, pos, elem, clampf(size * 2.2 * k, 0.5, 1.6), color)
 	else:
 		CombatFX.burst(zone.fx_root, pos, color.lightened(0.3), int(8 * k), 3.5, 0.05, 0.25, -dir, 60, -6.0)

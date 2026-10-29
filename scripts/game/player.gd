@@ -627,12 +627,14 @@ func _execute(s: Dictionary) -> void:
 			var fp := Projectile.fire(z, origin, _dir_to(origin, target), 16.0, s.range, s.color, 0.5, true, func(e):
 				var p: Vector3 = e.global_position
 				hit_area(p, s.radius, s.mult, true)
-				CombatFX.burst(z.fx_root, p + Vector3.UP, Color(1, 0.6, 0.2), 30, 8.0, 0.12, 0.6, Vector3.UP, 90, -6)
+				Vfx.fire(z.fx_root, p + Vector3.UP, 1.6)
+				Vfx.scorch(z.fx_root, Vector3(p.x, z.ground_y(p), p.z), s.radius * 0.8)
 				z.shake(0.3)
 				z.fx("burst", p + Vector3.UP, s.radius, s.color, 0.4))
 			fp.add_trail(s.color, true)
 		"frost_nova":
 			CombatFX.burst(z.fx_root, global_position + Vector3.UP * 0.3, Color(0.7, 0.95, 1.0), 40, 9.0, 0.1, 0.6, Vector3.UP, 95, -2)
+			Vfx.ice(z.fx_root, global_position + Vector3.UP * 0.4, 1.8)
 			hit_area(global_position, s.radius, s.mult, true, func(e): e.slow(0.4, 3.0))
 			z.fx("ring", global_position, s.radius, s.color, 0.45)
 		"rage":

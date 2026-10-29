@@ -117,7 +117,8 @@ static func apply_to_player(p, s: Dictionary, eff: Dictionary, src := "") -> voi
 		p.add_buff(make_buff(s, eff, src))
 	var z = p.zone()
 	if z:
-		CombatFX.pillar(z.fx_root, p.global_position, s.color, 2.6, 0.7)
+		Vfx.beam(z.fx_root, p.global_position + Vector3.UP * 7.0, p.global_position, s.color, 0.7)   # v0.9.3: луч и аура
+		Vfx.aura(z.fx_root, p, s.color, 1.4)
 		if eff.has("heal"): z.float_text(p.global_position + Vector3.UP * 2.6, "+%d" % roundi(mhp * float(eff.heal)), Color(0.4, 1, 0.5))
 
 static func apply_to_minion(m, s: Dictionary, eff: Dictionary) -> void:
@@ -157,7 +158,7 @@ static func cast(p, s: Dictionary, target) -> bool:
 				z.fx("ring", pos, float(s.radius), col, 0.6)
 				CombatFX.flash(z.fx_root, pos + Vector3.UP, col, float(s.radius) * 0.5, 0.5)
 			elif ally != null and ally != p:
-				CombatFX.burst(z.fx_root, ally.global_position + Vector3.UP, col, 22, 3.0, 0.08, 0.5)
+				Vfx.beam(z.fx_root, p.global_position + Vector3.UP * 1.4, ally.global_position + Vector3.UP, col, 0.5)
 			if Net.in_game:
 				var aid := 0
 				if ally is RemotePlayer: aid = int(ally.peer_id)

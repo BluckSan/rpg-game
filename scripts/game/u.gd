@@ -65,16 +65,8 @@ static func flat_dist(a: Vector3, b: Vector3) -> float:
 
 # ---------- эффекты ----------
 static func burst(parent: Node, pos: Vector3, radius: float, c: Color, dur := 0.35) -> void:
-	var mi := MeshInstance3D.new()
-	mi.mesh = mesh("sphere")
-	mi.material_override = fx_mat(Color(c.r, c.g, c.b, 0.45))
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	parent.add_child(mi)
-	mi.global_position = pos
-	mi.scale = Vector3.ONE * 0.2
-	var tw := mi.create_tween()
-	tw.tween_property(mi, "scale", Vector3.ONE * radius * 2.0, dur).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-	tw.tween_callback(mi.queue_free)
+	# v0.9.3: вместо цветной сферы — эффект стихии (огонь, лёд, молния, свет)
+	Vfx.impact(parent, pos, Vfx.elem_of(c), clampf(radius / 1.6, 0.5, 2.2), c)
 
 static func ring(parent: Node, pos: Vector3, radius: float, c: Color, dur := 0.4) -> void:
 	var mi := MeshInstance3D.new()

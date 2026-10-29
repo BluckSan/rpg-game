@@ -67,27 +67,14 @@ static func hit(parent: Node, pos: Vector3, kind: String, crit: bool, from_dir: 
 			burst(parent, pos, Color(0.85, 0.08, 0.05), 16 if crit else 10, 5.0, 0.07, 0.5, d, 60, -14)
 			burst(parent, pos, Color(1, 0.85, 0.5), 8 if crit else 4, 7.0, 0.04, 0.25, d, 40)
 	if crit:
-		flash(parent, pos, Color(1, 0.9, 0.5), 0.9, 0.12)
+		Vfx.hit_flash(parent, pos, Color(1, 0.9, 0.5), 0.9, 0.12)
+		Vfx.shake(0.12)
 
-## Короткая вспышка-сфера
+## Короткая вспышка (v0.9.3: по стихии цвета — огонь/лёд/молния/свет; без сфер)
 static func flash(parent: Node, pos: Vector3, c: Color, radius: float, dur: float) -> void:
-	var mi := MeshInstance3D.new()
-	var s := SphereMesh.new(); s.radius = 0.5; s.height = 1.0; s.radial_segments = 12; s.rings = 6
-	mi.mesh = s
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	m.albedo_color = c
-	mi.material_override = m
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	parent.add_child(mi)
-	mi.global_position = pos
-	mi.scale = Vector3.ONE * radius * 0.4
-	var tw := mi.create_tween().set_parallel(true)
-	tw.tween_property(mi, "scale", Vector3.ONE * radius * 2.0, dur)
-	tw.tween_property(m, "albedo_color:a", 0.0, dur)
-	tw.chain().tween_callback(mi.queue_free)
+	var el := Vfx.elem_of(c)
+	if el in ["fire", "ice", "lightning"] and radius >= 0.6: Vfx.impact(parent, pos, el, clampf(radius / 1.4, 0.5, 2.0), c)
+	else: Vfx.hit_flash(parent, pos, c, radius, maxf(dur, 0.12))
 
 ## Дуга-«взмах» (для кругового удара и тяжёлых атак)
 static func slash_arc(parent: Node, center: Vector3, fwd: Vector3, radius: float, arc_deg: float, c: Color, dur := 0.22, height := 1.1) -> void:
