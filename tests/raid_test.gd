@@ -38,6 +38,7 @@ func _run() -> void:
 func _dungeon(did: String) -> void:
 	var cls: String = args.get("cls", "warrior")
 	var lvl := int(args.get("lvl", "12"))
+	lvl = DB.dungeon_level(did, lvl)   # герой не ниже уровня подземелья
 	print("--- %s (%s, ур. %d) ---" % [RaidDefs.DUNGEONS[did].name, cls, lvl])
 	for f in Game.list_characters(): if str(f.get("name", "")) == "Рейдер": Game.delete_character(f["id"])
 	var rng := RandomNumberGenerator.new(); rng.seed = 5
@@ -60,7 +61,7 @@ func _dungeon(did: String) -> void:
 	check(trash == 8, "[%s] стражи коридора на клиенте: %d (NetEnemy)" % [did, trash])
 	check(d.builder.gate_is_closed, "[%s] решётка арены закрыта до зачистки" % did)
 	var boss = d.builder.boss_enemy()
-	check(boss != null and boss.brain is RaidBrain and absf(boss.max_hp - RaidDefs.boss_hp(lvl, 1) * float(RaidDefs.DUNGEONS[did].get("hp_k", 1.0))) < 1.0, "[%s] босс «%s»: здоровье %d (соло-масштаб)" % [did, boss.def.name if boss else "?", boss.max_hp if boss else 0])
+	check(boss != null and boss.brain is RaidBrain and absf(boss.max_hp - RaidDefs.boss_hp(sim.level, 1) * float(RaidDefs.DUNGEONS[did].get("hp_k", 1.0))) < 1.0, "[%s] босс «%s»: здоровье %d (соло-масштаб, ждём %d, мозг %s)" % [did, boss.def.name if boss else "?", boss.max_hp if boss else 0, RaidDefs.boss_hp(sim.level, 1) * float(RaidDefs.DUNGEONS[did].get("hp_k", 1.0)), boss.brain.get_script().resource_path if boss and boss.brain else "-"])
 	var bot := RaidBot.new(d, 1, func(): return [])
 	var t0 := Time.get_ticks_msec()
 	var limit := float(args.get("limit", "900"))   # секунд игрового времени
