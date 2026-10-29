@@ -229,7 +229,7 @@ func _ready() -> void:
 			await frames(2)
 			if pl.try_use(1): extra_ok += 1
 			await frames(50)
-		check(extra_ok == 2, "доп. умения пути %s: %d/2" % [a["name"], extra_ok])
+		check(extra_ok == a.get("skills_extra", []).size(), "доп. умения пути %s: %d/%d" % [a["name"], extra_ok, a.get("skills_extra", []).size()])
 	# босс
 	var boss = null
 	for e in z2.enemies:
@@ -639,7 +639,7 @@ func _wait_free(br) -> void:
 
 func _dungeon_tests(z, pl: Player) -> void:
 	# открытие после тролля
-	var fresh := {"level": 5, "zones": {}}
+	var fresh := {"level": 10, "zones": {}}   # v0.9.2: подземелье с 8 ур.
 	check(DB.zone_lock_reason(fresh, "dungeon") != "", "подземелье закрыто до победы над троллем: %s" % DB.zone_lock_reason(fresh, "dungeon"))
 	DB.set_zone_flag(fresh, "starter", "boss_troll_killed")
 	check(DB.zone_lock_reason(fresh, "dungeon") == "", "после тролля подземелье открыто")
