@@ -307,7 +307,7 @@ func net_attack(ranged: bool, target_pos: Vector3, a := "") -> void:
 		Tele.bolt(zone.fx_root, origin, target_pos + Vector3.UP, def.get("proj", Color(0.6, 0.9, 1)), 0.22, 0.07)
 
 ## Смерть по решению сервера: опыт и счётчики — участникам; добычу сервер кладёт на землю сам
-func net_die(participant: bool) -> void:
+func net_die(participant: bool, xp := -1) -> void:
 	if not alive: return
 	hp = 0
 	alive = false
@@ -315,8 +315,7 @@ func net_die(participant: bool) -> void:
 	var p: Player = zone.player
 	if p and participant:
 		p.data["kills"] += 1
-		var mult := Combat.reward_factor(int(p.data["level"]), level)
-		p.gain_xp(maxi(1, int(round(def.xp * (1 + (level - 1) * 0.25) * mult))))
+		if xp >= 0: p.gain_xp(xp)   # v0.9.3: число опыта решает сервер
 		if on_death.is_valid(): on_death.call(self)
 	CombatFX.burst(zone.fx_root, global_position + Vector3.UP * (2.0 if def.boss else 0.8), Color(0.85, 0.85, 1.0, 0.7), 16 if not def.boss else 40, 2.5, 0.16, 0.9, Vector3.UP, 50, 1.5)
 	if model and model.has_method("set_dead"): model.set_dead(true)
@@ -376,9 +375,9 @@ func _die() -> void:
 	var p: Player = zone.player
 	if p:
 		p.data["kills"] += 1
-		var diff: int = p.data["level"] - level
-		var mult := Combat.reward_factor(int(p.data["level"]), level)
-		p.gain_xp(maxi(1, int(round(def.xp * (1 + (level - 1) * 0.25) * mult))))
+		var rk := "boss" if def.boss else str(rank)
+		var sh: Array = Xp.shares(float(def.xp), level, rk, [int(p.data["level"])])
+		p.gain_xp(Xp.personal(sh[0], p.get_meta("xp_st", {}) if p.has_meta("xp_st") else _xp_st(p), kind, Time.get_ticks_msec() / 1000.0, Xp.today()))
 	Loot.drop_for(zone, self)
 	# дымка/искры души при гибели
 	CombatFX.burst(zone.fx_root, global_position + Vector3.UP * (2.0 if def.boss else 0.8), Color(0.85, 0.85, 1.0, 0.7), 16 if not def.boss else 40, 2.5, 0.16, 0.9, Vector3.UP, 50, 1.5)
@@ -687,3 +686,9 @@ func _affix_tick(delta: float) -> void:
 			var a := Enemy.spawn(zone, mk, maxi(1, level - 2), pos, get_parent())
 			a._aggro = true; a.home = home
 			zone.fx("burst", pos + Vector3.UP * 0.5, 1.2, Color(0.6, 0.3, 0.9), 0.4)
+
+
+func _xp_st(p: Node) -> Dictionary:
+	var st := {}
+	p.set_meta("xp_st", st)
+	return st

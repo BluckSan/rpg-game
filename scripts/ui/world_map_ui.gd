@@ -155,6 +155,7 @@ func refresh() -> void:
 	var lv: Array = WorldData.BIOMES[b].lv
 	info.text = "Вы здесь: %s (ур. %d–%d)\nКолесо/щипок/«+ −» — масштаб, перетаскивание — сдвиг, касание значка — подсказка." % [WorldData.BIOMES[b].name, lv[0], lv[1]]
 	UIK.clear(list)
+	if wb == null: return   # v0.9.3: вне открытого мира (город/подземелье) — без точек телепорта
 	var open: Array = wb.world_state()["wp"]
 	for wp in wb.waypoints:
 		var known: bool = open.has(wp.id)
@@ -209,6 +210,7 @@ func center_on_player() -> void:
 func collect_markers() -> Array:
 	var wb := _wb()
 	var out := []
+	if wb == null: return out
 	var open: Array = wb.world_state()["wp"]
 	var killed: Array = wb.world_state().get("bosses", [])
 	for i in WorldData.TOWNS.size():
@@ -257,6 +259,7 @@ func collect_markers() -> Array:
 ## Цель: босс зоны по уровню героя (ещё не побеждённый)
 func _quest_marker() -> Dictionary:
 	var wb := _wb()
+	if wb == null: return {}
 	var lvl := int(data.get("level", 1))
 	var killed: Array = wb.world_state().get("bosses", [])
 	for bs in wb.bosses:
@@ -302,7 +305,7 @@ func _draw_map() -> void:
 	map_rect.draw_rect(Rect2(tl, Vector2.ONE * WorldData.HALF * 2 * sp), Color(0.6, 0.48, 0.3), false, 3.0)
 	var view := Rect2(Vector2.ZERO, map_rect.size).grow(40)
 	# постройки городов и точек (контуры) — при приближении
-	if zoom >= CATS.building[3] and not off_cats.has("building"):
+	if wb != null and zoom >= CATS.building[3] and not off_cats.has("building"):
 		for f in wb.map_features:
 			var c := to_map(f.pos)
 			if not view.has_point(c): continue
@@ -434,7 +437,7 @@ func travel(id: String) -> bool:
 		if e.alive and e._aggro and U.flat_dist(e.global_position, p.global_position) < 25.0:
 			Game.toast("Нельзя переместиться во время боя", 2.0)
 			return false
-	var ok := _wb().travel_to(id)
+	var ok := _wb() != null and _wb().travel_to(id)
 	if ok:
 		zone.hud.close_window()
 		Game.toast("Перемещение: %s" % _name_of(id), 2.0)

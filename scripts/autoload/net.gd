@@ -14,7 +14,7 @@ signal chat_received(from: String, text: String)
 signal roster_changed
 signal party_changed
 
-const PROTOCOL := 7   # v0.9.2: враги и боссы на сервере, лимит и уровни подземелий (v0.9.1 — 6)
+const PROTOCOL := 8   # v0.9.2: враги и боссы на сервере, лимит и уровни подземелий (v0.9.1 — 6)
 const DEFAULT_HOST := "146.0.76.20"
 const AUTH_PORT := 7780
 const GAME_PORT := 7777
@@ -1301,8 +1301,9 @@ func _wm_on_kill(sim: WorldSim, sp, m: Dictionary) -> void:
 	if sim.zone_id == "dungeon" and str(m.kind) == "warden" and int(m.add_of) == 0:
 		for pid in sim.players: _dng_count(pid, "dungeon")
 	var subs: Dictionary = sp.subs if sp != null else {}
+	var xpm := wm_xp(sim, m)
 	for s in sim.players:
-		if players.has(s) and (subs.has(s) or m.parts.has(s)): s_wm_kill.rpc_id(s, int(m.nid), m.parts.has(s))
+		if players.has(s) and (subs.has(s) or m.parts.has(s) or xpm.has(s)): s_wm_kill.rpc_id(s, int(m.nid), m.parts.has(s) or xpm.has(s), int(xpm.get(s, 0)))
 	if int(m.killer) == 0 and m.parts.is_empty(): return   # взорвался сам — без добычи
 	var kp = players.get(int(m.killer))
 	var cls := str(kp.data.get("class", "warrior")) if kp != null else "warrior"
@@ -1505,15 +1506,39 @@ func s_wm_pos(ids: PackedInt32Array, data: PackedFloat32Array) -> void:
 			e.net_pos(Vector3(data[i * 4], 0.0, data[i * 4 + 1]), data[i * 4 + 2])
 			e.hp = minf(data[i * 4 + 3], e.max_hp)
 
+## v0.9.3: опыт за убийство (сервер): участники + их согруппники рядом (≤ 50 м), доли по уровням, бонус группы
+func wm_xp(sim, m: Dictionary) -> Dictionary:
+	var elig := {}
+	for s in m.parts:
+		if not players.has(s): continue
+		elig[s] = true
+		var pid := int(players[s].get("party", 0))
+		if pid != 0 and parties.has(pid):
+			for o in parties[pid].members:
+				if players.has(o) and sim.players.has(o) and U.flat_dist(players[o].pos, m.pos) <= 50.0: elig[o] = true
+	if elig.is_empty(): return {}
+	var ids := elig.keys()
+	var lv := []
+	for s in ids: lv.append(int(players[s].data.get("level", 1)))
+	var rk := "boss" if bool(m.def.boss) or str(m.rank) == "boss" else str(m.rank)
+	var sh: Array = Xp.shares(float(m.def.xp), int(m.lvl), rk, lv)
+	var out := {}
+	var now := _now()
+	for i in ids.size():
+		var p = players[ids[i]]
+		if not p.has("xp_st"): p["xp_st"] = {}
+		out[ids[i]] = Xp.personal(sh[i], p.xp_st, str(m.kind), now, Xp.today())
+	return out
+
 @rpc("authority", "call_remote", "reliable")
-func s_wm_kill(nid: int, participant: bool) -> void:
+func s_wm_kill(nid: int, participant: bool, xp := -1) -> void:
 	var e = wm_nodes.get(nid)
 	wm_nodes.erase(nid)
 	if e != null and is_instance_valid(e) and e.alive:
 		var sp = wm_spawner_nodes.get(str(e.get_meta("wm_key", "")))
 		if e.has_meta("wm_add"): e.on_death = Callable()
 		elif not participant and sp != null and is_instance_valid(sp): sp.alive = maxi(0, sp.alive - 1)
-		e.net_die(participant)
+		e.net_die(participant, xp)
 
 
 @rpc("authority", "call_remote", "reliable")

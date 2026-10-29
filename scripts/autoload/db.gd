@@ -666,7 +666,7 @@ func auto_build_skills(c: Dictionary, prefer: Array = []) -> void:
 
 # ---------------- Персонаж ----------------
 static func xp_to_next(level: int) -> int:
-	return int(60.0 * pow(level, 1.6))
+	return Xp.to_next(level)   # v0.9.3: новая кривая (см. Xp)
 
 static func class_xp_to_next(cl: int) -> int:
 	return int(100.0 * pow(cl, 1.5))

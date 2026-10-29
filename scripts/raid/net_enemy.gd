@@ -68,7 +68,7 @@ func stun(_t: float) -> void: pass
 func slow(_f: float, _t: float) -> void: pass
 
 ## Смерть по команде сервера (награда приходит отдельным событием)
-func net_die(quiet := false) -> void:
+func net_die(quiet := false, _xp := -1) -> void:
 	if not alive: return
 	alive = false; hp = 0
 	zone.enemies.erase(self)

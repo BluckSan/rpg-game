@@ -231,7 +231,12 @@ func _kill(e: Dictionary) -> void:
 	_emit(0, {"t": "die", "id": e.id})
 	var def: Dictionary = DB.ENEMIES[e.kind]
 	if e.role == "trash":
-		_emit(0, {"t": "xp", "v": int(round(float(def.xp) * (1 + (level - 1) * 0.25) * (3.0 if e.get("elite", false) else 1.6)))})
+		# v0.9.3: опыт подземелья — по общей формуле (Xp), отдельно каждому участнику; ×1.6 за подземелье
+		var ids := players.keys()
+		var lv := []
+		for pid in ids: lv.append(int(players[pid].lvl))
+		var sh: Array = Xp.shares(float(def.xp) * 1.6, level, "elite" if e.get("elite", false) else "normal", lv)
+		for i in ids.size(): _emit(int(ids[i]), {"t": "xp", "v": maxi(1, int(round(sh[i])))})
 		if _trash_left() == 0 and not gate_open:
 			gate_open = true
 			_warn("Решётка арены поднялась!")
