@@ -16,10 +16,12 @@ func _ready() -> void:
 		get_tree().root.add_child.call_deferred(r); return
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	var vfx := false
+	var portals := false
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--out="): out = a.substr(6)
 		if a.begins_with("--pref="): pref = a.substr(7)
 		if a == "--vfx": vfx = true
+		if a == "--portals": portals = true
 	DirAccess.make_dir_recursive_absolute(out)
 	for f in Game.list_characters(): Game.delete_character(f["id"])
 	var rng := RandomNumberGenerator.new(); rng.seed = 7
@@ -30,9 +32,20 @@ func _ready() -> void:
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 	await w(1.5)
 	if not vfx: await shot("00_menu")
-	Game.play(c); await w(3.0)
+	if portals: c["zone"] = "global"; c["has_pos"] = false
+	Game.play(c); await w(6.0 if portals else 3.0)
 	var z = get_tree().current_scene
 	z.player.god_mode = true
+	if portals:   # v0.9.3: порталы подземелий на карте мира + окно группы + проверка готовности
+		var pui = null
+		for n in get_tree().root.find_children("*", "PartyUI", true, false): pui = n
+		pui.open_dungeons(); await w(1.2); await shot("04_map_portal")
+		z.hud.close_window(); await w(0.4)
+		pui.open_tab("party"); await w(0.8); await shot("05_party_window"); pui.close(); await w(0.3)
+		pui._on_rc_ask("ash", "Лидер", 25.0)
+		pui._on_rc_state("ash", {"Лидер": true, "Арина": false, "Борис": true}, "wait")
+		await w(0.8); await shot("06_ready_check")
+		get_tree().quit(); return
 	if vfx: await _vfx(z); get_tree().quit(); return
 	await shot("01_hud")
 	for wn in ["hero", "skills", "talents", "map", "pause"]:

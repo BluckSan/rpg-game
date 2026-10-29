@@ -112,7 +112,7 @@ func setup(z) -> void:
 	legend_body = legend as VBoxContainer
 	legend_body.add_theme_constant_override("separation", 2)
 	for k in CATS: _legend_row(k)
-	var lh := UIK.label(v, "Путевые камни", 28, UIK.ACCENT); lh.autowrap_mode = TextServer.AUTOWRAP_OFF
+	var lh := UIK.label(v, "Порталы и путевые камни", 28, UIK.ACCENT); lh.autowrap_mode = TextServer.AUTOWRAP_OFF
 	var holder := Control.new(); holder.size_flags_vertical = Control.SIZE_EXPAND_FILL; v.add_child(holder)
 	list = UIK.scroll_list(holder, 8)
 	var pp: Vector3 = zone.player.global_position
