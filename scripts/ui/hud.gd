@@ -496,13 +496,26 @@ const HINTS := {
 	"boss": "Красные зоны — предупреждение об атаке босса. Уходите из них или делайте кувырок!",
 }
 
+## v0.9.3: на ПК — текст про клавиатуру и мышь (с текущими клавишами), на телефоне — про касания
+func _hint_text(id: String) -> String:
+	if not Game.desktop: return HINTS[id]
+	var K := func(a): return Controls.key_hint(a)
+	match id:
+		"move": return "%s%s%s%s — движение, правая кнопка мыши — поворот камеры, колесо — приближение." % [K.call("move_up"), K.call("move_left"), K.call("move_down"), K.call("move_right")]
+		"attack": return "%s — атака: три удара подряд — комбо. Умения — клавиши 1…0 и F1…F12 на панелях внизу." % K.call("attack")
+		"jump": return "%s — прыжок через ударные волны, %s — кувырок с мигом неуязвимости." % [K.call("jump"), K.call("roll")]
+		"talents": return "Есть свободное очко! Откройте «Таланты» (%s) и изучите новый узел." % K.call("talents")
+		"skills": return "Есть очко умений! Откройте «Умения» (%s) и перетащите умение на панель ярлыков." % K.call("skills")
+		"shop": return "Рядом торговец: нажмите %s, чтобы купить зелья и снаряжение или продать добычу." % K.call("interact")
+	return HINTS[id]
+
 func _tut() -> Dictionary: return zone.data["tutorial"]
 
 func show_hint(id: String) -> void:
 	if _tut().get(id, false) or hint_id == id: return
 	hint_id = id
 	_hint_age = 0.0
-	hint_label.text = HINTS[id]
+	hint_label.text = _hint_text(id)
 	hint_panel.visible = true
 	UIK.pop_in(hint_panel, 0.25)
 
