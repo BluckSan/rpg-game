@@ -29,6 +29,14 @@ const DUNGEONS := {
 		"theme": {"floor": Color(0.34, 0.33, 0.38), "wall": Color(0.4, 0.38, 0.46), "light": Color(0.75, 0.6, 1.0), "fog": Color(0.1, 0.08, 0.18), "accent": Color(0.8, 0.55, 1.0)}},
 }
 const ORDER := ["ash", "crypt", "star"]
+## v0.9.3: порталы подземелий на карте мира — у города подходящего уровня (вход только через карту)
+const PORTAL_TOWN := {"ash": "well", "crypt": "bog", "star": "frost"}
+const READY_TIME := 25.0   # секунд на проверку готовности группы
+
+static func portal_pos(did: String) -> Vector2:
+	for t in WorldData.TOWNS:
+		if t.id == PORTAL_TOWN.get(did, ""): return (t.pos as Vector2) + Vector2(0, -WorldData.TOWN_R - 22.0)
+	return Vector2.ZERO
 
 static func by_zone(zone_id: String) -> String:
 	for k in DUNGEONS:

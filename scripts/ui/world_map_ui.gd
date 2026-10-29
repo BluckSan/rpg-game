@@ -97,7 +97,7 @@ func setup(z) -> void:
 	tip_label.add_theme_font_size_override("normal_font_size", 24); tip_label.add_theme_font_size_override("bold_font_size", 27)
 	tip_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tv.add_child(tip_label)
-	tip_btn = UIK.button(tv, "Переместиться", func(): if _tip_target.has("wp"): travel(_tip_target.wp), UIK.BLUE, 26, "treasure-map")
+	tip_btn = UIK.button(tv, "Переместиться", _tip_action, UIK.BLUE, 26, "treasure-map")
 	UIK.min_h(tip_btn, 60)
 	# правая панель: легенда (сворачивается) + путевые камни
 	var rp := UIK.panel(self)
@@ -156,6 +156,12 @@ func refresh() -> void:
 	info.text = "Вы здесь: %s (ур. %d–%d)\nКолесо/щипок/«+ −» — масштаб, перетаскивание — сдвиг, касание значка — подсказка." % [WorldData.BIOMES[b].name, lv[0], lv[1]]
 	UIK.clear(list)
 	if wb == null: return   # v0.9.3: вне открытого мира (город/подземелье) — без точек телепорта
+	for did in RaidDefs.ORDER:
+		var lk := DB.dungeon_lock(data, did)
+		var r2: Array = DB.DUNGEON_LV[did]
+		var db := UIK.button(list, "Портал: %s  ·  ур. %d–%d" % [RaidDefs.DUNGEONS[did].name, r2[0], r2[1]], focus_dungeon.bind(did), UIK.PURPLE if lk == "" else Color(0.25, 0.22, 0.28), 22, "magic-portal")
+		db.alignment = HORIZONTAL_ALIGNMENT_LEFT; db.name = "Portal_" + did
+		UIK.min_h(db, 60)
 	var open: Array = wb.world_state()["wp"]
 	for wp in wb.waypoints:
 		var known: bool = open.has(wp.id)
@@ -252,6 +258,11 @@ func collect_markers() -> Array:
 	for mp in wb.merchant_points:
 		out.append({"cat": "merchant", "pos": Vector2(mp.x, mp.z), "name": "Торговец", "text": "Покупка и продажа снаряжения, зелья"})
 		out.append({"cat": "stash", "pos": Vector2(mp.x, mp.z) + Vector2(12.5, -0.5), "name": "Сундук-хранилище", "text": "Общий склад всех героев"})
+	for did in RaidDefs.ORDER:   # v0.9.3: порталы групповых подземелий
+		var d: Dictionary = RaidDefs.DUNGEONS[did]
+		var lk := DB.dungeon_lock(data, did)
+		out.append({"cat": "dungeon", "did": did, "pos": RaidDefs.portal_pos(did), "name": "Портал: " + String(d.name), "label": true,
+			"text": "%s\n%s\nДобыча: «%s»" % [String(d.desc), DB.dungeon_info(data, did) if lk == "" else lk, Items.SETS[d.set].name]})
 	var q := _quest_marker()
 	if not q.is_empty(): out.append(q)
 	return out
@@ -424,11 +435,43 @@ func tap(pos: Vector2) -> bool:
 func show_tip(mk: Dictionary) -> void:
 	_tip_target = mk
 	tip_label.text = "[b][color=#%s]%s[/color][/b]\n%s" % [(CATS[mk.cat][2] as Color).to_html(false), mk.name, mk.get("text", "")]
-	tip_btn.visible = mk.get("wp", "") != ""
+	tip_btn.visible = mk.get("wp", "") != "" or mk.has("did")
+	tip_btn.disabled = false
+	if mk.has("did"):
+		var lk := DB.dungeon_lock(data, mk.did)
+		var can := not Net.in_game or not Net.in_party() or Net.is_leader()
+		tip_btn.text = ("Проверка готовности" if Net.in_game and Net.in_party() else "Войти в портал") if can else "Ведёт лидер"
+		tip_btn.disabled = lk != "" or not can or (zone.has_method("is_raid") and zone.is_raid())
+	else: tip_btn.text = "Переместиться"
 	tip.visible = true
 	tip.reset_size()
 	var p: Vector2 = mk.get("screen", map_rect.size * 0.5) + Vector2(24, -20)
 	tip.position = Vector2(clampf(p.x, 8, map_rect.size.x - tip.size.x - 8), clampf(p.y, 8, map_rect.size.y - tip.size.y - 8))
+
+func _tip_action() -> void:
+	if _tip_target.has("did"): enter_portal(str(_tip_target.did))
+	elif _tip_target.get("wp", "") != "": travel(_tip_target.wp)
+
+## v0.9.3: вход в подземелье через портал на карте (в группе — сначала проверка готовности)
+func enter_portal(did: String) -> bool:
+	var p: Player = zone.player
+	for e in zone.enemies:
+		if e.alive and e._aggro and U.flat_dist(e.global_position, p.global_position) < 25.0:
+			Game.toast("Нельзя войти в портал во время боя", 2.0)
+			return false
+	var lk := DB.dungeon_lock(data, did)
+	if lk != "": Game.toast(lk, 2.5); return false
+	zone.hud.close_window()
+	Net.raid_enter(did)
+	return true
+
+## Сдвинуть карту к порталу подземелья (кнопка «Подземелья»)
+func focus_dungeon(did: String) -> void:
+	center = RaidDefs.portal_pos(did); zoom = maxf(zoom, 2.0); _clamp_center(); map_rect.queue_redraw()
+	for mk in collect_markers():
+		if mk.get("did", "") == did:
+			mk["screen"] = map_rect.size * 0.5
+			show_tip(mk); return
 
 ## Быстрое перемещение (не во время боя)
 func travel(id: String) -> bool:

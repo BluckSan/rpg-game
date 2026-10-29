@@ -14,7 +14,7 @@ signal chat_received(from: String, text: String)
 signal roster_changed
 signal party_changed
 
-const PROTOCOL := 8   # v0.9.3: опыт считает сервер (s_wm_kill с xp); v0.9.2 — 7
+const PROTOCOL := 9   # v0.9.3: опыт считает сервер (s_wm_kill с xp) + проверка готовности (c_rc_answer/s_rc_*); v0.9.2 — 7
 const DEFAULT_HOST := "146.0.76.20"
 const AUTH_PORT := 7780
 const GAME_PORT := 7777
@@ -648,6 +648,25 @@ func party_kick(pname: String) -> void:
 func is_leader() -> bool: return not party.is_empty() and int(party.get("leader", 0)) == my_id
 func in_party() -> bool: return not party.is_empty()
 
+## v0.9.3: проверка готовности (клиент)
+signal ready_check(did: String, state: Dictionary, phase: String)
+signal ready_ask(did: String, leader: String, secs: float)
+var rc_pending := ""     # did, на который нас спрашивают
+
+func rc_answer(yes: bool) -> void:
+	rc_pending = ""
+	if in_game: c_rc_answer.rpc_id(1, yes)
+
+@rpc("authority", "call_remote", "reliable")
+func s_rc_ask(did: String, leader: String, secs: float) -> void:
+	rc_pending = did
+	ready_ask.emit(did, leader, secs)
+
+@rpc("authority", "call_remote", "reliable")
+func s_rc_state(did: String, state: Dictionary, phase: String) -> void:
+	if phase != "wait": rc_pending = ""
+	ready_check.emit(did, state, phase)
+
 ## Вход в подземелье: онлайн — через сервер (лидер ведёт всю группу), офлайн — сразу соло-забег
 func raid_enter(did: String) -> void:
 	if not RaidDefs.DUNGEONS.has(did): return
@@ -849,6 +868,65 @@ func c_raid_enter(did: String) -> void:
 					if players.has(m) and int(players[m].iid) != iid:
 						_srv_raid_remove(m); players[m].iid = iid; s_raid_start.rpc_id(m, did, iid)
 				return
+		# v0.9.3: группа из 2+ — сначала проверка готовности (каждый подтверждает за READY_TIME с)
+		if members.size() > 1:
+			_srv_rc_start(pid, id, did); return
+	_srv_raid_launch(id, members, pid, did)
+
+## ---------- v0.9.3: проверка готовности перед подземельем ----------
+func _srv_rc_start(pid: int, id: int, did: String) -> void:
+	var pt: Dictionary = parties[pid]
+	if pt.has("rc"): s_notice.rpc_id(id, "Проверка готовности уже идёт"); return
+	var tok := randi()
+	pt["rc"] = {"did": did, "yes": [id], "tok": tok}
+	for m in pt.members:
+		if m != id and players.has(m): s_rc_ask.rpc_id(m, did, str(players[id].name), RaidDefs.READY_TIME)
+	_srv_rc_send(pid, "wait")
+	get_tree().create_timer(RaidDefs.READY_TIME).timeout.connect(_srv_rc_timeout.bind(pid, tok))
+
+func _srv_rc_send(pid: int, state: String) -> void:
+	var pt: Dictionary = parties[pid]
+	var rc: Dictionary = pt.get("rc", {})
+	var st := {}
+	for m in pt.members:
+		if players.has(m): st[str(players[m].name)] = rc.get("yes", []).has(m)
+	for m in pt.members:
+		if players.has(m): s_rc_state.rpc_id(m, str(rc.get("did", "")), st, state)
+
+func _srv_rc_end(pid: int, state: String, why := "") -> void:
+	if not parties.has(pid) or not parties[pid].has("rc"): return
+	_srv_rc_send(pid, state)
+	if why != "":
+		for m in parties[pid].members:
+			if players.has(m): s_notice.rpc_id(m, why)
+	parties[pid].erase("rc")
+
+func _srv_rc_timeout(pid: int, tok: int) -> void:
+	if parties.has(pid) and int(parties[pid].get("rc", {}).get("tok", -1)) == tok:
+		_srv_rc_end(pid, "fail", "Проверка готовности: время вышло")
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_rc_answer(yes: bool) -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null: return
+	var pid := int(p.party)
+	if pid == 0 or not parties.has(pid) or not parties[pid].has("rc"): return
+	var pt: Dictionary = parties[pid]
+	var rc: Dictionary = pt.rc
+	if not yes:
+		_srv_rc_end(pid, "fail", "%s не готов(а) — вход отменён" % p.name); return
+	if not rc.yes.has(id): rc.yes.append(id)
+	var all := true
+	for m in pt.members:
+		if players.has(m) and not rc.yes.has(m): all = false
+	if not all: _srv_rc_send(pid, "wait"); return
+	var did: String = rc.did
+	_srv_rc_end(pid, "go")
+	if players.has(pt.leader): _srv_raid_launch(pt.leader, pt.members.duplicate(), pid, did)
+
+func _srv_raid_launch(id: int, members: Array, pid: int, did: String) -> void:
 	# v0.9.2: уровень и лимит прохождений — у каждого; не прошедшие проверку не входят
 	var ok := []
 	for m in members:

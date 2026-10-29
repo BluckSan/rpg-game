@@ -53,7 +53,7 @@ func _ready() -> void:
 	btn.custom_minimum_size = Vector2(0, 48)
 	btn.anchor_top = 0.3; btn.anchor_bottom = 0.3
 	btn.offset_left = 144 if Net.in_game else 24; btn.offset_right = btn.offset_left + 200; btn.offset_bottom = 52
-	dbtn = UIK.button(root, "Подземелья", open_tab.bind("dungeons"), UIK.PURPLE, 24, "crossed-swords")
+	dbtn = UIK.button(root, "Подземелья", open_dungeons, UIK.PURPLE, 24, "crossed-swords")
 	dbtn.name = "DungeonsBtn"
 	dbtn.custom_minimum_size = Vector2(0, 48)
 	dbtn.anchor_top = 0.3; dbtn.anchor_bottom = 0.3
@@ -84,14 +84,18 @@ func _ready() -> void:
 	win.offset_left = -560; win.offset_right = 560; win.offset_top = -380; win.offset_bottom = 380
 	var head := UIK.hbox(win, 64)
 	UIK.rect(head, Vector2(24, 18), Vector2(1072, 64))
-	var tp := UIK.button(head, "Группа", func(): tab = "party"; refresh(), UIK.BUTTON, 26, "three-friends"); tp.name = "Tab_party"
-	var td := UIK.button(head, "Подземелья", func(): tab = "dungeons"; refresh(), UIK.BUTTON, 26, "dungeon-gate"); td.name = "Tab_dungeons"
+	# v0.9.3: окно только для группы; подземелья — через порталы на карте мира
+	UIK.icon_rect(head, "three-friends", 48, UIK.ACCENT)
+	var tl := UIK.label(head, "Группа", 34, UIK.ACCENT); tl.name = "Tab_party"; tl.autowrap_mode = TextServer.AUTOWRAP_OFF
 	var sp := Control.new(); UIK.expand(sp); head.add_child(sp)
 	UIK.button(head, "Закрыть", close, UIK.RED, 26)
 	var holder := Control.new(); win.add_child(holder)
 	UIK.rect(holder, Vector2(10, 92), Vector2(1100, 650))
 	body = UIK.scroll_list(holder, 12)
 	win.visible = false
+	_build_rc(root)
+	Net.ready_ask.connect(_on_rc_ask)
+	Net.ready_check.connect(_on_rc_state)
 	Net.party_changed.connect(refresh)
 	Net.roster_changed.connect(refresh)
 	refresh()
@@ -104,7 +108,22 @@ func close() -> void:
 	win.visible = false
 	if name_edit and is_instance_valid(name_edit): name_edit.release_focus()
 
-## Открыть окно на вкладке («party» / «dungeons»); повторное нажатие той же кнопки закрывает окно
+## v0.9.3: «Подземелья» — карта мира с порталами (вход только через порталы)
+func open_dungeons() -> void:
+	if zone and zone.has_method("is_raid") and zone.is_raid():
+		open_tab("party"); return
+	if zone == null or not (zone.builder is WorldBuilder):
+		Game.toast("Порталы подземелий отмечены на карте мира: у Сухого Колодца, Топкого лагеря и Заставы Инея", 4.0); return
+	if zone.hud.window: return
+	zone.hud._open("map")
+	var m = zone.hud.window
+	if m and m.has_method("focus_dungeon"):
+		var pick: String = RaidDefs.ORDER[0]
+		for did in RaidDefs.ORDER:
+			if DB.dungeon_lock(zone.data, did) == "": pick = did
+		m.call_deferred("focus_dungeon", pick)
+
+## Открыть окно группы; повторное нажатие закрывает
 func open_tab(t: String) -> void:
 	if win.visible and tab == t: close(); return
 	if zone and zone.hud and zone.hud.window: return   # поверх других окон не открываем
@@ -124,6 +143,9 @@ func _process(delta: float) -> void:
 	var main_view: bool = not (zone and zone.hud and zone.hud.window != null)
 	ui_root.visible = main_view
 	if not main_view: return
+	if rc_win and rc_win.visible:
+		rc_left = maxf(0.0, rc_left - delta)
+		if rc_yes.visible and rc_left <= 0.0: rc_win.visible = false
 	_t -= delta
 	if _t > 0.0: return
 	_t = 0.25
@@ -212,18 +234,17 @@ func _frame() -> Control:
 func refresh() -> void:
 	if body == null or not win.visible: return
 	UIK.clear(body)
-	for t in ["party", "dungeons"]:
-		var b = win.find_child("Tab_" + t, true, false)
-		if b: b.modulate = Color(1.2, 1.15, 0.85) if tab == t else Color(0.75, 0.75, 0.75)
-	if tab == "party": _party_tab()
-	else: _dungeon_tab()
+	if zone != null and zone.has_method("is_raid") and zone.is_raid():
+		UIK.label(body, "Вы в подземелье «%s»" % DB.ZONES[zone.data.zone].name, 30, UIK.ACCENT)
+		UIK.button(body, "Выйти из подземелья", func(): close(); zone.raid.leave(), UIK.RED, 26)
+	_party_tab()
 
 func _row(h := 64.0) -> HBoxContainer: return UIK.hbox(body, h, 12)
 
 func _party_tab() -> void:
 	if not Net.in_game:
 		UIK.label(body, "Группа", 30, UIK.ACCENT)
-		UIK.label(body, "Группы доступны в онлайн-режиме: войдите в аккаунт в главном меню («Онлайн»), чтобы приглашать игроков, видеть участников и ходить в подземелья вместе. Соло-подземелья — на вкладке «Подземелья».", 24, UIK.MUTED)
+		UIK.label(body, "Группы доступны в онлайн-режиме: войдите в аккаунт в главном меню («Онлайн»), чтобы приглашать игроков, видеть участников и ходить в подземелья вместе. Подземелья — через порталы на карте мира.", 24, UIK.MUTED)
 		return
 	for pid in Net.party_invites:
 		var r := _row()
@@ -275,7 +296,50 @@ func _invite_typed() -> void:
 	name_edit.text = ""
 	name_edit.release_focus()
 
-func _dungeon_tab() -> void:
+# ---------- v0.9.3: проверка готовности ----------
+var rc_win: Panel
+var rc_title: Label
+var rc_list: Label
+var rc_yes: Button
+var rc_no: Button
+var rc_left := 0.0
+
+func _build_rc(root: Control) -> void:
+	rc_win = UIK.panel(root, Color(0.05, 0.05, 0.09, 0.94), 12); rc_win.name = "ReadyCheck"
+	rc_win.anchor_left = 0.5; rc_win.anchor_right = 0.5; rc_win.anchor_top = 0.22; rc_win.anchor_bottom = 0.22
+	rc_win.offset_left = -330; rc_win.offset_right = 330; rc_win.offset_bottom = 300
+	rc_title = UIK.label(rc_win, "", 28, UIK.ACCENT); UIK.rect(rc_title, Vector2(20, 12), Vector2(620, 80))
+	rc_list = UIK.label(rc_win, "", 22); UIK.rect(rc_list, Vector2(20, 96), Vector2(620, 110))
+	rc_yes = UIK.button(rc_win, "Готов", func(): Net.rc_answer(true); rc_yes.disabled = true; rc_no.disabled = true, UIK.GREEN, 26); rc_yes.name = "RcYes"
+	UIK.rect(rc_yes, Vector2(20, 214), Vector2(300, 70))
+	rc_no = UIK.button(rc_win, "Не готов", func(): Net.rc_answer(false); rc_win.visible = false, UIK.RED, 26); rc_no.name = "RcNo"
+	UIK.rect(rc_no, Vector2(340, 214), Vector2(300, 70))
+	rc_win.visible = false
+	if zone and zone.hud: zone.hud.blockers.append(rc_win)
+	else: _pending_blockers.append(rc_win)
+
+func _on_rc_ask(did: String, leader: String, secs: float) -> void:
+	rc_left = secs
+	rc_title.text = "%s ведёт группу в «%s». Вы готовы?" % [leader, RaidDefs.DUNGEONS[did].name if RaidDefs.DUNGEONS.has(did) else did]
+	rc_yes.visible = true; rc_no.visible = true; rc_yes.disabled = false; rc_no.disabled = false
+	rc_win.visible = true; UIK.pop_in(rc_win)
+
+func _on_rc_state(did: String, st: Dictionary, phase: String) -> void:
+	var nm: String = RaidDefs.DUNGEONS[did].name if RaidDefs.DUNGEONS.has(did) else did
+	var lines := []
+	for n in st: lines.append(("✔ " if st[n] else "… ") + str(n))
+	rc_list.text = "  ".join(lines)
+	if phase == "wait":
+		if not rc_win.visible:   # лидер: ждём остальных
+			rc_title.text = "Проверка готовности: «%s»" % nm
+			rc_yes.visible = false; rc_no.visible = false
+			rc_left = RaidDefs.READY_TIME
+			rc_win.visible = true
+	else:
+		rc_win.visible = false
+		Game.toast("Группа готова — вход в «%s»" % nm if phase == "go" else "Вход в «%s» отменён" % nm, 2.5)
+
+func _dungeon_tab_unused() -> void:
 	var in_raid: bool = zone != null and zone.is_raid()
 	if in_raid:
 		UIK.label(body, "Вы в подземелье «%s»" % DB.ZONES[zone.data.zone].name, 30, UIK.ACCENT)
