@@ -217,7 +217,6 @@ var menu_btn: Button
 var menu_panel: PanelContainer
 var menu_items := {}
 var menu_open := false
-var _menu_tw: Tween
 
 func _build_menu() -> void:
 	menu_btn = _top_button("Меню", toggle_menu, Color(0.22, 0.2, 0.3), 0, 220, "hamburger-menu")
@@ -261,22 +260,32 @@ func open_menu() -> void:
 	menu_panel.visible = true
 	menu_panel.pivot_offset = Vector2(menu_panel.size.x, 0)
 	menu_panel.scale = Vector2(0.85, 0.85); menu_panel.modulate.a = 0.0
-	if _menu_tw: _menu_tw.kill()
-	_menu_tw = create_tween().set_ignore_time_scale(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).set_parallel().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_menu_tw.tween_property(menu_panel, "scale", Vector2.ONE, 0.18)
-	_menu_tw.tween_property(menu_panel, "modulate:a", 1.0, 0.14)
+	_menu_t0 = Time.get_ticks_msec()
+
+## v0.9.4: анимация меню вручную по реальному времени (не зависит от паузы, time_scale и твинов)
+var _menu_t0 := -1
+func _menu_anim() -> void:
+	if _menu_t0 < 0 or menu_panel == null: return
+	var t := (Time.get_ticks_msec() - _menu_t0) / 1000.0
+	if menu_open:
+		var k := clampf(t / 0.18, 0.0, 1.0)
+		var e := 1.0 + 2.70158 * pow(k - 1.0, 3) + 1.70158 * pow(k - 1.0, 2)   # back-out
+		menu_panel.scale = Vector2.ONE * lerpf(0.85, 1.0, e)
+		menu_panel.modulate.a = clampf(t / 0.14, 0.0, 1.0)
+		if k >= 1.0: menu_panel.scale = Vector2.ONE; menu_panel.modulate.a = 1.0; _menu_t0 = -1
+	else:
+		var k := clampf(t / 0.12, 0.0, 1.0)
+		menu_panel.scale = Vector2.ONE * lerpf(1.0, 0.9, k * k)
+		menu_panel.modulate.a = 1.0 - k * k
+		if k >= 1.0: menu_panel.hide(); _menu_t0 = -1
 
 func close_menu(instant := false) -> void:
 	if not menu_open: return
 	menu_open = false
-	if _menu_tw: _menu_tw.kill()
 	if instant:
-		menu_panel.visible = false
+		menu_panel.visible = false; _menu_t0 = -1
 		return
-	_menu_tw = create_tween().set_ignore_time_scale(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS).set_parallel().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	_menu_tw.tween_property(menu_panel, "scale", Vector2(0.9, 0.9), 0.12)
-	_menu_tw.tween_property(menu_panel, "modulate:a", 0.0, 0.12)
-	_menu_tw.chain().tween_callback(menu_panel.hide)
+	_menu_t0 = Time.get_ticks_msec()
 
 func _menu_pick(what: String) -> void:
 	close_menu(true)
@@ -878,6 +887,7 @@ func _set_joy(center: Vector2, knob: Vector2) -> void:
 
 # ---------------- обновление ----------------
 func _process(delta: float) -> void:
+	_menu_anim()
 	if player == null or player.stats.is_empty(): return
 	if window == null: _tick_buff_tip(delta)
 	elif buff_tip != null and buff_tip.visible: show_buff_tip(null)

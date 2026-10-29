@@ -109,7 +109,8 @@ func _menu(z) -> void:
 	h._touch_down(-1 if Game.desktop else 0, out_pt); h._touch_up(-1 if Game.desktop else 0)
 	ck(not h.menu_open, "клик мимо меню закрывает его")
 	ck(not z.player.attack_held, "клик мимо меню не превращается в атаку")
-	await w(0.5)
+	var t0 := Time.get_ticks_msec()
+	while h.menu_panel.visible and Time.get_ticks_msec() - t0 < 3000: await get_tree().process_frame
 	ck(not h.menu_panel.visible, "анимация закрытия скрыла панель (scale=%s a=%.2f ts=%.2f)" % [h.menu_panel.scale, h.menu_panel.modulate.a, Engine.time_scale])
 	# Esc закрывает
 	h.open_menu(); await w(0.3)
