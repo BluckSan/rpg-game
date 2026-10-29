@@ -250,6 +250,12 @@ func apply_skill_layout() -> void:
 		interact_btn.offset_bottom = interact_btn.offset_top + 100
 	var ac := Vector2(-170, -170)          # центр кнопки атаки
 	_place(skill_btns[0], ac, 240)
+	if Game.desktop:
+		# ПК: умения, зелье и выбор цели — на панелях ярлыков и клавишах; круглые кнопки убираем
+		_place(skill_btns[0], Vector2(-110, -110), 150)
+		for b in skill_btns.slice(1) + [potion_btn, target_btn]:
+			b.visible = false; _place(b, Vector2(-99999, -99999), 10)
+		return
 	if layout == "pc":
 		var sz := 104.0; var gap := 12.0
 		var n := skill_btns.size() - 1
@@ -291,14 +297,21 @@ func refresh_key_hints() -> void:
 	target_btn.key_hint = Controls.key_hint("target_next")
 	_key_e = " [%s]" % Controls.key_hint("interact")
 	for b in skill_btns + [potion_btn, target_btn]: b.queue_redraw()
+	if bars != null and bars.root != null: bars.refresh_keys()
+	var tops := [["Таланты", "talents"], ["Герой", "hero"], ["Умения", "skills"]]
+	for k in mini(3, top_buttons.size()):
+		top_buttons[k].text = "%s  [%s]" % [tops[k][0], Controls.key_hint(tops[k][1])]
+		top_buttons[k].add_theme_font_size_override("font_size", 23)
+	if top_buttons.size() > 3: top_buttons[3].text = "Меню"; top_buttons[3].tooltip_text = "Esc"
 	var help = root.find_child("KeyHelp", false, false)
 	if help:
 		var K := func(a): return Controls.key_hint(a)
-		help.text = "%s%s%s%s — ход · %s — атака · 1–8 — умения\n%s — цель · %s — сброс цели · ПКМ — камера\n%s — прыжок · %s — кувырок · %s — зелье · %s — герой\n%s — умения · %s — таланты · %s — карта · Esc — меню" % [
+		help.text = "%s%s%s%s — ход · %s — атака · 1…0, F1…F12 — ярлыки\n%s — цель · %s — сброс цели · ПКМ — камера\n%s — прыжок · %s — кувырок · %s — зелье · %s — герой\n%s — умения · %s — таланты · %s — карта · Esc — меню" % [
 			K.call("move_up"), K.call("move_left"), K.call("move_down"), K.call("move_right"), K.call("attack"), K.call("target_next"), K.call("target_clear"),
 			K.call("jump"), K.call("roll"), K.call("potion"), K.call("hero"), K.call("skills"), K.call("talents"), K.call("map")]
 
 func refresh_skill_buttons() -> void:
+	if bars != null and bars.root != null: bars.refresh_all()
 	for i in range(1, skill_btns.size()):
 		var s = player.get_skill(i)
 		skill_btns[i].text = s.name if s != null else "Пусто"
@@ -309,7 +322,12 @@ func refresh_skill_buttons() -> void:
 
 # ---------------- ПК: клавиатура и мышь ----------------
 ## Сенсорные элементы прячем, на кнопках умений — подсказки клавиш
+var bars: ShortcutBars
 func _setup_desktop() -> void:
+	# v0.9.3: панели ярлыков в стиле L2 вместо ряда круглых кнопок
+	bars = ShortcutBars.new(); bars.name = "ShortcutBars"
+	zone.add_child.call_deferred(bars)
+	bars.ready.connect(func(): bars.setup(self), CONNECT_ONE_SHOT)
 	joy_base.visible = false
 	jump_btn.visible = false
 	roll_btn.visible = false
@@ -341,8 +359,16 @@ func _hotkey_ev(ev: InputEvent) -> bool:
 		if zone.target_ctl and zone.target_ctl.has_target():   # Esc сначала сбрасывает цель, затем — меню
 			zone.target_ctl.clear(); return true
 		_open("pause"); return true
+	# v0.9.3: ПК — клавиши 1…0 и F1…F12 срабатывают по ячейкам панелей ярлыков
+	if bars != null and act.begins_with("bar_page_"):
+		bars.page(0, 1 if act == "bar_page_next" else -1); return true
+	if bars != null and (act.begins_with("skill_") or act.begins_with("bar2_")):
+		var bs := ShortcutBars.slot_of_action(act)
+		bars.activate(int(bs[0]), int(bs[1]))
+		return true
 	if act.begins_with("skill_"):
 		var i := int(act.substr(6))
+		if i >= skill_btns.size(): return false
 		player.try_use(i)
 		skill_btns[i].set_held(true)
 		get_tree().create_timer(0.12).timeout.connect(func(): if is_instance_valid(skill_btns[i]): skill_btns[i].set_held(false))
@@ -632,6 +658,7 @@ func _screen() -> Vector2:
 
 func _touch_down(idx: int, p: Vector2) -> void:
 	if _over_top_button(p): return
+	if bars != null and bars.over(p): return
 	var bic := buff_icon_at(p)
 	if bic != null:
 		touches[idx] = {"role": "buff"}
@@ -874,9 +901,9 @@ func _update_enemy_bars() -> void:
 		var br = boss.brain
 		if br:
 			boss_phase.text = "Фаза %d · %s" % [br.phase, br.PHASE_NAMES[br.phase]] + ("  · ЯРОСТЬ" if br.enraged else "")
-			var fill: StyleBoxTexture = boss_bar.get_theme_stylebox("fill")
+			var fill: StyleBoxFlat = boss_bar.get_theme_stylebox("fill")
 			var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.008)
-			fill.modulate_color = Color(0.95, 0.25 + 0.2 * pulse, 0.05) if br.enraged else (Color(0.85, 0.2, 0.08) if br.phase == 2 else Color(0.78, 0.1, 0.1))
+			fill.bg_color = Color(0.95, 0.25 + 0.2 * pulse, 0.05) if br.enraged else (Color(0.85, 0.2, 0.08) if br.phase == 2 else Color(0.78, 0.1, 0.1))
 			for f in [66, 33]:
 				var m: ColorRect = boss_bar.get_node("Mark%d" % f)
 				m.color = Color(1, 0.85, 0.4, 0.95) if boss.hp / boss.max_hp > f / 100.0 else Color(0.4, 0.35, 0.3, 0.7)

@@ -47,14 +47,27 @@ static func box(c: Color, radius := 10, border := 0, border_color := Color.TRANS
 		s.set_border_width_all(border); s.border_color = border_color
 	return s
 
-## Орнаментальная панель (кожа + золотая рамка)
-static func frame(kind := "panel", tint := Color.WHITE, margin := 22) -> StyleBoxTexture:
-	var s := StyleBoxTexture.new()
-	s.texture = tex("res://assets/ui/%s.png" % kind)
-	var m := 24 if kind.begins_with("panel") else (14 if kind == "slot" else 20)
-	s.texture_margin_left = m; s.texture_margin_right = m; s.texture_margin_top = m; s.texture_margin_bottom = m
+## v0.9.3: современная панель — тёмное полупрозрачное стекло, тонкая светлая рамка, мягкая тень
+static func frame(kind := "panel", tint := Color.WHITE, margin := 22) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	var a := tint.a
+	match kind:
+		"slot":
+			s.bg_color = Color(0.04, 0.05, 0.08, 0.78 * a); s.set_corner_radius_all(12)
+			s.set_border_width_all(2); s.border_color = Color(0.55, 0.62, 0.78, 0.45 * a)
+		"tooltip":
+			s.bg_color = Color(0.05, 0.06, 0.09, 0.95 * a); s.set_corner_radius_all(12)
+			s.set_border_width_all(1); s.border_color = Color(ACCENT.r, ACCENT.g, ACCENT.b, 0.55 * a)
+		"panel_dark":
+			s.bg_color = Color(0.04, 0.05, 0.08, 0.72 * a); s.set_corner_radius_all(14)
+			s.set_border_width_all(1); s.border_color = Color(1, 1, 1, 0.1 * a)
+		_:
+			s.bg_color = Color(0.06, 0.07, 0.1, 0.86 * a); s.set_corner_radius_all(16)
+			s.set_border_width_all(1); s.border_color = Color(1, 1, 1, 0.14 * a)
+			s.border_width_top = 2; s.border_color = Color(0.75, 0.8, 0.95, 0.22 * a)
+	s.shadow_color = Color(0, 0, 0, 0.35 * a); s.shadow_size = 10; s.shadow_offset = Vector2(0, 4)
+	s.anti_aliasing = true
 	s.content_margin_left = margin; s.content_margin_right = margin; s.content_margin_top = margin * 0.7; s.content_margin_bottom = margin * 0.7
-	s.modulate_color = tint
 	return s
 
 static func panel(parent: Node, c := PANEL, radius := 12) -> Panel:
@@ -144,13 +157,17 @@ static func _guard(cb: Callable) -> void:
 		Game.sfx("click")
 		cb.call()
 
-static func _btn_style(c: Color) -> StyleBoxTexture:
-	var s := StyleBoxTexture.new()
-	s.texture = tex("res://assets/ui/button.png")
-	s.texture_margin_left = 14; s.texture_margin_right = 14; s.texture_margin_top = 14; s.texture_margin_bottom = 14
+## v0.9.3: плоская кнопка — цвет-акцент на тёмном стекле, скругление, светлая кромка сверху
+static func _btn_style(c: Color) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	var base := Color(c.r * 0.55 + 0.05, c.g * 0.55 + 0.06, c.b * 0.55 + 0.09, 0.9 * c.a)
+	s.bg_color = base
+	s.set_corner_radius_all(12)
+	s.set_border_width_all(1); s.border_width_top = 2
+	s.border_color = Color(minf(c.r * 1.5, 1), minf(c.g * 1.5, 1), minf(c.b * 1.5, 1), 0.55 * c.a)
+	s.shadow_color = Color(0, 0, 0, 0.3); s.shadow_size = 4; s.shadow_offset = Vector2(0, 2)
+	s.anti_aliasing = true
 	s.content_margin_left = 16; s.content_margin_right = 16; s.content_margin_top = 8; s.content_margin_bottom = 8
-	var k := 1.35
-	s.modulate_color = Color(minf(c.r * k, 1), minf(c.g * k, 1), minf(c.b * k, 1), c.a)
 	return s
 
 static func set_button_color(b: Button, c: Color) -> void:
@@ -198,13 +215,12 @@ static func clear(n: Node) -> void:
 static func bar(parent: Node, fill: Color) -> ProgressBar:
 	var p := ProgressBar.new()
 	p.show_percentage = false
-	var bg := StyleBoxTexture.new(); bg.texture = tex("res://assets/ui/bar_bg.png")
-	bg.texture_margin_left = 10; bg.texture_margin_right = 10; bg.texture_margin_top = 10; bg.texture_margin_bottom = 10
+	var bg := StyleBoxFlat.new(); bg.bg_color = Color(0.02, 0.02, 0.04, 0.75); bg.set_corner_radius_all(8)
+	bg.set_border_width_all(1); bg.border_color = Color(1, 1, 1, 0.12); bg.anti_aliasing = true
 	p.add_theme_stylebox_override("background", bg)
-	var f := StyleBoxTexture.new(); f.texture = tex("res://assets/ui/bar_fill.png")
-	f.texture_margin_left = 4; f.texture_margin_right = 4; f.texture_margin_top = 4; f.texture_margin_bottom = 4
-	f.expand_margin_left = -3; f.expand_margin_right = -3; f.expand_margin_top = -3; f.expand_margin_bottom = -3
-	f.modulate_color = fill.lightened(0.1)
+	var f := StyleBoxFlat.new(); f.bg_color = fill.lightened(0.1); f.set_corner_radius_all(7); f.anti_aliasing = true
+	f.border_width_top = 2; f.border_color = fill.lightened(0.45)
+	f.expand_margin_left = -2; f.expand_margin_right = -2; f.expand_margin_top = -2; f.expand_margin_bottom = -2
 	p.add_theme_stylebox_override("fill", f)
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(p)
@@ -263,7 +279,7 @@ static func place_tooltip(t: Control, near: Rect2, vs: Vector2) -> void:
 	f.call_deferred()
 
 ## Плавное появление окна
-static func pop_in(c: Control, dur := 0.2) -> void:
+static func pop_in(c: Control, dur := 0.18) -> void:
 	c.modulate.a = 0.0
 	c.pivot_offset = c.get_viewport_rect().size / 2 if c.size == Vector2.ZERO else c.size / 2
 	c.scale = Vector2.ONE * 0.94

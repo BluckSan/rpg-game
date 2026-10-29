@@ -17,6 +17,29 @@ var win: Panel
 var body: VBoxContainer
 var tab := "party"
 var _t := 0.0
+var head_bar: Panel
+var _drag := false
+var _drag_off := Vector2.ZERO
+const LAYOUT := "user://ui_layout.cfg"
+
+func _place_frames(p: Vector2) -> void:
+	var vs := get_viewport().get_visible_rect().size if get_viewport() else Vector2(1920, 1080)
+	p = Vector2(clampf(p.x, 0, vs.x - 340), clampf(p.y, 0, vs.y - 160))
+	head_bar.position = p
+	frames.anchor_top = 0; frames.anchor_bottom = 0
+	frames.offset_left = p.x; frames.offset_right = p.x + 330; frames.offset_top = p.y + 34; frames.offset_bottom = p.y + 34
+
+func _head_input(ev: InputEvent) -> void:
+	if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT:
+		_drag = ev.pressed
+		_drag_off = head_bar.get_global_mouse_position() - head_bar.position
+		if not ev.pressed:
+			var cf := ConfigFile.new(); cf.load(LAYOUT)
+			cf.set_value("party", "pos", head_bar.position); cf.save(LAYOUT)
+		head_bar.accept_event()
+	elif ev is InputEventMouseMotion and _drag:
+		_place_frames(head_bar.get_global_mouse_position() - _drag_off)
+		head_bar.accept_event()
 static var preview := false   # снимки/тесты: показать рамки из Net.party без сервера
 
 func _ready() -> void:
@@ -41,6 +64,21 @@ func _ready() -> void:
 	frames.offset_left = 24; frames.offset_right = 24 + 330
 	frames.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(frames)
+	# v0.9.3 (ПК): окно группы как в L2 — заголовок перетаскивается, позиция сохраняется
+	if Game.desktop:
+		head_bar = UIK.panel(root, Color(0.06, 0.08, 0.12, 0.9), 8); head_bar.name = "PartyHead"
+		head_bar.mouse_filter = Control.MOUSE_FILTER_STOP
+		head_bar.mouse_default_cursor_shape = Control.CURSOR_MOVE
+		head_bar.size = Vector2(330, 30)
+		var hl := UIK.label(head_bar, "Группа  ·  тяните, чтобы сдвинуть", 16, UIK.MUTED); hl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		hl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		UIK.rect(hl, Vector2(10, 3), Vector2(312, 24))
+		head_bar.gui_input.connect(_head_input)
+		head_bar.visible = false
+		var cf := ConfigFile.new()
+		var pp := Vector2(24, 400)
+		if cf.load(LAYOUT) == OK: pp = cf.get_value("party", "pos", pp)
+		_place_frames(pp)
 	win = UIK.panel(root)
 	win.anchor_left = 0.5; win.anchor_right = 0.5; win.anchor_top = 0.5; win.anchor_bottom = 0.5
 	win.offset_left = -560; win.offset_right = 560; win.offset_top = -380; win.offset_bottom = 380
@@ -97,6 +135,9 @@ func _process(delta: float) -> void:
 # ---------- рамки группы ----------
 func _frames() -> void:
 	var mem: Array = Net.party.get("members", []) if (Net.in_game or preview) else []
+	if head_bar:
+		if not head_bar.visible and not mem.is_empty() and zone and zone.hud: zone.hud.blockers.append(head_bar)
+		head_bar.visible = not mem.is_empty()
 	while frames.get_child_count() < mem.size(): _frame()
 	for i in frames.get_child_count():
 		var f: Control = frames.get_child(i)
@@ -111,6 +152,10 @@ func _frames() -> void:
 		nl.add_theme_color_override("font_color", UIK.ACCENT if me else UIK.TEXT)
 		var b: ProgressBar = f.get_node("Hp")
 		b.max_value = 1.0; b.value = hpf
+		var mpf := float(m.get("mp", 1.0))
+		if me and zone and zone.player: mpf = zone.player.mp / maxf(1.0, zone.player.stats.max_mp)
+		var mb: ProgressBar = f.get_node("Mp")
+		mb.max_value = 1.0; mb.value = mpf
 		var zl: Label = f.get_node("Zone")
 		var zk := str(m.zone)
 		zl.text = "погиб" if hpf <= 0.0 else (DB.ZONES[zk].name if DB.ZONES.has(zk) else zk)
@@ -144,19 +189,21 @@ func select_member(pid: int) -> bool:
 
 func _frame() -> Control:
 	var p := UIK.panel(frames, Color(0.05, 0.05, 0.07, 0.78), 8)
-	p.custom_minimum_size = Vector2(330, 104)
+	p.custom_minimum_size = Vector2(330, 112)
 	p.mouse_filter = Control.MOUSE_FILTER_STOP   # v0.9.0: нажатие по рамке — выбрать союзника целью
 	p.gui_input.connect(_frame_input.bind(p))
 	if zone and zone.hud: zone.hud.blockers.append(p)
 	else: _pending_blockers.append(p)
 	var bx := HBoxContainer.new(); bx.name = "Buffs"; bx.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bx.add_theme_constant_override("separation", 4)
-	p.add_child(bx); UIK.rect(bx, Vector2(10, 64), Vector2(312, 36))
+	p.add_child(bx); UIK.rect(bx, Vector2(10, 72), Vector2(312, 36))
 	var nl := UIK.label(p, "", 21); nl.name = "Name"; nl.autowrap_mode = TextServer.AUTOWRAP_OFF
 	nl.clip_text = true
 	UIK.rect(nl, Vector2(10, 2), Vector2(312, 30))
 	var b := UIK.bar(p, Color(0.2, 0.75, 0.3)); b.name = "Hp"
-	UIK.rect(b, Vector2(10, 34), Vector2(200, 26))
+	UIK.rect(b, Vector2(10, 34), Vector2(200, 20))
+	var mpb := UIK.bar(p, Color(0.25, 0.45, 0.95)); mpb.name = "Mp"   # v0.9.3: мана участника
+	UIK.rect(mpb, Vector2(10, 57), Vector2(200, 11))
 	var zl := UIK.label(p, "", 17, UIK.MUTED); zl.name = "Zone"; zl.autowrap_mode = TextServer.AUTOWRAP_OFF; zl.clip_text = true
 	UIK.rect(zl, Vector2(216, 34), Vector2(108, 26))
 	return p

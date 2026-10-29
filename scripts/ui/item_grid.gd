@@ -136,6 +136,14 @@ func _cell(it: Dictionary, idx: int) -> void:
 		ck.add_theme_color_override("font_outline_color", Color.BLACK); ck.add_theme_constant_override("outline_size", 6)
 		ck.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.pressed.connect(_on_cell.bind(str(it.uid), idx))
+	# v0.9.3 (ПК): снаряжение можно перетащить на панель ярлыков (щелчок по ярлыку — надеть)
+	if Game.desktop and it.has("slot"):
+		var ic: Texture2D = UIK.icon(UIK.item_icon(it, str(data.get("class", "warrior")) if data else "warrior"))
+		var uid := str(it.uid)
+		b.set_drag_forwarding(func(_p):
+			var pv := TextureRect.new(); pv.texture = ic; pv.size = Vector2(64, 64); pv.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			b.set_drag_preview(pv)
+			return {"item": uid}, Callable(), Callable())
 	b.mouse_entered.connect(func(): hovered.emit(it))
 	b.mouse_exited.connect(func(): hovered.emit(null))
 
