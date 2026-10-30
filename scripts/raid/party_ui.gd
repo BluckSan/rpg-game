@@ -252,6 +252,11 @@ const BTN_GOLD := Color(0.66, 0.46, 0.18)
 const BTN_GREY := Color(0.42, 0.42, 0.44)
 const CLASS_EMBLEM := {"warrior": "visored-helm", "mage": "ui-hood", "archer": "pocket-bow"}
 
+func _lp(l: Control, pos: Vector2, sz: Vector2) -> void:
+	if l is Label and sz.y < 60 * win_k: (l as Label).autowrap_mode = TextServer.AUTOWRAP_OFF
+	l.size = sz; l.position = pos; l.size = sz
+	l.set_deferred("size", sz)
+
 static func stone_box(bg := STONE, border := 3, bc := GOLD_LINE, radius := 6) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
 	s.bg_color = bg; s.set_corner_radius_all(radius)
@@ -382,7 +387,7 @@ func _layout_win() -> void:
 	win.position = Vector2(clampf(p.x, 0, vs.x - sz.x), clampf(p.y, 0, vs.y - sz.y))
 	var hh := 80.0 * k
 	head_area.position = Vector2.ZERO; head_area.size = Vector2(sz.x, hh)
-	title_l.position = Vector2(80 * k, 10 * k); title_l.size = Vector2(sz.x - 160 * k, hh - 16 * k)
+	_lp(title_l, Vector2(80 * k, 10 * k), Vector2(sz.x - 160 * k, hh - 16 * k))
 	var x: Control = head_area.get_node("Close")
 	x.size = Vector2(58, 58) * k; x.position = Vector2(sz.x - 80 * k, 12 * k)
 	var sep: Control = win.get_node("Sep"); sep.position = Vector2(24 * k, hh); sep.size = Vector2(sz.x - 48 * k, 2)
@@ -437,22 +442,22 @@ func _member_row(m: Dictionary) -> Control:
 	var x0 := 16 * k + es + 20 * k
 	var nl := UIK.label(r, str(m.name), int(30 * k), UIK.ACCENT if me else Color(0.97, 0.92, 0.82)); nl.name = "Name"
 	nl.add_theme_font_override("font", UIK.title_font()); nl.autowrap_mode = TextServer.AUTOWRAP_OFF
-	nl.position = Vector2(x0, 10 * k); nl.size = Vector2(250 * k, 42 * k)
+	_lp(nl, Vector2(x0, 18 * k), Vector2(250 * k, 42 * k))
 	if lead:
 		var tw := nl.get_theme_font("font").get_string_size(str(m.name), HORIZONTAL_ALIGNMENT_LEFT, -1, int(30 * k)).x
 		var cr := UIK.icon_rect(r, "ui-crown", 30 * k, Color(1.0, 0.8, 0.3)); cr.name = "Crown"
-		cr.position = Vector2(x0 + tw + 10 * k, 16 * k)
+		cr.position = Vector2(x0 + tw + 10 * k, 24 * k)
 	var lv := UIK.label(r, "Ур. %d" % int(m.lvl), int(22 * k), Color(0.82, 0.76, 0.66)); lv.name = "Lvl"
-	lv.position = Vector2(x0, 52 * k); lv.size = Vector2(200 * k, 30 * k)
+	_lp(lv, Vector2(x0, 60 * k), Vector2(200 * k, 30 * k))
 	var dot := Panel.new(); dot.name = "Dot"; dot.mouse_filter = Control.MOUSE_FILTER_IGNORE; r.add_child(dot)
-	dot.position = Vector2(x0 + 2 * k, 94 * k); dot.size = Vector2(16, 16) * k
+	dot.position = Vector2(x0 + 270 * k, 18 * k); dot.size = Vector2(16, 16) * k
 	var st := UIK.label(r, "", int(21 * k), Color(0.6, 0.9, 0.5)); st.name = "Status"; st.autowrap_mode = TextServer.AUTOWRAP_OFF
-	st.clip_text = true; st.position = Vector2(x0 + 26 * k, 84 * k); st.size = Vector2(240 * k, 32 * k)
+	st.clip_text = true; _lp(st, Vector2(x0 + 296 * k, 8 * k), Vector2(240 * k, 32 * k))
 	# полосы
 	var bx := x0 + 270 * k
 	var bw: float = maxf(180.0, _win_size().x - 48 * k - bx - 24 * k)
-	var hp := _bar(r, Color(0.78, 0.13, 0.12)); hp.name = "Hp"; hp.position = Vector2(bx, 26 * k); hp.size = Vector2(bw, 36 * k)
-	var mp := _bar(r, Color(0.18, 0.4, 0.85)); mp.name = "Mp"; mp.position = Vector2(bx, 72 * k); mp.size = Vector2(bw, 36 * k)
+	var hp := _bar(r, Color(0.78, 0.13, 0.12)); hp.name = "Hp"; hp.position = Vector2(bx, 46 * k); hp.size = Vector2(bw, 34 * k)
+	var mp := _bar(r, Color(0.18, 0.4, 0.85)); mp.name = "Mp"; mp.position = Vector2(bx, 88 * k); mp.size = Vector2(bw, 34 * k)
 	_fill_row(r, m)
 	return r
 
@@ -565,9 +570,9 @@ func _empty_state(t: String, hint: String) -> void:
 	var em := UIK.icon_rect(p, "three-friends", 110 * k, Color(0.86, 0.66, 0.3, 0.9))
 	em.position = Vector2((_win_size().x - 48 * k) / 2 - 55 * k, 24 * k)
 	var tl := UIK.label(p, t, int(30 * k), UIK.ACCENT, HORIZONTAL_ALIGNMENT_CENTER); tl.add_theme_font_override("font", UIK.title_font())
-	tl.position = Vector2(20, 140 * k); tl.size = Vector2(_win_size().x - 48 * k - 40, 44 * k)
+	_lp(tl, Vector2(20, 140 * k), Vector2(_win_size().x - 48 * k - 40, 44 * k))
 	var hl := UIK.label(p, hint, int(22 * k), Color(0.82, 0.76, 0.66), HORIZONTAL_ALIGNMENT_CENTER); hl.name = "Hint"
-	hl.position = Vector2(40, 188 * k); hl.size = Vector2(_win_size().x - 48 * k - 80, 100 * k)
+	_lp(hl, Vector2(40, 188 * k), Vector2(_win_size().x - 48 * k - 80, 100 * k))
 
 func _kick_sel() -> void:
 	if _why_off(b_kick): return
@@ -651,9 +656,9 @@ func _build_popup(root: Control) -> void:
 	root.add_child(ipop); ipop.mouse_filter = Control.MOUSE_FILTER_STOP
 	_corners(ipop, 30.0, 3.0)
 	var t := UIK.label(ipop, "Приглашение в группу", int(26 * k), Color(0.86, 0.66, 0.3), HORIZONTAL_ALIGNMENT_CENTER)
-	t.add_theme_font_override("font", UIK.title_font()); t.position = Vector2(20, 18 * k); t.size = Vector2(520 * k, 36 * k)
+	t.add_theme_font_override("font", UIK.title_font()); _lp(t, Vector2(20, 18 * k), Vector2(520 * k, 36 * k))
 	ipop_text = UIK.label(ipop, "", int(28 * k), Color(0.97, 0.92, 0.82), HORIZONTAL_ALIGNMENT_CENTER); ipop_text.name = "Text"
-	ipop_text.position = Vector2(20, 62 * k); ipop_text.size = Vector2(520 * k, 90 * k)
+	_lp(ipop_text, Vector2(20, 62 * k), Vector2(520 * k, 90 * k))
 	var a := _mk_btn(ipop, "Принять", "ui-check", BTN_GREEN, func(): Net.party_accept(ipop_pid); _hide_invite(), "Принять|Вступить в группу")
 	a.name = "Accept"; a.position = Vector2(24 * k, 166 * k); a.size = Vector2(246 * k, 76 * k)
 	var d := _mk_btn(ipop, "Отклонить", "ui-cross", BTN_RED, func(): Net.party_decline(ipop_pid); _hide_invite(), "Отклонить|Отказаться от приглашения")

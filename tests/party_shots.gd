@@ -32,9 +32,10 @@ func _ready() -> void:
 	var c := DB.new_character("Арина", "warrior", CharAssets.random_look(1, rng))
 	c["level"] = 18
 	Game.save_character(c)
-	Game.play(c); await w(3.0)
+	Game.play(c); await w(7.0)
 	var z = get_tree().current_scene
 	z.player.god_mode = true
+	Game._toast_panel.visible = false
 	if z.hud.hint_panel: z.hud.hint_panel.visible = false
 	var pui = z.party_ui
 	# имитация онлайна (без сервера): сеть не подключена, отправки RPC не происходят
