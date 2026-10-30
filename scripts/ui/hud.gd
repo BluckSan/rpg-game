@@ -788,6 +788,12 @@ func _touch_down(idx: int, p: Vector2) -> void:
 		potion_btn.set_held(true)
 		player.use_potion()
 		return
+	# v0.9.4.1: клик/касание по добыче на земле — подобрать (вместо атаки, джойстика или камеры)
+	if window == null and not _over_ui(p):
+		var lt := Loot.at_screen(zone, p)
+		if lt != null:
+			touches[idx] = {"role": "loot"}
+			lt.manual_pick(); return
 	if Game.desktop and idx == -1:
 		# ЛКМ по миру — атака (удержание — серия ударов)
 		if window == null and not _over_ui(p):

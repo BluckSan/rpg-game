@@ -645,6 +645,9 @@ func party_leave() -> void:
 	if in_game and _connected(): c_party_leave.rpc_id(1)
 func party_kick(pname: String) -> void:
 	if in_game and _connected(): c_party_kick.rpc_id(1, pname)
+## v0.9.4.1: передать лидерство участнику (только лидер)
+func party_promote(pname: String) -> void:
+	if in_game and _connected(): c_party_promote.rpc_id(1, pname)
 func is_leader() -> bool: return not party.is_empty() and int(party.get("leader", 0)) == my_id
 func in_party() -> bool: return not party.is_empty()
 
@@ -738,7 +741,7 @@ func _srv_party_state(pid: int) -> Dictionary:
 		if p == null: continue
 		mem.append({"id": m, "name": p.name, "cls": str(p.data.get("class", "warrior")), "lvl": int(p.data.get("level", 1)),
 			"hp": float(p.hp), "mp": float(p.get("mp", 1.0)), "zone": str(p.zone), "iid": int(p.iid), "tg": p.get("target", ["", 0]),
-			"bf": _srv_buff_pub(p)})
+			"bf": _srv_buff_pub(p), "hpm": int(_srv_stats(p).get("max_hp", 0)), "mpm": int(_srv_stats(p).get("max_mp", 0))})
 	return {"id": pid, "leader": pt.leader, "members": mem}
 
 ## Баффы игрока для рамок группы: [[id, иконка, цвет, осталось, длительность, бафф?]]
@@ -821,6 +824,21 @@ func c_party_kick(pname: String) -> void:
 	if tid == 0 or tid == id or not pt.members.has(tid): return
 	s_notice.rpc_id(tid, "Вас исключили из группы")
 	_srv_party_remove(tid, "исключён(а) из группы")
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_party_promote(pname: String) -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null or int(p.party) == 0 or not parties.has(int(p.party)): return
+	var pt: Dictionary = parties[int(p.party)]
+	if pt.leader != id: s_notice.rpc_id(id, "Передать лидерство может только лидер"); return
+	var tid := _srv_find(pname.left(40))
+	if tid == 0 or tid == id or not pt.members.has(tid): return
+	pt.leader = tid
+	for m in pt.members:
+		if players.has(m): s_notice.rpc_id(m, "Лидер группы теперь %s" % players[tid].name)
+	_srv_party_send(int(p.party))
 
 func _srv_party_remove(id: int, why: String) -> void:
 	var p = players.get(id)
@@ -1384,6 +1402,7 @@ func c_wm_cc(nid: int, kind: String, v: float, dur: float, dir: Vector3) -> void
 	wm_stats.cc += 1
 	sim.cc(id, nid, kind, v, dur, dir)
 
+var _test_loot := OS.get_environment("RPG_TEST_LOOT") == "1"
 ## Враг погиб (решение WorldSim): участникам — опыт и флаги, добыча — на землю для всех
 func _wm_on_kill(sim: WorldSim, sp, m: Dictionary) -> void:
 	wm_stats.kills += 1
@@ -1399,6 +1418,7 @@ func _wm_on_kill(sim: WorldSim, sp, m: Dictionary) -> void:
 	var hl := int(kp.data.get("level", 1)) if kp != null else int(m.lvl)
 	var boss: bool = bool(m.def.boss) or str(m.rank) == "boss"
 	var list: Array = Loot.roll_boss_drops(int(m.lvl), cls) if boss else Loot.roll_drops(int(m.lvl), hl, cls, str(m.rank))
+	if _test_loot: list.append(["item", 1, Items.roll(int(m.lvl), cls)])   # только тесты: гарантированная вещь
 	var out := []
 	for dr in list:
 		var r := Vector2.from_angle(randf() * TAU) * randf_range(0.4, 1.6) * (2.0 if boss else 1.0)

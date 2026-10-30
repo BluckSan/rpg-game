@@ -12,6 +12,9 @@ func shot(n: String) -> void:
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png("%s/%s_%s_%s.png" % [out, pref, ("pc" if Game.desktop else "phone"), n])
 	print("shot ", n)
+func _click() -> InputEventMouseButton:
+	var e := InputEventMouseButton.new(); e.button_index = MOUSE_BUTTON_LEFT; e.pressed = false
+	return e
 func w(sec: float) -> void:
 	await get_tree().create_timer(sec, true, false, true).timeout
 func _ready() -> void:
@@ -49,11 +52,13 @@ func _ready() -> void:
 	if pui.has_method("_hide_invite"): pui._hide_invite()
 	# 3) группа из трёх, я лидер
 	Net.party = {"id": 5, "leader": 1, "members": [
-		{"id": 1, "name": "Арина", "cls": "warrior", "lvl": 18, "hp": 1.0, "mp": 0.8, "zone": "starter"},
-		{"id": 7, "name": "Борис", "cls": "mage", "lvl": 15, "hp": 0.45, "mp": 0.3, "zone": "starter"},
-		{"id": 11, "name": "Глеб", "cls": "archer", "lvl": 17, "hp": 0.9, "mp": 1.0, "zone": "pd_ash"}]}
+		{"id": 1, "name": "Арина", "cls": "warrior", "lvl": 18, "hp": 0.764, "mp": 0.652, "hpm": 1120, "mpm": 420, "zone": "starter"},
+		{"id": 7, "name": "Борис", "cls": "mage", "lvl": 15, "hp": 0.45, "mp": 0.3, "hpm": 760, "mpm": 980, "zone": "starter"},
+		{"id": 11, "name": "Глеб", "cls": "archer", "lvl": 17, "hp": 0.9, "mp": 1.0, "hpm": 890, "mpm": 310, "zone": "dungeon"}]}
 	pui.open_tab("party"); await w(0.8); await shot("03_party_leader")
 	if pui.has_method("self_check"): for r in pui.self_check(): ck(r[0], r[1])
+	pui._row_input(_click(), "Борис", 7); await w(0.4); await shot("03b_party_selected")
+	pui._open_invite(); await w(0.5); await shot("06_invite_panel"); pui.inv_pan.visible = false
 	pui.close(); await w(0.5); await shot("04_frames")
 	# 4) я участник
 	Net.party.leader = 7
