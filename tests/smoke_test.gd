@@ -261,7 +261,7 @@ func _ready() -> void:
 	z2 = get_tree().current_scene
 	pl = z2.player
 	# сундук в лагере: окно, массовый перенос туда и обратно (UI)
-	check(z2.stash_point != Vector3.INF, "сундук в лагере есть")
+	check(z2.stash_point != Vector3.INF, "сундук в лагере есть (%s, %s, builder=%s)" % [z2.name, str(Game.current.get("zone", "")), str(z2.builder)])
 	pl.data["inventory"].clear()
 	for i in 6: pl.data["inventory"].append(Items.roll(3, String(pl.data["class"]), 0.2))
 	var st0: int = pl.data["stash"].size()
@@ -836,7 +836,7 @@ func _dungeon_tests(z, pl: Player) -> void:
 		for e in d2.enemies: if is_instance_valid(e) and not e.def.boss: pe += 1
 		check(pe >= 10, "группы врагов вернулись (%d)" % pe)
 		check(DB.zone_flag(p2.data, "dungeon", "boss_warden_killed") and d2.builder.gate_open(), "победа и решённая загадка сохраняются (решётка открыта)")
-		Game.travel("starter", "dungeon")
+		Game.travel_start("starter")   # к лагерю долины (не к входу в склеп — иначе вход сразу затянет обратно)
 		g = 0
 		while get_tree().current_scene == d2 and g < 300:
 			await frames(1); g += 1

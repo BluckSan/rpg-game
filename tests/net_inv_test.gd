@@ -248,6 +248,28 @@ func _manual_round(z, p, round: int, touch: bool) -> void:
 				Input.parse_input_event(b); await get_tree().create_timer(0.05).timeout
 				b = b.duplicate(); b.pressed = false; Input.parse_input_event(b)
 		var got := await wait_until(func(): return Net.picks_ok > n0, 3.0)
+		if not got and is_instance_valid(l) and U.flat_dist(p.global_position, l.global_position) > 4.0:
+			# героя унесло (смерть/коррекция позиции) — это не ошибка подбора: вернуть и повторить тем же способом
+			print("    [b] герой отнесён на %.1f м — повтор" % U.flat_dist(p.global_position, l.global_position))
+			Net.notify_teleport(); await get_tree().create_timer(0.1).timeout
+			p.global_position = l.global_position + Vector3(1.6, 0.3, 0.6)
+			await get_tree().create_timer(0.6).timeout
+			if is_instance_valid(l):
+				if m == "key":
+					var ev2 := InputEventKey.new(); ev2.keycode = KEY_E; ev2.physical_keycode = KEY_E; ev2.pressed = true
+					Input.parse_input_event(ev2); await get_tree().process_frame
+					ev2 = ev2.duplicate(); ev2.pressed = false; Input.parse_input_event(ev2)
+				else:
+					var sp2: Vector2 = get_viewport().get_final_transform() * get_viewport().get_camera_3d().unproject_position(l.global_position + Vector3.UP * 0.4)
+					var t2 := InputEventScreenTouch.new() if m == "touch" else null
+					if t2 != null:
+						t2.index = 0; t2.position = sp2; t2.pressed = true; Input.parse_input_event(t2); await get_tree().create_timer(0.05).timeout
+						t2 = t2.duplicate(); t2.pressed = false; Input.parse_input_event(t2)
+					else:
+						var b2 := InputEventMouseButton.new(); b2.button_index = MOUSE_BUTTON_LEFT; b2.position = sp2; b2.pressed = true
+						Input.parse_input_event(b2); await get_tree().create_timer(0.05).timeout
+						b2 = b2.duplicate(); b2.pressed = false; Input.parse_input_event(b2)
+				got = await wait_until(func(): return Net.picks_ok > n0, 3.0)
 		check(got, "подбор: %s (%s)" % [{"key": "клавиша E", "touch": "касание", "click": "клик мышью"}[m], l.type if is_instance_valid(l) else "?"] + ("" if got else " отказы=%s дист=%.1f" % [Net.pick_fails, U.flat_dist(p.global_position, l.global_position) if is_instance_valid(l) else -1.0]))
 
 var full_tested := false
