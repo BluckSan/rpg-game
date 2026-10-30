@@ -220,7 +220,7 @@ func _manual_round(z, p, round: int, touch: bool) -> void:
 		check(int(Net.pick_fails.get("full", 0)) > n0, "полный инвентарь: сервер отказал с причиной")
 		check(Net.net_drops.has(did) and is_instance_valid(Net.net_drops[did]), "вещь осталась на земле")
 		var sold := []
-		for i in 6: sold.append(str(Game.current.inventory[Game.current.inventory.size() - 1 - i].uid))
+		for i in mini(20, Game.current.inventory.size()): sold.append(str(Game.current.inventory[Game.current.inventory.size() - 1 - i].uid))
 		Net.inv("sell", sold); await wait_until(func(): return Net.inv_pending == 0, 5.0)
 	var methods := ["key", "touch" if touch else "click"]
 	var k := 0
@@ -238,7 +238,7 @@ func _manual_round(z, p, round: int, touch: bool) -> void:
 			ev = ev.duplicate(); ev.pressed = false; Input.parse_input_event(ev)
 		else:
 			var cam: Camera3D = get_viewport().get_camera_3d()
-			var sp := cam.unproject_position(l.global_position + Vector3.UP * 0.4)
+			var sp: Vector2 = get_viewport().get_final_transform() * cam.unproject_position(l.global_position + Vector3.UP * 0.4)   # окно ≠ 1920×1080 вьюпорта
 			if m == "touch":
 				var t := InputEventScreenTouch.new(); t.index = 0; t.position = sp; t.pressed = true
 				Input.parse_input_event(t); await get_tree().create_timer(0.05).timeout
@@ -248,7 +248,7 @@ func _manual_round(z, p, round: int, touch: bool) -> void:
 				Input.parse_input_event(b); await get_tree().create_timer(0.05).timeout
 				b = b.duplicate(); b.pressed = false; Input.parse_input_event(b)
 		var got := await wait_until(func(): return Net.picks_ok > n0, 3.0)
-		check(got, "подбор: %s (%s)" % [{"key": "клавиша E", "touch": "касание", "click": "клик мышью"}[m], l.type if is_instance_valid(l) else "?"])
+		check(got, "подбор: %s (%s)" % [{"key": "клавиша E", "touch": "касание", "click": "клик мышью"}[m], l.type if is_instance_valid(l) else "?"] + ("" if got else " отказы=%s дист=%.1f" % [Net.pick_fails, U.flat_dist(p.global_position, l.global_position) if is_instance_valid(l) else -1.0]))
 
 var full_tested := false
 func _finish() -> void:

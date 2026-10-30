@@ -816,7 +816,8 @@ func _dungeon_tests(z, pl: Player) -> void:
 		await frames(1); g += 1
 	await frames(20)
 	var s2 = get_tree().current_scene
-	check(s2 != d and not s2.is_dungeon() and U.flat_dist(s2.player.global_position, s2.dungeon_gate_point) < 6.0, "возврат в долину к входу в склеп")
+	# v0.9.2: портал после победы ведёт к начальной точке долины (не к входу в склеп)
+	check(s2 != d and not s2.is_dungeon() and str(Game.current.get("zone", "")) == "starter", "возврат в долину после победы (%s)" % str(Game.current.get("zone", "")))
 	# повторный забег: снова через вход — герой у входа, контрольные точки сброшены, Хранитель и группы на месте
 	s2.player.teleport(s2.dungeon_gate_point + Vector3(0, 0.1, 0) + Basis(Vector3.UP, deg_to_rad(115.0)) * Vector3(0, 0, 0.8))
 	g = 0
@@ -836,6 +837,9 @@ func _dungeon_tests(z, pl: Player) -> void:
 		check(pe >= 10, "группы врагов вернулись (%d)" % pe)
 		check(DB.zone_flag(p2.data, "dungeon", "boss_warden_killed") and d2.builder.gate_open(), "победа и решённая загадка сохраняются (решётка открыта)")
 		Game.travel("starter", "dungeon")
+		g = 0
+		while get_tree().current_scene == d2 and g < 300:
+			await frames(1); g += 1
 		await frames(20)
 
 func _alive_enemy(z):
