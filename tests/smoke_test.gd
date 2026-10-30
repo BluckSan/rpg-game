@@ -217,7 +217,7 @@ func _ready() -> void:
 		var e2 = _alive_enemy(z2)
 		pl.teleport(e2.global_position + Vector3(0, 0.1, -2))
 		await frames(2)
-		check(pl.try_use(3), "умение пути «%s»" % a["skill"]["name"])
+		check(pl.try_use(3), "умение пути «%s» %s" % [a["skill"]["name"], pl.last_fail])
 		await frames(70)
 		check(pl.data["loadout"][2] == a["skill"]["id"], "умение пути в слоте 3")
 		var extra_ok := 0
