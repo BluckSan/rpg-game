@@ -57,7 +57,7 @@ var roll_cd := 0.0
 var invuln := 0.0
 var raid_slow := 0.0        # v0.9.5: замедление механик рейда (доля 0..0.8)
 var raid_slow_t := 0.0
-var frozen_t := 0.0         # v0.9.5: «Ледяная гробница» — не двигается и не бьёт
+var frozen_t := 0.0         # v0.9.5: «Ледяная гробница» — скован (не двигается), но может бить лёд изнутри
 var _roll_time := 0.0
 var _roll_dir := Vector3.FORWARD
 var _last_move := Vector3.ZERO
@@ -491,7 +491,6 @@ func use_potion() -> void:
 
 var last_fail := ""   # причина последнего отказа try_use (диагностика тестов)
 func try_use(slot: int) -> bool:
-	if frozen_t > 0.0: last_fail = "frozen"; return false
 	if dead or cooldowns[slot] > 0:
 		last_fail = "dead" if dead else "cd %.2f" % cooldowns[slot]; return false
 	if lock_reason(slot) != "":

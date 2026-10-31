@@ -16,6 +16,7 @@ var done := false
 var stats := {"hurt": 0, "taken": 0.0, "lethal": 0, "warns": [], "loot": [], "kills": 0, "wipes": 0, "events": {}, "src": {}}
 var _snap_t := 0.0
 var _pull := {}
+var mc := {}               # v0.9.5: текущий каст мини-босса Некрополя {n, l, tt, id}
 var gzs := {}              # v0.9.5: наземные зоны (облака гнили, «Смерть и разложение») id -> {node, left}
 var ui: CanvasLayer
 var warn_label: Label
@@ -126,6 +127,7 @@ func handle(ev: Dictionary) -> void:
 		"st":
 			brain.apply(ev, RaidSim.PHASES[did])
 			zone.builder.set_gate(bool(ev.gate))
+			mc = ev.get("mc", {})
 			if ev.has("doors") and zone.builder.has_method("set_doors"): zone.builder.set_doors(ev.doors)
 			if bool(ev.get("done", false)) and not done:
 				done = true
@@ -158,7 +160,7 @@ func handle(ev: Dictionary) -> void:
 		"frz":
 			if int(ev.p) == my_pid and zone.player:
 				zone.player.frozen_t = float(ev.dur)
-				show_warn("Вас заковали в лёд! Союзники — разбейте гробницу")
+				show_warn("Вас заковали в лёд! Бейте гробницу — союзники помогут")
 		"unfrz":
 			if int(ev.p) == my_pid and zone.player: zone.player.frozen_t = 0.0
 		"gz": _make_gz(ev)

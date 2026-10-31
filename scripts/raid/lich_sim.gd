@@ -114,7 +114,7 @@ func _pre_ai(e: Dictionary, dt: float) -> bool:
 	return false
 
 func _aura_tick(e: Dictionary, dt: float) -> void:
-	e.t1 = float(e.t1) - dt
+	e.t1 = float(e.get("t1", 1.0)) - dt
 	if e.t1 > 0.0: return
 	var tp = _target(e)
 	if tp == null: return
@@ -183,7 +183,7 @@ func _mini_ai(e: Dictionary, dt: float) -> void:
 	elif e.kind == "rm_sister" and dist < 5.0:
 		var np2 := RaidDefs.clamp_pos(e.pos - to.normalized() * float(e.speed) * dt * 0.8, did)
 		if RaidDefs.l_section(np2) == int(e.sec): e.pos = np2
-	e.t1 = float(e.t1) - dt
+	e.t1 = float(e.get("t1", 1.0)) - dt
 	if e.t1 <= 0.0:
 		match e.kind:
 			"rm_keeper":

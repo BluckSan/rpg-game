@@ -13,10 +13,14 @@ var stuck_t := 0.0
 var last_pos := Vector3.ZERO
 var mech_moves := 0
 var interrupts_tried := 0
+var lich := false
+var hides := 0
+var behind_frames := 0
 
 func _init(z, pid: int, others_cb: Callable) -> void:
 	zone = z; p = z.player; my_pid = pid; others = others_cb
 	ranged = str(p.data["class"]) != "warrior"
+	lich = z.raid != null and z.raid.did == "lich"
 
 func _teles() -> Array:
 	var out := []
@@ -35,16 +39,46 @@ func _boss():
 
 func _pick_target():
 	var best = null; var bs := -INF
+	var reach := _reach()
 	for e in zone.enemies:
 		if not is_instance_valid(e) or not e.alive: continue
+		if lich and RaidDefs.l_section(e.global_position) > reach: continue
 		var s := -U.flat_dist(e.global_position, p.global_position) * 0.2
 		if e is NetEnemy:
 			match e.role:
 				"add", "naiad": s += 100.0
 				"half": s += 80.0 + e.hp / maxf(1.0, e.max_hp) * 50.0   # бьём ту, у которой больше здоровья — умирают вместе
 				"trash": s += 60.0
+				"tomb": s += 150.0
+				"phyl": s += 90.0
+				"mini": s += 55.0
+				"minion": s += 95.0
 				"boss": s += 10.0 - (200.0 if e.brain and e.brain.invulnerable else 0.0)
 		if s > bs: bs = s; best = e
+	return best
+
+## Некрополь: самая дальняя секция, куда можно пройти (двери закрываются до зачистки)
+func _reach() -> int:
+	if not lich: return 99
+	var b = zone.builder
+	if b.ldoor_closed[0]: return 0
+	if b.ldoor_closed[1]: return 2
+	if b.ldoor_closed[2]: return 3
+	if b.gate_is_closed: return 4
+	return 5
+
+## Укрытие от рывка Колосса: точка за ближайшей колонной (колонна между героем и Колоссом)
+func _hide_spot(me: Vector3):
+	var col = null
+	for e in zone.enemies:
+		if is_instance_valid(e) and e.alive and e.kind == "rm_colossus": col = e
+	if col == null: return null
+	var best = null; var bd := INF
+	for pl in RaidDefs.L_COL_PILLARS:
+		var away: Vector3 = U.flat(pl - col.global_position).normalized()
+		var spot: Vector3 = pl + away * (RaidDefs.L_COL_PILLAR_R + 1.0)
+		var d := U.flat_dist(spot, me)
+		if d < bd: bd = d; best = spot
 	return best
 
 ## Один шаг (каждый физический кадр). Возвращает направление движения
@@ -61,6 +95,21 @@ func step(dt: float) -> void:
 		if t.k == "safe":
 			var d := U.flat_dist(me, t.c)
 			if d < sd: sd = d; safe_best = t
+	if lich and not urgent:
+		var mc: Dictionary = zone.raid.mc
+		if str(mc.get("n", "")) == "Сокрушительный рывок":
+			var hs = _hide_spot(me)
+			if hs != null:
+				var to: Vector3 = U.flat(hs - me)
+				mv = to.normalized() if to.length() > 0.5 else Vector3.ZERO
+				urgent = true; hides += 1
+		for id in zone.raid.gzs:   # облака гнили, «Смерть и разложение»
+			var g: Dictionary = zone.raid.gzs[id]
+			if not is_instance_valid(g.node): continue
+			var gc := U.flat(g.node.global_position); var gr: float = g.node.scale.x
+			if U.flat_dist(gc, me) < gr + 0.8: mv += U.flat(me - gc).normalized() * 1.5; urgent = true
+		for pit in RaidDefs.L_PITS:
+			if U.flat_dist(pit, me) < RaidDefs.L_PIT_R + 0.8: mv += U.flat(me - pit).normalized() * 1.2; urgent = true
 	if safe_best != null:
 		if sd > safe_best.r * 0.55: mv = U.flat(safe_best.c - me).normalized(); urgent = true
 		else: mv = Vector3.ZERO; urgent = true
@@ -94,6 +143,7 @@ func step(dt: float) -> void:
 						for a in allies:
 							var ad := U.flat_dist(a, me)
 							if ad < t.r * 2.0 + 1.0: mv += U.flat(me - a).normalized() * 1.5; urgent = true
+					elif t.m == "aim": pass
 					elif d < t.r + 1.0 and t.fo != my_pid:
 						mv += (-to_c.normalized() if d > 0.1 else Vector3.RIGHT) * 1.5; urgent = true
 	if urgent: mech_moves += 1
@@ -102,7 +152,25 @@ func step(dt: float) -> void:
 	var b0 = _boss()
 	if b0 != null and b0.brain and b0.brain.cast_name == "Песнь Бездны": tgt = b0   # все — к боссу, прервать песнь
 	var bb = _boss()
-	if not urgent and bb != null and not RaidDefs.in_arena(me) and zone.builder.gate_open() and zone.builder.packs_left() == 0:
+	var sis_cast: bool = lich and str(zone.raid.mc.get("n", "")) == "Воскрешение мёртвых"
+	if sis_cast:
+		for e in zone.enemies:
+			if is_instance_valid(e) and e.alive and e.kind == "rm_sister": tgt = e
+	if lich and not urgent and tgt == null:
+		var gt: Vector3 = zone.builder.guide_target()
+		if U.flat_dist(gt, me) > 3.0: mv = U.flat(gt - me).normalized()
+	elif lich and not urgent and tgt != null and tgt.kind == "rm_keeper":
+		# Хранитель режет урон спереди — заходим за спину
+		var fwd := Vector3(sin(tgt.rotation.y), 0, cos(tgt.rotation.y))
+		var spot: Vector3 = U.flat(tgt.global_position) - fwd * (6.0 if ranged else 2.0 + tgt.radius)
+		var to: Vector3 = U.flat(spot - me)
+		if to.length() > 0.7:
+			var rel: Vector3 = U.flat(me - tgt.global_position)
+			# огибаем сбоку, а не идём сквозь него
+			if rel.normalized().dot(fwd) > -0.2 and rel.length() < 5.0: to += fwd.cross(Vector3.UP).normalized() * (1.0 if rel.dot(fwd.cross(Vector3.UP)) >= 0 else -1.0) * 2.0
+			mv = to.normalized()
+		else: behind_frames += 1
+	elif not lich and not urgent and bb != null and not RaidDefs.in_arena(me) and zone.builder.gate_open() and zone.builder.packs_left() == 0:
 		mv = U.flat(RaidDefs.ARENA_C - me).normalized()   # решётка открыта — все на арену, пока не закрылась
 	elif tgt and not urgent:
 		var dist := U.flat_dist(tgt.global_position, me)
@@ -119,8 +187,11 @@ func step(dt: float) -> void:
 				p.face_towards(b.global_position)
 				tgt = b
 			# в Склепе умение 2 бережём для прерывания Песни Бездны (как сделал бы игрок)
-			var keep: bool = zone.raid != null and zone.raid.did == "crypt"
-			if song:
+			var keep: bool = zone.raid != null and (zone.raid.did == "crypt" or (zone.raid.did == "lich" and RaidDefs.l_section(me) == 3))
+			if sis_cast and tgt.kind == "rm_sister":
+				for s in [2, 1]:
+					if p.try_use(s): interrupts_tried += 1; break
+			elif song:
 				for s in [2, 1]:
 					if p.try_use(s): interrupts_tried += 1; break
 			elif randf() < 0.5:

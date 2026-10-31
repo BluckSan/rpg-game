@@ -25,6 +25,7 @@ func _ready() -> void:
 	_run.call_deferred()
 
 const EXPECT := {"ash": ["meteors", "shield", "slab", "ring", "shield broken"], "crypt": ["song", "drops", "tide", "naiads", "whirlpool"],
+	"lich": ["door0", "keeper", "door1", "sister", "door2", "colossus", "gate", "arrow", "ice", "wave", "phase2", "phyl", "phase3", "tomb", "dnd", "phase4"],
 	"star": ["beam", "starfall", "split", "split done", "nova", "gravity"]}
 
 func _run() -> void:
@@ -58,7 +59,12 @@ func _dungeon(did: String) -> void:
 	if args.has("god"): p.god_mode = true
 	var trash := 0
 	for e in d.enemies: if e is NetEnemy and e.role == "trash": trash += 1
-	check(trash == 8, "[%s] стражи коридора на клиенте: %d (NetEnemy)" % [did, trash])
+	if did == "lich": check(trash >= 8, "[%s] нежить Некрополя на клиенте: %d (NetEnemy)" % [did, trash])
+	else: check(trash == 8, "[%s] стражи коридора на клиенте: %d (NetEnemy)" % [did, trash])
+	if did == "lich":
+		check(d.builder is LichNecropolisBuilder, "[lich] своя локация: LichNecropolisBuilder")
+		check(d.builder.ldoor_closed == [true, true, true], "[lich] двери склепа закрыты до зачистки")
+		check(sim.minis.size() == 3, "[lich] мини-боссы: %s" % str(sim.minis.keys()))
 	check(d.builder.gate_is_closed, "[%s] решётка арены закрыта до зачистки" % did)
 	var boss = d.builder.boss_enemy()
 	check(boss != null and boss.brain is RaidBrain and absf(boss.max_hp - RaidDefs.boss_hp(sim.level, 1) * float(RaidDefs.DUNGEONS[did].get("hp_k", 1.0))) < 1.0, "[%s] босс «%s»: здоровье %d (соло-масштаб, ждём %d, мозг %s)" % [did, boss.def.name if boss else "?", boss.max_hp if boss else 0, RaidDefs.boss_hp(sim.level, 1) * float(RaidDefs.DUNGEONS[did].get("hp_k", 1.0)), boss.brain.get_script().resource_path if boss and boss.brain else "-"])
@@ -80,14 +86,22 @@ func _dungeon(did: String) -> void:
 			var b = sim.enemies.get(sim.boss_id)
 			print("    t=%.0f с: босс %.0f%% фаза %d, бой=%s, вайпов %d, смертей %d, урон героя %.0f" % [game_t, 100.0 * b.hp / b.mhp, sim.phase, str(sim.engaged), sim.wipes, deaths, sim.players[1].dealt])
 	var names := {}
+	if did == "lich":
+		for l in sim.mlog: names[str(l[1]).get_slice(" ", 0)] = true; names[str(l[1]).get_slice(" ", 1) if " " in str(l[1]) else str(l[1])] = true
 	for l in sim.mlog: names[str(l[1]).get_slice(" ", 0) if not str(l[1]).begins_with("shield broken") and not str(l[1]).begins_with("split done") else str(l[1])] = true
-	print("    журнал: ", sim.mlog.slice(0, 60))
+	print("    журнал: ", sim.mlog.slice(0, 60) if did != "lich" else sim.mlog.filter(func(l): return not str(l[1]) in ["arrow", "ice zones", "keeper quake"]))
 	print("    по герою: ударов %d, урон %.0f (%.1f× здоровья), смертельных %d, уклонений механик (кадров) %d" % [d.raid.stats.hurt, d.raid.stats.taken, d.raid.stats.taken / maxf(1.0, p.stats.max_hp), d.raid.stats.lethal, bot.mech_moves])
 	print("    источники урона (доли здоровья): ", d.raid.stats.src)
 	check(names.has("gate"), "[%s] стражи перебиты — решётка поднялась" % did)
 	check(names.has("engage"), "[%s] бой с боссом начался" % did)
 	for m in EXPECT[did]:
 		check(names.has(m), "[%s] механика «%s» сработала" % [did, m])
+	if did == "lich":
+		var fight := game_t - eng_at
+		check(eng_at > 0 and eng_at < 15.0 * 60.0, "[lich] зачистка до босса: %.1f мин (цель ≈10)" % (eng_at / 60.0))
+		if sim.done: check(fight >= 20.0 * 60.0 * float(args.get("minf", "1.0")) and fight < 25.0 * 60.0, "[lich] бой с Кел'Тааром: %.1f мин (цель ≥20, бешенство в 25)" % (fight / 60.0))
+		check(not sim.enraged, "[lich] бешенство не наступило")
+		print("    укрытий от рывка (кадров): %d, за спиной Хранителя (кадров): %d, попыток прерывания: %d" % [bot.hides, bot.behind_frames, bot.interrupts_tried])
 	if did == "crypt": check(sim.mlog.any(func(l): return str(l[1]).begins_with("interrupt")), "[%s] Песнь Бездны прервана умением" % did)
 	check(sim.done, "[%s] босс убит за %.0f с боя (вайпов %d, смертей героя %d, урон %.0f, %.0f/с)" % [did, game_t - eng_at, sim.wipes, deaths, sim.players[1].dealt, sim.players[1].dealt / maxf(1.0, game_t)])
 	if not sim.done: return
