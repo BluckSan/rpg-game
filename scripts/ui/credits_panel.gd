@@ -10,6 +10,11 @@ const TEXT := """[center][b][color=#f2c46d]Осколки Эфира[/color][/b]
 game-icons.net — авторы [b]Lorc[/b], [b]Delapouite[/b], [b]Skoll[/b], [b]Sbed[/b]
 Лицензия: creativecommons.org/licenses/by/3.0 · иконки перекрашены и уменьшены.
 
+[b][color=#f2c46d]Модель босса Кел'Таар — CC BY 4.0 (указание авторства обязательно)[/color][/b]
+"Skeletal Lich King in Bone Crown and Robes" by Pigcraft (@s8819296)
+sketchfab.com/3d-models/skeletal-lich-king-in-bone-crown-and-robes-0fa4c6a200444b4abc108a9b0b9edae6
+Лицензия: creativecommons.org/licenses/by/4.0 · изменено: модель упрощена (LOD для ПК и телефона), текстура перенесена в цвет вершин, анимация процедурная.
+
 [b][color=#f2c46d]Фотограмметрия и реалистичные модели — CC0 1.0[/color][/b]
 [b]Poly Haven[/b] (polyhaven.com): WoodenTable_01, boulder_01, dandelion_01, dead_quiver_trunk, dead_tree_trunk_02, dry_branches_medium_01, fern_02, gothic_statue, grass_medium_02, large_castle_door, modular_fort_01, namaqualand_boulder_02–05, nettle_plant, periwinkle_plant, quiver_tree_02, rock_07, rock_moss_set_01, rock_moss_set_02, root_cluster_01, shrub_02–04, shrub_sorrel_01, spinning_wheel_01, stone_fire_pit, treasure_chest, tree_stump_01–02, weed_plant_02, wicker_basket_01, wild_rooibos_bush, wine_barrel_01, wooden_axe_03, wooden_bucket_01, wooden_crate_01–02, wooden_ladder, wooden_lantern_01, wooden_stool_01.
 Небо — HDRI «Kloofendal 48d Partly Cloudy (Pure Sky)» (Greg Zaal / Poly Haven, CC0). Модели упрощены (LOD), текстуры уменьшены.

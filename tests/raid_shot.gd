@@ -10,14 +10,18 @@ func _ready() -> void:
 		var r = load("res://tests/raid_shot.gd").new(); r.is_runner = true
 		get_tree().root.add_child.call_deferred(r); return
 	var preset := 2
+	var only := ""
 	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--only="): only = a.substr(7)
 		if a.begins_with("--out="): out = a.substr(6)
 		if a.begins_with("--tag="): tag = a.substr(6)
 		if a.begins_with("--preset="): preset = int(a.substr(9))
 	DirAccess.make_dir_recursive_absolute(out)
 	Game.apply_preset(preset)
 	get_tree().create_timer(600.0, true, false, true).timeout.connect(func(): get_tree().quit(2))
-	for did in RaidDefs.ORDER: await _dungeon(did)
+	for did in RaidDefs.ORDER:
+		if did == "lich" or (only != "" and did != only): continue   # Некрополь — tests/lich_shot
+		await _dungeon(did)
 	print("RAID SHOTS DONE")
 	get_tree().quit()
 
