@@ -107,6 +107,7 @@ func step(dt: float) -> void:
 			var g: Dictionary = zone.raid.gzs[id]
 			if not is_instance_valid(g.node): continue
 			var gc := U.flat(g.node.global_position); var gr: float = g.node.scale.x
+			if float(g.dur) <= 10.0 and p.hp > p.stats.max_hp * 0.5: continue   # мелкое облако гнили: терпим, иначе кайт без конца
 			if U.flat_dist(gc, me) < gr + 0.8: mv += U.flat(me - gc).normalized() * 1.5; urgent = true
 		for pit in RaidDefs.L_PITS:
 			if U.flat_dist(pit, me) < RaidDefs.L_PIT_R + 0.8: mv += U.flat(me - pit).normalized() * 1.2; urgent = true

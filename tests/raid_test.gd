@@ -85,6 +85,12 @@ func _dungeon(did: String) -> void:
 		if int(game_t * 10) % 300 == 0 and int((game_t - dt) * 10) % 300 != 0:
 			var b = sim.enemies.get(sim.boss_id)
 			print("    t=%.0f с: босс %.0f%% фаза %d, бой=%s, вайпов %d, смертей %d, урон героя %.0f" % [game_t, 100.0 * b.hp / b.mhp, sim.phase, str(sim.engaged), sim.wipes, deaths, sim.players[1].dealt])
+			if did == "lich":
+				var pp = d.player.global_position
+				var al := []
+				for o in sim.enemies.values():
+					if o.alive and o.role != "boss": al.append("%s@%.0f,%.0f" % [o.role, o.pos.x, o.pos.z])
+				print("      DBG me %.0f,%.0f reach=%d alive=%s doors=%s" % [pp.x, pp.z, bot._reach(), str(al), str(sim.doors)])
 	var names := {}
 	if did == "lich":
 		for l in sim.mlog: names[str(l[1]).get_slice(" ", 0)] = true; names[str(l[1]).get_slice(" ", 1) if " " in str(l[1]) else str(l[1])] = true
