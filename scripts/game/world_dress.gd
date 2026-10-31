@@ -50,6 +50,7 @@ var _sky_t := 0.0
 var _sky_applied := {}
 var critters: Array = []       # {node, vel, t}
 var _critter_t := 1.0
+const TOWNSFOLK := false        # v0.9.4.2: декоративные жители выключены
 var npcs: Array = []           # {node, town, home, target, t, walker}
 var _npc_built := {}
 static var _cloud_tex: NoiseTexture2D
@@ -193,7 +194,8 @@ func _process(delta: float) -> void:
 		_cur[key] = _cur[key].lerp(_target[key], k) if _cur[key] is Color else lerpf(_cur[key], _target[key], k)
 	_apply_grade(delta)
 	if Game.quality >= 1: _critters_tick(delta, p)
-	_npcs_tick(delta, p)
+	# v0.9.4.2: декоративные жители городов убраны (без функции); торговцы, сундуки и камни — в WorldBuilder
+	if TOWNSFOLK: _npcs_tick(delta, p)
 
 func _apply_grade(delta: float) -> void:
 	if _cur.is_empty(): return
