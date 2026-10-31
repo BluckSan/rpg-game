@@ -293,7 +293,9 @@ func _ready() -> void:
 		await frames(3)
 		check(wz.hud.minimap.mouse_filter == Control.MOUSE_FILTER_STOP, "мини-карта в мире открывает карту по касанию")
 		var ev := InputEventMouseButton.new(); ev.button_index = MOUSE_BUTTON_LEFT; ev.pressed = true
-		wz.hud.minimap._gui_input(ev); await frames(2)
+		wz.hud.minimap._gui_input(ev)
+		var evu := InputEventMouseButton.new(); evu.button_index = MOUSE_BUTTON_LEFT; evu.pressed = false
+		wz.hud.minimap._gui_input(evu); await frames(2)   # v0.9.4.2: открытие по отпусканию (долгое — метка)
 		check(wz.hud.window != null and wz.hud.window.has_method("travel"), "касание мини-карты → карта мира")
 		wz.hud.close_window(); await frames(2)
 	Game.to_menu()
