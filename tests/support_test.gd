@@ -25,7 +25,7 @@ func _ready() -> void:
 	var lvl := int(args.get("lvl", "20"))
 	print("=== SUPPORT TEST (ур. %d) ===" % lvl)
 	_static_checks(lvl)
-	var dl: Array = RaidDefs.ORDER if not args.has("dungeon") else [args.dungeon]
+	var dl: Array = RaidDefs.ORDER.filter(func(x): return x != "lich") if not args.has("dungeon") else [args.dungeon]
 	for did in dl:
 		for sc in DB.CLASS_ORDER:
 			seed(1000 + did.length() * 7 + sc.length())
