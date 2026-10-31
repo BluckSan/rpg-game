@@ -410,12 +410,16 @@ func guide_target() -> Vector3:
 	if ldoor_closed[0]: return RaidDefs.L_PACKS[0] if p.z < RaidDefs.L_PACKS[0].z - 2 else RaidDefs.L_PACKS[1]
 	if ldoor_closed[1]: return RaidDefs.L_KEEPER if sec <= 1 else RaidDefs.L_PACKS[2]
 	if ldoor_closed[2]: return RaidDefs.L_SISTER
-	if gate_is_closed: return RaidDefs.L_COLOSSUS
+	if gate_is_closed and _colossus_alive(): return RaidDefs.L_COLOSSUS
 	return RaidDefs.L_ARENA_C
+func _colossus_alive() -> bool:
+	for e in zone.enemies:
+		if is_instance_valid(e) and e.alive and e.kind == "rm_colossus": return true
+	return false
 func objective() -> String:
 	if arena_exit != null: return "Некрополь пройден! Портал в тронном зале вернёт к Заставе Инея"
 	if ldoor_closed[0]: return "Цель: перебить легионы склепа (%d)" % packs_left()
 	if ldoor_closed[1]: return "Цель: Хранитель склепа (бейте в спину) и стража галереи"
 	if ldoor_closed[2]: return "Цель: Сестра Нежити — прерывайте «Воскрешение мёртвых»"
-	if gate_is_closed: return "Цель: Костяной Колосс — заманите его рывок в колонну"
+	if gate_is_closed and _colossus_alive(): return "Цель: Костяной Колосс — заманите его рывок в колонну"
 	return "Цель: Кел'Таар, Король-Лич"
