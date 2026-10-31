@@ -34,7 +34,7 @@ var _half_dead_t := -1.0
 var _boss_stun := 0.0
 var _reset_until := 0.0          # после вайпа босс 12 с не вступает в бой — группа успевает собраться
 
-const PHASES := {"ash": ["", "Пламя", "Пепел", "Пожар"], "crypt": ["", "Тишина", "Прилив", "Бездна"], "star": ["", "Свет", "Раскол", "Коллапс"]}
+const PHASES := {"ash": ["", "Пламя", "Пепел", "Пожар"], "crypt": ["", "Тишина", "Прилив", "Бездна"], "star": ["", "Свет", "Раскол", "Коллапс"], "lich": ["", "Лёд", "Филактерии", "Гробница", "Буря душ"]}
 
 func setup(dungeon: String, lvl: int, party_n: int) -> void:
 	did = dungeon; d = RaidDefs.DUNGEONS[dungeon]
@@ -45,7 +45,7 @@ func setup(dungeon: String, lvl: int, party_n: int) -> void:
 # ---------------- игроки ----------------
 func add_player(pid: int, info: Dictionary) -> void:
 	players[pid] = {"name": str(info.get("name", "?")), "cls": str(info.get("cls", "warrior")), "lvl": int(info.get("lvl", 1)),
-		"pos": RaidDefs.ENTRY, "hp": 1.0, "alive": true, "win_t": 0.0, "win_dmg": 0.0, "dealt": 0.0, "threat_k": 2.0 if str(info.get("cls", "")) == "warrior" else 1.0}
+		"pos": RaidDefs.entry(did), "hp": 1.0, "alive": true, "win_t": 0.0, "win_dmg": 0.0, "dealt": 0.0, "threat_k": 2.0 if str(info.get("cls", "")) == "warrior" else 1.0}
 	var list := []
 	for id in enemies:
 		if enemies[id].alive and not enemies[id].get("hidden", false): list.append(_pub(enemies[id]))
@@ -79,7 +79,10 @@ func hit(pid: int, eid: int, amount: float, skill: bool) -> float:
 	p.win_dmg = float(p.win_dmg) + amount
 	if skill and eid == boss_id and cast.get("interrupt", false):
 		_interrupt(pid)
+	if skill: _on_skill_hit(e, pid)
 	if e.get("invuln", false) or (eid == boss_id and t < shield_until): return 0.0
+	amount *= _dmg_mult(e, pid)
+	if amount <= 0.0: return 0.0
 	amount *= 1.0 + _dbf(e, "mark")   # v0.9.0: метка поддержки (потолок Support.MARK_CAP)
 	e.hp = maxf(0.0, float(e.hp) - amount)
 	p.dealt = float(p.dealt) + amount
@@ -105,7 +108,7 @@ func tick(dt: float) -> void:
 func status() -> Dictionary:
 	var b = enemies.get(boss_id)
 	var names: Array = PHASES[did]
-	return {"t": "st", "ph": phase, "pn": names[clampi(phase, 0, 3)], "cn": cast.get("name", ""), "ct": float(cast.get("total", 0.0)),
+	return {"t": "st", "ph": phase, "pn": names[clampi(phase, 0, names.size() - 1)], "cn": cast.get("name", ""), "ct": float(cast.get("total", 0.0)),
 		"cl": float(cast.get("left", 0.0)), "h": cast.get("hint", ""), "en": engaged, "el": maxf(0.0, float(d.enrage) - eng_t),
 		"rg": enraged, "gate": gate_closed(), "inv": b != null and (b.get("invuln", false) or t < shield_until or b.get("hidden", false)), "done": done}
 
@@ -151,7 +154,7 @@ func _spawn_trash() -> void:
 			el.frac = 0.06; el.elite = true
 
 func _spawn_boss() -> void:
-	var b := _new_enemy(d.boss, RaidDefs.ARENA_C + Vector3(0, 0, 6), RaidDefs.boss_hp(level, n) * float(d.get("hp_k", 1.0)), "boss")
+	var b := _new_enemy(d.boss, RaidDefs.boss_home(did), RaidDefs.boss_hp(level, n) * float(d.get("hp_k", 1.0)), "boss")
 	b.yaw = PI
 	boss_id = b.id
 	_reset_mech()
@@ -173,7 +176,7 @@ func _alive_players(arena_only := false) -> Array:
 	var out := []
 	for pid in players:
 		var p = players[pid]
-		if p.alive and (not arena_only or RaidDefs.in_arena(p.pos)): out.append(pid)
+		if p.alive and (not arena_only or RaidDefs.in_arena(p.pos, did)): out.append(pid)
 	return out
 
 func _target(e: Dictionary):
@@ -188,6 +191,7 @@ func _target(e: Dictionary):
 
 func _enemy_ai(e: Dictionary, dt: float) -> void:
 	var is_boss: bool = e.id == boss_id
+	if _pre_ai(e, dt): return
 	if e.role == "naiad":   # наяда стоит и лечит босса
 		var b = enemies.get(boss_id)
 		if b and b.alive and not b.get("hidden", false): b.hp = minf(b.mhp, b.hp + b.mhp * 0.001 * dt)
@@ -213,7 +217,7 @@ func _enemy_ai(e: Dictionary, dt: float) -> void:
 	var reach: float = float(e.range) + (1.6 if is_boss else 0.6)
 	if dist > reach * 0.9 and e.role != "naiad":
 		var step: float = minf(dist - reach * 0.8, float(e.speed) * dt * (1.0 - _dbf(e, "slow")))
-		e.pos = RaidDefs.clamp_pos(e.pos + to.normalized() * step)
+		e.pos = RaidDefs.clamp_pos(e.pos + to.normalized() * step, did)
 	e.atk_t = float(e.atk_t) - dt
 	if e.atk_t <= 0.0 and dist <= reach + 0.5:
 		e.atk_t = float(e.interval) * (0.6 if enraged and is_boss else 1.0)
@@ -237,12 +241,13 @@ func _kill(e: Dictionary) -> void:
 		for pid in ids: lv.append(int(players[pid].lvl))
 		var sh: Array = Xp.shares(float(def.xp) * 1.6, level, "elite" if e.get("elite", false) else "normal", lv)
 		for i in ids.size(): _emit(int(ids[i]), {"t": "xp", "v": maxi(1, int(round(sh[i])))})
-		if _trash_left() == 0 and not gate_open:
+		if _gate_ready() and not gate_open:
 			gate_open = true
 			_warn("Решётка арены поднялась!")
 			_note("gate")
 	if e.role == "half": _on_half_dead(e)
 	if e.role == "add" and did == "ash": _check_shield_adds()
+	_on_kill(e)
 	if e.id == boss_id: _boss_dead()
 
 # ---------------- зоны урона (телеграфы) ----------------
@@ -378,6 +383,7 @@ func _boss_tick(dt: float) -> void:
 		"ash": _voragos(b)
 		"crypt": _morwen(b)
 		"star": _aeteron(b)
+		_: _boss_custom(b)
 
 func _cast_done(k: String) -> void:
 	var b := _boss()
@@ -398,7 +404,7 @@ func _cast_done(k: String) -> void:
 		"nova":
 			b.invuln = false
 			_note("nova done")
-		_: pass
+		_: _cast_custom(k)
 
 func _boss_hp_check() -> void:
 	var b := _boss()
@@ -414,6 +420,7 @@ func _boss_hp_check() -> void:
 			if phase == 1 and k <= 0.70: phase = 2; _star_split()
 			elif phase >= 2 and not mech.has("nova50") and k <= 0.50: mech["nova50"] = 1.0; phase = 3; _star_nova()
 			elif mech.has("nova50") and not mech.has("nova20") and k <= 0.20: mech["nova20"] = 1.0; _star_nova()
+		_: _hp_custom(k)
 	_emit(0, status())
 
 func _wipe() -> void:
@@ -425,11 +432,11 @@ func _wipe() -> void:
 	tele.clear()
 	for id in enemies.keys():
 		var e = enemies[id]
-		if e.role in ["add", "naiad", "half"]:
+		if e.role in _temp_roles():
 			if e.alive: _emit(0, {"t": "die", "id": id, "q": true})
 			enemies.erase(id)
 	var b := _boss()
-	b.hp = b.mhp; b.pos = RaidDefs.ARENA_C + Vector3(0, 0, 6); b.threat.clear(); b.invuln = false
+	b.hp = b.mhp; b.pos = RaidDefs.boss_home(did); b.threat.clear(); b.invuln = false
 	if b.get("hidden", false):
 		b.hidden = false; _spawn_pub(b)
 	_reset_mech()
@@ -441,7 +448,7 @@ func _boss_dead() -> void:
 	_note("boss dead t=%.1f" % eng_t)
 	for id in enemies:
 		var e = enemies[id]
-		if e.alive and e.role in ["add", "naiad", "half"]:
+		if e.alive and e.role in _temp_roles():
 			e.alive = false; _emit(0, {"t": "die", "id": id, "q": true})
 	_warn("%s повержен!" % _boss().name)
 	_loot()
@@ -475,6 +482,7 @@ func _loot() -> void:
 	var mat: String = Items.BOSS_MAT.get(str(d.boss), "aether_dust")
 	for i in n + 1: list.append(["mat", 2 + level / 12, {"mat": mat}])
 	for i in n: list.append(["mat", 2 + level / 10, {"mat": "aether_dust"}])
+	_extra_loot(list, ilvl)
 	var c: Vector3 = _boss().pos
 	drops.clear()
 	for k in list.size():
@@ -716,3 +724,15 @@ func _dbf_pub(e: Dictionary) -> Dictionary:
 		var d: Array = e.dbf[k]
 		if t < float(d[1]): out[k] = [float(d[0]), float(d[1]) - t, float(d[2])]
 	return out
+
+# ---------------- v0.9.5: точки расширения (LichSim) ----------------
+func _temp_roles() -> Array: return ["add", "naiad", "half"]
+func _gate_ready() -> bool: return _trash_left() == 0
+func _dmg_mult(_e: Dictionary, _pid: int) -> float: return 1.0
+func _on_skill_hit(_e: Dictionary, _pid: int) -> void: pass
+func _pre_ai(_e: Dictionary, _dt: float) -> bool: return false
+func _on_kill(_e: Dictionary) -> void: pass
+func _boss_custom(_b: Dictionary) -> void: pass
+func _cast_custom(_k: String) -> void: pass
+func _hp_custom(_k: float) -> void: pass
+func _extra_loot(_list: Array, _ilvl: int) -> void: pass

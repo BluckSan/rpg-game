@@ -11,6 +11,10 @@ const DEFS := {
 		"anims": {"idle": "Idle", "walk": "Walk", "run": "Gallop", "attack": "Attack", "hit": "Idle_HitReact_Left", "death": "Death", "roar": "Idle_2_HeadLow", "spawn": "Jump_ToIdle"}},
 	"skeleton": {"scene": "mobs/skeleton", "scale": 0.35, "pre": "SkeletonArmature|Skeleton_",
 		"anims": {"idle": "Idle", "walk": "Running", "run": "Running", "attack": "Attack", "hit": "Idle", "death": "Death", "spawn": "Spawn"}},
+	# v0.9.5: Кел'Таар — временная модель (скелет + процедурные корона, мантия, посох). Если появится
+	# res://assets/mobs/lich/keltaar.glb (Pigcraft, CC-BY), setup() возьмёт её — см. LICH_GLB / LICH_GLB_DEF
+	"lich": {"scene": "mobs/skeleton", "scale": 0.35, "pre": "SkeletonArmature|Skeleton_", "regalia": true,
+		"anims": {"idle": "Idle", "walk": "Running", "run": "Running", "attack": "Attack", "hit": "Idle", "death": "Death", "spawn": "Spawn", "cast": "Attack"}},
 	# --- v0.5.1: семейства монстров (Quaternius, CC0: Ultimate Monsters, Animated Animals, Enemies) ---
 	"rat": {"scene": "mobs/rat", "scale": 0.36, "pre": "RatArmature|Rat_",
 		"anims": {"idle": "Idle", "walk": "Walk", "run": "Run", "attack": "Attack", "hit": "Idle", "death": "Death", "spawn": "Jump"}},
@@ -71,9 +75,15 @@ var _last_pos := Vector3.ZERO
 var _speed := 0.0
 var _cur := ""
 
+## Хук импорта модели лича: положите GLB сюда — масштаб/префикс/имена анимаций правятся в LICH_GLB_DEF
+const LICH_GLB := "res://assets/mobs/lich/keltaar.glb"
+const LICH_GLB_DEF := {"scene": "mobs/lich/keltaar", "scale": 1.0, "pre": "",
+	"anims": {"idle": "Idle", "walk": "Walk", "run": "Walk", "attack": "Attack", "hit": "Hit", "death": "Death", "spawn": "Idle", "cast": "Cast"}}
+
 func setup(k: String, opts := {}) -> MobModel:
 	kind = k
 	def = DEFS[k]
+	if k == "lich" and ResourceLoader.exists(LICH_GLB): def = LICH_GLB_DEF
 	root = CharAssets.prop(def.scene).instantiate()
 	add_child(root)
 	var s: float = def.scale * float(opts.get("scale", 1.0))
@@ -94,9 +104,73 @@ func setup(k: String, opts := {}) -> MobModel:
 	for m in root.find_children("*", "MeshInstance3D", true, false):
 		(m as MeshInstance3D).visibility_range_end = 70.0
 		(m as MeshInstance3D).visibility_range_end_margin = 6.0
+	if def.get("regalia", false): _lich_regalia(float(opts.get("scale", 1.0)))
 	_play("idle", 0.0)
 	_last_pos = global_position
 	return self
+
+## Временные регалии Короля-Лича на скелете: корона из костяных шипов, мантия, посох с филактерией, глаза
+func _lich_regalia(sc: float) -> void:
+	if skel == null: return
+	var k: float = skel.global_basis.get_scale().x / maxf(0.0001, global_basis.get_scale().x)
+	if k <= 0.0001: k = def.scale * sc
+	var bone := Color(0.86, 0.84, 0.76); var ice := Color(0.45, 1.0, 0.85); var cloth := Color(0.1, 0.13, 0.17)
+	var head := _bone_node("Head", k)
+	if head:
+		var crown := Node3D.new(); head.add_child(crown); crown.position = Vector3(0, 0.3, 0) * sc / k
+		U.prim("cylinder", crown, Vector3.ZERO, Vector3(0.34, 0.035, 0.34) * sc / k, bone, 0.6)
+		for i in 7:
+			var a := TAU * i / 7.0
+			var sp := U.prim("cone", crown, Vector3(cos(a) * 0.15, 0.1, sin(a) * 0.15) * sc / k, Vector3(0.06, 0.24 if i % 2 == 0 else 0.15, 0.06) * sc / k, bone, 0.6)
+			sp.rotation = Vector3(sin(a) * 0.25, 0, -cos(a) * 0.25)
+		U.prim("sphere", crown, Vector3(0, 0.05, 0.17) * sc / k, Vector3.ONE * 0.06 * sc / k, ice, 0.2, 3.0)
+		for x in [-0.055, 0.055]:
+			U.prim("sphere", head, Vector3(x, 0.14, 0.12) * sc / k, Vector3.ONE * 0.045 * sc / k, ice, 0.2, 4.0)
+	var hips := _bone_node("Torso", k)
+	if hips:
+		var robe := U.prim("cylinder", hips, Vector3(0, -0.28, 0) * sc / k, Vector3(0.62, 0.5, 0.5) * sc / k, cloth, 0.9)
+		var rm := StandardMaterial3D.new(); rm.albedo_color = cloth; rm.roughness = 0.95
+		robe.mesh = _robe_mesh(); robe.material_override = rm
+		robe.scale = Vector3.ONE * sc / k
+		var trim := U.prim("cylinder", hips, Vector3(0, -0.02, 0) * sc / k, Vector3(0.36, 0.02, 0.3) * sc / k, ice, 0.3, 1.5)
+		trim.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		for x in [-0.2, 0.2]:   # наплечники
+			var pd := U.prim("sphere", hips, Vector3(x, 0.32, 0) * sc / k, Vector3(0.2, 0.12, 0.2) * sc / k, bone, 0.6)
+			U.prim("cone", pd, Vector3(0, 0.6, 0), Vector3(0.35, 1.2, 0.35), bone, 0.6)
+	var hand := _bone_node("R.DownLeg.001", k)
+	if hand:
+		var st := Node3D.new(); hand.add_child(st); st.position = Vector3(0, 0.1, 0) * sc / k
+		st.scale = Vector3.ONE * sc / k
+		U.prim("cylinder", st, Vector3(0, 0.1, 0), Vector3(0.035, 0.75, 0.035), Color(0.25, 0.3, 0.33), 0.5)
+		U.prim("sphere", st, Vector3(0, 0.9, 0), Vector3(0.09, 0.14, 0.09), ice, 0.1, 4.0)
+		for i in 3:
+			var a := TAU * i / 3.0
+			var cl := U.prim("cone", st, Vector3(cos(a) * 0.07, 0.86, sin(a) * 0.07), Vector3(0.035, 0.22, 0.035), bone, 0.6)
+			cl.rotation = Vector3(sin(a) * -0.4, 0, cos(a) * 0.4)
+
+func _bone_node(bone: String, _k: float) -> Node3D:
+	if skel.find_bone(bone) < 0: return null
+	var ba := BoneAttachment3D.new(); ba.bone_name = bone
+	skel.add_child(ba)
+	return ba
+
+static var _robe: ArrayMesh
+## Мантия: расширяющийся книзу рваный конус (единичный, ~1.1 м)
+static func _robe_mesh() -> ArrayMesh:
+	if _robe: return _robe
+	var st := SurfaceTool.new(); st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n := 14
+	for i in n:
+		var a0 := TAU * i / n; var a1 := TAU * (i + 1) / n
+		var r0 := 0.18; var r1 := 0.42
+		var j0 := 1.0 + (0.12 if i % 2 == 0 else -0.05); var j1 := 1.0 + (0.12 if (i + 1) % 2 == 0 else -0.05)
+		var t0 := Vector3(cos(a0) * r0, 0.15, sin(a0) * r0); var t1 := Vector3(cos(a1) * r0, 0.15, sin(a1) * r0)
+		var b0 := Vector3(cos(a0) * r1, -0.95 * j0, sin(a0) * r1); var b1 := Vector3(cos(a1) * r1, -0.95 * j1, sin(a1) * r1)
+		for v in [t0, b0, b1, t0, b1, t1]: st.add_vertex(v)
+		for v in [t0, b1, b0, t0, t1, b1]: st.add_vertex(v)   # изнанка
+	st.generate_normals()
+	_robe = st.commit()
+	return _robe
 
 func _name(a: String) -> String:
 	return def.pre + def.anims.get(a, "Idle")

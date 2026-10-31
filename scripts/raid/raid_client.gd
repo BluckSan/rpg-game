@@ -34,7 +34,7 @@ func setup(z, dungeon: String) -> void:
 		Net.raid_ready(self)
 	else:
 		my_pid = 1
-		sim = RaidSim.new()
+		sim = RaidDefs.make_sim(did)
 		sim.setup(did, DB.dungeon_level(did, int(z.data.get("level", 1))), 1)
 		sim.add_player(1, {"name": z.data.get("name", "?"), "cls": z.data.get("class", "warrior"), "lvl": z.data.get("level", 1)})
 		_drain()

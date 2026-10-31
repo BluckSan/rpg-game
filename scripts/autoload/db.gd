@@ -209,6 +209,18 @@ var ENEMIES := {
 	"rb_aeteron_r": {"name": "Аэтерон: Тень", "hp": 1000.0, "dmg": 30.0, "speed": 3.4, "range": 3.0, "interval": 1.8, "aggro": 30.0, "radius": 1.3, "xp": 0.0, "ranged": false, "boss": false, "color": Color(0.3,0.2,0.5), "model": "skeleton", "model_scale": 1.8, "tint": Color(0.35, 0.28, 0.55), "emission": Color(0.55, 0.3, 1.0), "raid": true},
 	"ra_ashguard": {"name": "Пепельный страж", "hp": 400.0, "dmg": 20.0, "speed": 3.2, "range": 2.4, "interval": 1.6, "aggro": 30.0, "radius": 0.9, "xp": 0.0, "ranged": false, "boss": false, "color": Color(0.4,0.3,0.25), "model": "orc", "model_scale": 1.25, "tint": Color(0.45, 0.36, 0.32), "emission": Color(1.0, 0.45, 0.1), "raid": true},
 	"ra_naiad": {"name": "Наяда Бездны", "hp": 300.0, "dmg": 14.0, "speed": 0.0, "range": 14.0, "interval": 2.4, "aggro": 30.0, "radius": 0.7, "xp": 0.0, "ranged": true, "boss": false, "color": Color(0.3,0.7,0.8), "model": "ghost", "model_scale": 1.2, "tint": Color(0.5, 0.95, 0.9), "emission": Color(0.3, 1.0, 0.85), "raid": true, "proj": Color(0.4, 0.9, 1.0)},
+	# ---- v0.9.5: Некрополь Пепельной Короны (RaidSim → LichSim) ----
+	"rb_keltaar": {"name": "Кел'Таар, Король-Лич", "hp": 9000.0, "dmg": 36.0, "speed": 3.0, "range": 4.0, "interval": 2.1, "aggro": 30.0, "radius": 1.9, "xp": 2600.0, "ranged": false, "boss": true, "color": Color(0.4,0.75,0.8), "model": "lich", "model_scale": 2.8, "tint": Color(0.62, 0.72, 0.78), "emission": Color(0.3, 1.0, 0.8), "elem": "ice", "raid": true},
+	"rm_keeper": {"name": "Хранитель склепа", "hp": 3000.0, "dmg": 30.0, "speed": 2.6, "range": 3.4, "interval": 2.0, "aggro": 30.0, "radius": 1.6, "xp": 500.0, "ranged": false, "boss": false, "color": Color(0.5,0.55,0.6), "model": "skeleton", "model_scale": 2.2, "tint": Color(0.55, 0.6, 0.66), "emission": Color(0.25, 0.9, 0.75), "raid": true, "shield": true},
+	"rm_sister": {"name": "Сестра Нежити", "hp": 2400.0, "dmg": 22.0, "speed": 2.4, "range": 12.0, "interval": 2.4, "aggro": 30.0, "radius": 1.0, "xp": 500.0, "ranged": true, "boss": false, "color": Color(0.4,0.8,0.6), "model": "ghost", "model_scale": 2.0, "tint": Color(0.45, 0.75, 0.62), "emission": Color(0.35, 1.0, 0.6), "raid": true, "proj": Color(0.4, 1.0, 0.6)},
+	"rm_colossus": {"name": "Костяной Колосс", "hp": 3600.0, "dmg": 34.0, "speed": 3.0, "range": 3.8, "interval": 2.2, "aggro": 30.0, "radius": 1.9, "xp": 600.0, "ranged": false, "boss": false, "color": Color(0.85,0.82,0.72), "model": "yeti", "model_scale": 2.0, "tint": Color(0.86, 0.83, 0.74), "emission": Color(0.3, 0.95, 0.75), "raid": true},
+	"rl_legion": {"name": "Костяной легионер", "hp": 420.0, "dmg": 18.0, "speed": 3.0, "range": 2.4, "interval": 1.7, "aggro": 30.0, "radius": 0.8, "xp": 0.0, "ranged": false, "boss": false, "color": Color(0.7,0.72,0.75), "model": "skeleton", "model_scale": 1.25, "tint": Color(0.7, 0.74, 0.8), "emission": Color(0.25, 0.85, 1.0), "raid": true, "shield": true},
+	"rl_ghost": {"name": "Пожиратель маны", "hp": 300.0, "dmg": 12.0, "speed": 3.4, "range": 9.0, "interval": 2.2, "aggro": 30.0, "radius": 0.7, "xp": 0.0, "ranged": true, "boss": false, "color": Color(0.4,0.5,0.9), "model": "ghost", "model_scale": 1.2, "tint": Color(0.45, 0.55, 0.95), "emission": Color(0.4, 0.55, 1.0), "raid": true, "proj": Color(0.45, 0.55, 1.0)},
+	"rl_acolyte": {"name": "Чумной послушник", "hp": 330.0, "dmg": 14.0, "speed": 2.8, "range": 10.0, "interval": 2.4, "aggro": 30.0, "radius": 0.8, "xp": 0.0, "ranged": true, "boss": false, "color": Color(0.5,0.7,0.3), "model": "skeleton", "model_scale": 1.1, "tint": Color(0.5, 0.62, 0.38), "emission": Color(0.55, 1.0, 0.25), "raid": true, "proj": Color(0.55, 0.95, 0.3)},
+	"rl_banshee": {"name": "Ледяная банши", "hp": 300.0, "dmg": 13.0, "speed": 3.6, "range": 10.0, "interval": 2.2, "aggro": 30.0, "radius": 0.7, "xp": 0.0, "ranged": true, "boss": false, "color": Color(0.7,0.9,1.0), "model": "ghost", "model_scale": 1.3, "tint": Color(0.8, 0.92, 1.0), "emission": Color(0.55, 0.9, 1.0), "raid": true, "proj": Color(0.6, 0.9, 1.0)},
+	"rl_skel": {"name": "Восставший скелет", "hp": 200.0, "dmg": 12.0, "speed": 3.4, "range": 2.2, "interval": 1.6, "aggro": 30.0, "radius": 0.7, "xp": 0.0, "ranged": false, "boss": false, "color": Color(0.75,0.75,0.7), "model": "skeleton", "model_scale": 1.0, "tint": Color(0.72, 0.74, 0.7), "emission": Color(0.3, 1.0, 0.7), "raid": true},
+	"rl_phyl": {"name": "Филактерия", "hp": 600.0, "dmg": 0.0, "speed": 0.0, "range": 0.0, "interval": 99.0, "aggro": 0.0, "radius": 1.0, "xp": 0.0, "ranged": false, "boss": false, "color": Color(0.3,1.0,0.75), "model": "", "static_obj": "phyl", "raid": true},
+	"rl_tomb": {"name": "Ледяная гробница", "hp": 500.0, "dmg": 0.0, "speed": 0.0, "range": 0.0, "interval": 99.0, "aggro": 0.0, "radius": 1.0, "xp": 0.0, "ranged": false, "boss": false, "color": Color(0.6,0.9,1.0), "model": "", "static_obj": "tomb", "raid": true},
 }
 
 ## Зоны: стартовая долина, подземелье, открытый мир «Земли Эфира» (WorldBuilder).
@@ -220,6 +232,7 @@ var ZONES := {
 	"pd_ash": {"name": "Пепельная Цитадель", "scene": "res://scenes/zone.tscn", "available": true, "min_level": 1, "party": true},
 	"pd_crypt": {"name": "Затопленный Склеп", "scene": "res://scenes/zone.tscn", "available": true, "min_level": 1, "party": true},
 	"pd_star": {"name": "Звёздное Святилище", "scene": "res://scenes/zone.tscn", "available": true, "min_level": 1, "party": true},
+	"pd_lich": {"name": "Некрополь Пепельной Короны", "scene": "res://scenes/zone.tscn", "available": true, "min_level": 1, "party": true},
 }
 
 # ---------------- Дерево талантов ----------------
@@ -805,6 +818,15 @@ func warden_unique(key: String, ilvl: int) -> Dictionary:
 	it["req"] = Items.req_level(ilvl)
 	return it
 
+## v0.9.5: уникальный посох Кел'Таара (гарантированно с босса Некрополя)
+const LICH_STAFF := {"name": "Посох Пепельной Короны", "slot": 0, "mods": [["int", 1.2], ["mp", 3.0], ["crit_r", 0.9], ["haste_r", 0.8], ["dmg", 0.45]]}
+func lich_staff(ilvl: int) -> Dictionary:
+	var it := {"uid": str(randi()), "name": LICH_STAFF.name, "slot": 0, "rarity": 3, "ilvl": ilvl, "unique": "lich_staff", "mods": [], "v": Items.ITEM_V,
+		"type": "staff", "cls": "mage", "req": Items.req_level(ilvl)}
+	for m in LICH_STAFF.mods: it.mods.append([m[0], Items.round_stat(float(m[1]) * (ilvl + 4) * Items.RARITY_MULT[3])])
+	it.base = round((3 + ilvl * 1.6) * 1.65)
+	return it
+
 ## Флаг зоны (например, «босс повержен»)
 func zone_flag(c: Dictionary, zone_id: String, flag: String) -> bool:
 	return c.get("zones", {}).get(zone_id, {}).get("flags", []).has(flag)
@@ -829,7 +851,7 @@ func zone_lock_reason(c: Dictionary, zone_id: String) -> String:
 # ---------------- v0.9.2: уровни подземелий и лимит прохождений ----------------
 ## [от, до] — рекомендуемые уровни; враги и босс — на уровне подземелья (уровень героя/группы в этих пределах);
 ## войти можно не ниже «от − DUNGEON_GRACE»
-const DUNGEON_LV := {"dungeon": [8, 12], "ash": [12, 20], "crypt": [16, 24], "star": [20, 30]}
+const DUNGEON_LV := {"dungeon": [8, 12], "ash": [12, 20], "crypt": [16, 24], "star": [20, 30], "lich": [24, 30]}
 const DUNGEON_GRACE := 2
 const DUNGEON_RUNS := 5    # прохождений (убит босс) на героя; неудачные попытки не считаются
 

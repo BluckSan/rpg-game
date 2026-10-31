@@ -71,6 +71,8 @@ const SETS := {
 		"b2": [["hp%", 15]], "b4": [["dr%", 8], ["regen", 4]], "b6": {"fx": {"leech_x": 1, "crit_heal": 4, "kill_heal": 5}, "desc": "Похищение жизни ×2; крит лечит 4%; убийство — 5%"}},
 	"r_star": {"name": "Осколки Звезды", "cls": "", "lvl": 99, "raid": true, "pieces": ["cloak", "circlet", "gloves", "boots", "ring", "amulet"],
 		"b2": [["spell%", 15], ["dmg%", 8]], "b4": [["cdr%", 10], ["critdmg%", 30]], "b6": {"fx": {"proc_bolt": 30, "chain_plus": 2, "crit_mark": 40}, "desc": "30% шанс молнии, цепи +2; 40% шанс: крит проклинает цель"}},
+	"r_lich": {"name": "Облачение Короля-Лича", "cls": "", "lvl": 99, "raid": true, "pieces": ["cloak", "circlet", "gloves", "boots", "ring", "amulet"],
+		"b2": [["spell%", 12], ["hp%", 10]], "b4": [["dr%", 8], ["cdr%", 10]], "b6": {"fx": {"elem_ice": 1, "aura_frost": 1, "aura_dmg": 30, "kill_mana": 8}, "desc": "Лёд вместо огня; морозная аура 30% урона/с; убийство — +8% маны"}},
 }
 
 # ---------------- v0.9.1: материалы комплектов и ремесло ----------------
@@ -81,9 +83,10 @@ const MATS := {
 	"ash_ember": {"name": "Пепельный уголь", "icon": "small-fire", "col": Color(1.0, 0.5, 0.2), "desc": "Ворагос (Пепельная Цитадель). Для «Регалий Пепельного Короля»."},
 	"tide_pearl": {"name": "Жемчуг бездны", "icon": "drop", "col": Color(0.35, 0.9, 0.85), "desc": "Морвен (Затопленный Склеп). Для «Покрова Утопленницы»."},
 	"star_shard": {"name": "Звёздный осколок", "icon": "crystal-ball", "col": Color(0.85, 0.7, 1.0), "desc": "Аэтерон (Звёздное Святилище). Для «Осколков Звезды»."},
+	"lich_soul": {"name": "Осколок филактерии", "icon": "crystal-ball", "col": Color(0.35, 1.0, 0.75), "desc": "Кел'Таар (Некрополь Пепельной Короны). Для «Облачения Короля-Лича»."},
 }
-const SET_MAT := {"r_ash": "ash_ember", "r_tide": "tide_pearl", "r_star": "star_shard"}
-const BOSS_MAT := {"rb_voragos": "ash_ember", "rb_morwen": "tide_pearl", "rb_aeteron": "star_shard"}
+const SET_MAT := {"r_ash": "ash_ember", "r_tide": "tide_pearl", "r_star": "star_shard", "r_lich": "lich_soul"}
+const BOSS_MAT := {"rb_voragos": "ash_ember", "rb_morwen": "tide_pearl", "rb_aeteron": "star_shard", "rb_keltaar": "lich_soul"}
 
 static func mat_of_set(set_id: String) -> String: return str(SET_MAT.get(set_id, "aether_dust"))
 

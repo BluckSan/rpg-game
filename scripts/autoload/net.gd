@@ -958,7 +958,7 @@ func _srv_raid_launch(id: int, members: Array, pid: int, did: String) -> void:
 	var lvl := 1
 	for m in members: lvl = maxi(lvl, int(players[m].data.get("level", 1)))
 	lvl = DB.dungeon_level(did, lvl)
-	var sim := RaidSim.new()
+	var sim := RaidDefs.make_sim(did)
 	sim.setup(did, lvl, members.size())
 	var iid := _next_iid; _next_iid += 1
 	instances[iid] = {"sim": sim, "did": did, "zone": RaidDefs.DUNGEONS[did].zone, "members": [], "party": pid, "log_n": 0, "t0": _now()}
