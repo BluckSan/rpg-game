@@ -178,7 +178,11 @@ func step(dt: float) -> void:
 		var dist := U.flat_dist(tgt.global_position, me)
 		var want: float = (8.0 if ranged else 2.2 + tgt.radius)
 		if dist > want: mv = U.flat(tgt.global_position - me).normalized()
-		elif ranged and dist < 4.0: mv = U.flat(me - tgt.global_position).normalized() * 0.6
+		if lich and dist > want and tgt.global_position.z > me.z + 3.0:
+			for dz in RaidDefs.L_DOORS:   # проём двери узкий: сначала в центр проёма, иначе упираемся в стену
+				if me.z < dz and tgt.global_position.z > dz and me.z > dz - 6.0 and absf(me.x) > 1.2:
+					mv = U.flat(Vector3(0, 0, dz + 1.5) - me).normalized(); break
+		if dist <= want and ranged and dist < 4.0: mv = U.flat(me - tgt.global_position).normalized() * 0.6
 	if tgt:
 		p.face_towards(tgt.global_position)
 		var dist := U.flat_dist(tgt.global_position, me)
