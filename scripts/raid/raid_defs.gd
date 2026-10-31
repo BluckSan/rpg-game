@@ -77,7 +77,7 @@ static func points(did := "") -> Array: return L_POINTS if did == "lich" else PO
 static func boss_home(did := "") -> Vector3: return L_BOSS_HOME if did == "lich" else ARENA_C + Vector3(0, 0, 6)
 
 static func in_arena(p: Vector3, did := "") -> bool:
-	if did == "lich": return Vector2(p.x - L_ARENA_C.x, p.z - L_ARENA_C.z).length() < L_ARENA_R + 0.6 and p.z > L_DOORS[3] + 1.0
+	if did == "lich": return p.z > L_DOORS[3] + 0.3 and (Vector2(p.x - L_ARENA_C.x, p.z - L_ARENA_C.z).length() < L_ARENA_R + 0.6 or absf(p.x) < 4.6)   # вход-ниша за решёткой тоже арена
 	return Vector2(p.x - ARENA_C.x, p.z - ARENA_C.z).length() < ARENA_R + 0.6 and p.z > GATE_Z + 1.0
 
 ## Проходимая область: коридор ∪ круг арены (для врагов сервера)
@@ -110,7 +110,7 @@ const L_BOSS_HOME := Vector3(0, 0, 206)
 const L_THRONE := Vector3(0, 0, 216)
 ## Филактерии — 4 столпа тронного зала; ледяные ямы — провалы во льду (замедляют и морозят)
 const L_POINTS := [Vector3(-13, 0, 187), Vector3(13, 0, 187), Vector3(-13, 0, 205), Vector3(13, 0, 205)]
-const L_PITS := [Vector3(-17, 0, 196), Vector3(17, 0, 196), Vector3(0, 0, 182), Vector3(-7, 0, 211), Vector3(7, 0, 211)]
+const L_PITS := [Vector3(-17, 0, 196), Vector3(17, 0, 196), Vector3(-10, 0, 184), Vector3(-7, 0, 211), Vector3(7, 0, 211)]
 const L_PIT_R := 2.4
 ## Проходимые фигуры: прямоугольники [x0, x1, z0, z1] и круги [центр, r]
 const L_RECTS := [[-9.0, 9.0, -4.0, 10.0], [-6.0, 6.0, 10.0, 53.0], [-4.5, 4.5, 75.0, 101.0], [-4.5, 4.5, 123.0, 125.0], [-12.0, 12.0, 124.0, 172.5], [-4.5, 4.5, 171.0, 177.0]]

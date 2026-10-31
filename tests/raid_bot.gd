@@ -60,6 +60,7 @@ func _pick_target():
 ## Некрополь: самая дальняя секция, куда можно пройти (двери закрываются до зачистки)
 func _reach() -> int:
 	if not lich: return 99
+	if RaidDefs.in_arena(p.global_position, "lich"): return 5   # решётка закрылась за спиной — мы уже в зале
 	var b = zone.builder
 	if b.ldoor_closed[0]: return 0
 	if b.ldoor_closed[1]: return 2

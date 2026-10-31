@@ -69,6 +69,9 @@ func _dungeon(did: String) -> void:
 	var boss = d.builder.boss_enemy()
 	check(boss != null and boss.brain is RaidBrain and absf(boss.max_hp - RaidDefs.boss_hp(sim.level, 1) * float(RaidDefs.DUNGEONS[did].get("hp_k", 1.0))) < 1.0, "[%s] босс «%s»: здоровье %d (соло-масштаб, ждём %d, мозг %s)" % [did, boss.def.name if boss else "?", boss.max_hp if boss else 0, RaidDefs.boss_hp(sim.level, 1) * float(RaidDefs.DUNGEONS[did].get("hp_k", 1.0)), boss.brain.get_script().resource_path if boss and boss.brain else "-"])
 	var bot := RaidBot.new(d, 1, func(): return [])
+	if args.has("skip_trash"):
+		for id in sim.enemies.keys():
+			if sim.enemies[id].alive and (sim.enemies[id].role == "trash" or (args.has("skip_keeper") and sim.enemies[id].kind == "rm_keeper") or (args.has("skip_sister") and sim.enemies[id].kind == "rm_sister") or (args.has("skip_col") and sim.enemies[id].kind == "rm_colossus")): sim._kill(sim.enemies[id])
 	var t0 := Time.get_ticks_msec()
 	var limit := float(args.get("limit", "900"))   # секунд игрового времени
 	var game_t := 0.0
@@ -82,6 +85,9 @@ func _dungeon(did: String) -> void:
 		if p.dead and not was_dead: deaths += 1
 		was_dead = p.dead
 		if sim.engaged and eng_at < 0: eng_at = game_t
+		if args.has("trace") and int(game_t * 2) != int((game_t - dt) * 2):
+			var sp = sim.players[1]
+			print("      TR t=%.1f sim=%s alive=%s in=%s cli=%s eng=%s" % [game_t, str(sp.pos), str(sp.alive), str(RaidDefs.in_arena(sp.pos, did)), str(p.global_position), str(sim.engaged)])
 		if int(game_t * 10) % 300 == 0 and int((game_t - dt) * 10) % 300 != 0:
 			var b = sim.enemies.get(sim.boss_id)
 			print("    t=%.0f с: босс %.0f%% фаза %d, бой=%s, вайпов %d, смертей %d, урон героя %.0f" % [game_t, 100.0 * b.hp / b.mhp, sim.phase, str(sim.engaged), sim.wipes, deaths, sim.players[1].dealt])
@@ -89,7 +95,8 @@ func _dungeon(did: String) -> void:
 				var pp = d.player.global_position
 				var al := []
 				for o in sim.enemies.values():
-					if o.alive and o.role != "boss": al.append("%s@%.0f,%.0f" % [o.role, o.pos.x, o.pos.z])
+					if o.alive and o.role != "boss": al.append("%s@%.0f,%.0f%s" % [o.role, o.pos.x, o.pos.z, (" hp%.0f%% yaw%.1f" % [100.0 * o.hp / o.mhp, o.yaw]) if o.role == "mini" else ""])
+				print("      LOG ", sim.mlog.slice(maxi(0, sim.mlog.size() - 6)))
 				print("      DBG me %.0f,%.0f reach=%d alive=%s doors=%s" % [pp.x, pp.z, bot._reach(), str(al), str(sim.doors)])
 	var names := {}
 	if did == "lich":

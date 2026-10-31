@@ -12,7 +12,7 @@ var _gz_t := 0.0
 var _pit_t := 0.0
 var _warn_t := {}
 
-const MINI_K := {"rm_keeper": 75.0, "rm_sister": 55.0, "rm_colossus": 85.0}   # здоровье: dps(ур.) · K · party_k
+const MINI_K := {"rm_keeper": 60.0, "rm_sister": 55.0, "rm_colossus": 85.0}   # здоровье: dps(ур.) · K · party_k
 const KEEPER_TURN := 1.25         # рад/с — Хранитель разворачивается медленно, щит держит перед собой
 const FROZEN_DUR := 14.0
 
@@ -58,7 +58,7 @@ func _target(e: Dictionary):
 	var arena_only: bool = e.role in ["boss", "add"]
 	var best = null; var bt := -1.0
 	for pid in _alive_players(arena_only):
-		if e.role == "mini" and RaidDefs.l_section(players[pid].pos) != int(e.sec): continue
+		if e.role == "mini" and RaidDefs.l_section(players[pid].pos) != int(e.sec) and U.flat_dist(players[pid].pos, e.home) > 16.0: continue   # у порога секции не сбрасываем
 		var th := float(e.threat.get(pid, 0.0)) + 1.0 / (1.0 + U.flat_dist(players[pid].pos, e.pos))
 		if th > bt: bt = th; best = pid
 	return best
