@@ -5,6 +5,7 @@ class_name RaidSim
 ## Враги, их здоровье, угроза, атаки, механики боссов и добыча считаются здесь; наружу уходят события
 ## (events: [pid или 0 — всем, словарь]) и снимки позиций/здоровья.
 
+const SOLO_LICH_K := 0.6
 var did := ""
 var d: Dictionary
 var level := 1
@@ -226,6 +227,7 @@ func _enemy_ai(e: Dictionary, dt: float) -> void:
 
 func _hurt(pid: int, frac: float, src: Vector3, lethal := false, what := "") -> void:
 	if not players.has(pid): return
+	if did == "lich" and players.size() == 1 and not lethal: frac *= SOLO_LICH_K   # v0.9.5: соло в Некрополе — урон по герою ×0.6
 	_emit(pid, {"t": "hurt", "f": frac, "x": src.x, "z": src.z, "l": lethal, "w": what})
 	# сервер сразу учитывает смертельные механики (клиент подтвердит здоровье следующим состоянием)
 	if lethal: players[pid].alive = false
