@@ -64,14 +64,14 @@ func build(z) -> void:
 func _lich_env() -> void:
 	var e: Environment = (get_node("Env") as WorldEnvironment).environment
 	e.background_color = Color(0.015, 0.03, 0.04)
-	e.ambient_light_color = Color(0.36, 0.5, 0.56)
-	e.ambient_light_energy = 0.85
+	e.ambient_light_color = Color(0.3, 0.42, 0.48)
+	e.ambient_light_energy = 0.4
 	e.fog_enabled = true
 	e.fog_light_color = Color(0.1, 0.2, 0.24)
 	e.fog_density = 0.018
 	e.fog_depth_begin = 12
 	var sun: DirectionalLight3D = get_node("Sun")
-	sun.light_color = Color(0.55, 0.8, 0.95); sun.light_energy = 0.42
+	sun.light_color = Color(0.55, 0.8, 0.95); sun.light_energy = 0.22
 
 ## Стелющийся морозный туман: полупрозрачные плоскости у пола (дёшево и на телефоне)
 func _ground_fog(c: Vector3, sx: float, sz: float) -> void:
@@ -79,7 +79,7 @@ func _ground_fog(c: Vector3, sx: float, sz: float) -> void:
 	var pm := PlaneMesh.new(); pm.size = Vector2(sx, sz); mi.mesh = pm
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED; m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.albedo_color = Color(0.55, 0.85, 0.9, 0.09); m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.albedo_color = Color(0.4, 0.7, 0.75, 0.035); m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	mi.material_override = m; mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi); mi.position = c + Vector3.UP * 0.35
 	_fog_planes.append(mi)
@@ -262,7 +262,7 @@ func _throne_room() -> void:
 			var a := TAU * k / 7.0 + _r(0, 0.4)
 			_add("cone", pit + Vector3(cos(a) * (rp + 0.2), 0.3, sin(a) * (rp + 0.2)), Vector3(0.18, 0.6 + _r(0, 0.5), 0.18), L_ICE, Vector3(sin(a) * -25, 0, cos(a) * 25), false)
 	_throne()
-	_light(c + Vector3(0, 11, 0), Color(0.5, 0.85, 1.0), 2.4, 34.0)
+	_light(c + Vector3(0, 11, 0), Color(0.5, 0.85, 1.0), 1.1, 30.0)
 	_light(RaidDefs.L_THRONE + Vector3(0, 4, -3), L_NECRO, 2.0, 14.0, true)
 	_ground_fog(c, r * 2, r * 2)
 
