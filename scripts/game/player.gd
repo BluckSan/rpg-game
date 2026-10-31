@@ -55,6 +55,9 @@ const ROLL_SPEED := 11.0
 const ROLL_CD := 0.9
 var roll_cd := 0.0
 var invuln := 0.0
+var raid_slow := 0.0        # v0.9.5: замедление механик рейда (доля 0..0.8)
+var raid_slow_t := 0.0
+var frozen_t := 0.0         # v0.9.5: «Ледяная гробница» — не двигается и не бьёт
 var _roll_time := 0.0
 var _roll_dir := Vector3.FORWARD
 var _last_move := Vector3.ZERO
@@ -150,6 +153,11 @@ func _physics_process(delta: float) -> void:
 		fwd = -cam.global_basis.z; fwd.y = 0; fwd = fwd.normalized()
 		right = cam.global_basis.x; right.y = 0; right = right.normalized()
 	var move := fwd * input.y + right * input.x
+	if raid_slow_t > 0.0:
+		raid_slow_t -= delta
+		if raid_slow_t <= 0.0: raid_slow = 0.0
+	if frozen_t > 0.0:
+		frozen_t -= delta; move = Vector3.ZERO; _roll_time = 0.0; _dash_time = 0.0
 	if force_move != Vector3.ZERO: move = Vector3(force_move.x, 0, force_move.z)
 	if move.length() > 1: move = move.normalized()
 	_last_move = move
@@ -162,7 +170,7 @@ func _physics_process(delta: float) -> void:
 		_dash_time -= delta
 		v = _dash_vel
 	else:
-		v = move * stats.move_speed * (1.4 if haste_timer > 0 else 1.0)
+		v = move * stats.move_speed * (1.4 if haste_timer > 0 else 1.0) * (1.0 - raid_slow)
 		if move.length() > 0.05:
 			rotation.y = lerp_angle(rotation.y, atan2(move.x, move.z), minf(1.0, delta * 12))
 	velocity.x = v.x; velocity.z = v.z
@@ -483,6 +491,7 @@ func use_potion() -> void:
 
 var last_fail := ""   # причина последнего отказа try_use (диагностика тестов)
 func try_use(slot: int) -> bool:
+	if frozen_t > 0.0: last_fail = "frozen"; return false
 	if dead or cooldowns[slot] > 0:
 		last_fail = "dead" if dead else "cd %.2f" % cooldowns[slot]; return false
 	if lock_reason(slot) != "":

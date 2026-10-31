@@ -69,7 +69,7 @@ func _ready() -> void:
 		data["zone"] = str(r.get("zone", "starter")) if r is Dictionary and DB.ZONES.has(str(r.get("zone", ""))) and not Game.is_dungeon_zone(str(r.get("zone", ""))) else "starter"
 		data["has_pos"] = false
 		Game.apply_return(data)   # v0.9.1: экземпляр закрыт — герой возвращается к месту входа
-	if RaidDefs.is_raid_zone(data["zone"]): builder = PartyDungeonBuilder.new()
+	if RaidDefs.is_raid_zone(data["zone"]): builder = LichNecropolisBuilder.new() if RaidDefs.by_zone(str(data["zone"])) == "lich" else PartyDungeonBuilder.new()
 	elif data["zone"] == "dungeon": builder = DungeonBuilder.new()
 	elif data["zone"] == "global": builder = WorldBuilder.new()
 	else: builder = StarterZoneBuilder.new()

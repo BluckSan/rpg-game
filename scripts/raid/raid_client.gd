@@ -16,6 +16,7 @@ var done := false
 var stats := {"hurt": 0, "taken": 0.0, "lethal": 0, "warns": [], "loot": [], "kills": 0, "wipes": 0, "events": {}, "src": {}}
 var _snap_t := 0.0
 var _pull := {}
+var gzs := {}              # v0.9.5: наземные зоны (облака гнили, «Смерть и разложение») id -> {node, left}
 var ui: CanvasLayer
 var warn_label: Label
 var roll_label: RichTextLabel
@@ -72,6 +73,14 @@ func _process(delta: float) -> void:
 			var s := sim.snapshot()
 			apply_snap(s[0], s[1])
 	_tele_tick(delta)
+	for id in gzs.keys():
+		var g: Dictionary = gzs[id]
+		g.left = float(g.left) - delta
+		var r := float(g.r) + float(g.g) * (float(g.dur) - float(g.left))
+		if g.node and is_instance_valid(g.node):
+			r = minf(r, float(g.rm)); g.node.scale = Vector3(r, 1, r)
+			g.node.rotation.y += delta * 0.3
+		if float(g.left) <= 0.0: _free_gz(id)
 	if p and not p.dead:
 		p.heal(p.stats.max_hp * 0.02 * delta)   # «благословение костра»: в подземельях группы нет лекаря
 		if not _pull.is_empty():
@@ -117,6 +126,7 @@ func handle(ev: Dictionary) -> void:
 		"st":
 			brain.apply(ev, RaidSim.PHASES[did])
 			zone.builder.set_gate(bool(ev.gate))
+			if ev.has("doors") and zone.builder.has_method("set_doors"): zone.builder.set_doors(ev.doors)
 			if bool(ev.get("done", false)) and not done:
 				done = true
 				zone.builder.spawn_arena_exit()
@@ -138,9 +148,27 @@ func handle(ev: Dictionary) -> void:
 		"reward": _reward(ev)
 		"water": zone.builder.water_rise(float(ev.dur))
 		"pull": _pull = {"pos": Vector3(float(ev.x), 0, float(ev.z)), "s": float(ev.s), "left": float(ev.dur)}
+		"mana":
+			if zone.player: zone.player.mp = maxf(0.0, zone.player.mp - float(ev.f) * float(zone.player.stats.get("max_mp", 100.0)))
+		"slow":
+			var sp = zone.player
+			if sp and not sp.dead:
+				sp.raid_slow = maxf(sp.raid_slow, clampf(float(ev.k), 0.0, 0.8)); sp.raid_slow_t = maxf(sp.raid_slow_t, float(ev.dur))
+				stats.src["slow:" + str(ev.get("w", ""))] = float(stats.src.get("slow:" + str(ev.get("w", "")), 0.0)) + 1.0
+		"frz":
+			if int(ev.p) == my_pid and zone.player:
+				zone.player.frozen_t = float(ev.dur)
+				show_warn("Вас заковали в лёд! Союзники — разбейте гробницу")
+		"unfrz":
+			if int(ev.p) == my_pid and zone.player: zone.player.frozen_t = 0.0
+		"gz": _make_gz(ev)
+		"gzclr":
+			for id in gzs.keys(): _free_gz(id)
 		"wipe":
 			stats.wipes += 1
 			_pull = {}
+			for id in gzs.keys(): _free_gz(id)
+			if zone.player: zone.player.frozen_t = 0.0
 			for id in teles.keys(): _free_tele(id)
 
 func _spawn(e: Dictionary) -> void:
@@ -211,6 +239,26 @@ func _tele_tick(delta: float) -> void:
 		if tl.left <= 0.0:
 			if tl.k != "safe": zone.fx("burst", node.global_position + Vector3.UP * 0.4, float(node.get_meta("radius", 2.0)) * 0.6, Color(1, 0.6, 0.3), 0.35)
 			_free_tele(id)
+
+## v0.9.5: стойкая наземная зона — полупрозрачный диск с кольцом, растёт со скоростью g до rm
+func _make_gz(ev: Dictionary) -> void:
+	var id = ev.id
+	if gzs.has(id): _free_gz(id)
+	var c: Color = COLORS.get(str(ev.c), Color(0.35, 1.0, 0.45))
+	var root := Node3D.new(); zone.fx_root.add_child(root)
+	root.global_position = Vector3(float(ev.x), 0.06, float(ev.z))
+	var disc := MeshInstance3D.new(); var cm := CylinderMesh.new()
+	cm.top_radius = 1.0; cm.bottom_radius = 1.0; cm.height = 0.02; cm.radial_segments = 32
+	disc.mesh = cm; disc.material_override = U.fx_mat(Color(c.r, c.g, c.b, 0.32)); root.add_child(disc)
+	var ring := MeshInstance3D.new(); var tm := TorusMesh.new(); tm.inner_radius = 0.93; tm.outer_radius = 1.0; tm.rings = 32
+	ring.mesh = tm; ring.material_override = U.fx_mat(Color(c.r, c.g, c.b, 0.85)); root.add_child(ring)
+	root.scale = Vector3(float(ev.r), 1, float(ev.r))
+	gzs[id] = {"node": root, "left": float(ev.dur), "dur": float(ev.dur), "r": float(ev.r), "rm": float(ev.get("rm", ev.r)), "g": float(ev.get("g", 0.0))}
+
+func _free_gz(id) -> void:
+	var g = gzs.get(id)
+	if g and g.node and is_instance_valid(g.node): g.node.queue_free()
+	gzs.erase(id)
 
 func _free_tele(id) -> void:
 	var tl = teles.get(id)

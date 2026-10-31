@@ -118,3 +118,32 @@ func _process(delta: float) -> void:
 	if cur.distance_to(goal) > 12.0: global_position = goal
 	else: global_position = cur.lerp(goal, minf(1.0, delta * 8.0))
 	rotation.y = lerp_angle(rotation.y, srv_yaw, minf(1.0, delta * 8.0))
+
+## v0.9.5: неподвижные «враги» Некрополя — кристалл филактерии и ледяная гробница (процедурные, без анимаций)
+func _build_model() -> void:
+	var so := str(def.get("static_obj", ""))
+	if so == "":
+		super._build_model(); return
+	model = Node3D.new()
+	if so == "phyl": model.set_script(preload("res://scripts/game/spin.gd"))
+	add_child(model)
+	match so:
+		"phyl":
+			var cr := U.prim("cone", model, Vector3(0, 1.35, 0), Vector3(0.55, 1.5, 0.55), Color(0.3, 1.0, 0.75), 0.1, 2.5)
+			var cr2 := U.prim("cone", model, Vector3(0, 0.6, 0), Vector3(0.55, -0.7, 0.55), Color(0.3, 1.0, 0.75), 0.1, 2.5)
+			cr2.rotation_degrees.x = 180
+			for m in [cr, cr2]: (m as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			for k in 3:
+				var a := TAU * k / 3.0
+				U.prim("cone", model, Vector3(cos(a) * 0.45, 0.45, sin(a) * 0.45), Vector3(0.18, 0.6, 0.18), Color(0.5, 1.0, 0.85), 0.1, 1.5)
+			var l := OmniLight3D.new(); l.light_color = Color(0.35, 1.0, 0.75); l.light_energy = 1.4; l.omni_range = 6.0
+			l.position = Vector3(0, 1.4, 0); model.add_child(l)
+		"tomb":
+			var ice := U.prim("box", model, Vector3(0, 1.05, 0), Vector3(1.4, 2.1, 1.4), Color(0.6, 0.9, 1.0), 0.05, 0.4)
+			var m := StandardMaterial3D.new()
+			m.albedo_color = Color(0.6, 0.9, 1.0, 0.45); m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			m.roughness = 0.05; m.emission_enabled = true; m.emission = Color(0.1, 0.3, 0.4); m.rim_enabled = true; m.rim = 0.7
+			ice.material_override = m
+			for k in 5:
+				var a := TAU * k / 5.0
+				U.prim("cone", model, Vector3(cos(a) * 0.75, 0.4, sin(a) * 0.75), Vector3(0.18, 0.9, 0.18), Color(0.7, 0.95, 1.0), 0.05, 0.6)
