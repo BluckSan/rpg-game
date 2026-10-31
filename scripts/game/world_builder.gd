@@ -50,6 +50,8 @@ var spawners: Array = []
 var waypoints: Array = []     # {id, name, pos: Vector3}
 var bosses: Array = []        # {biome, name, pos, spawner}
 var merchant_points: Array = []
+var stash_points: Array = []    # v0.9.4.2: настоящие сундуки (для карт)
+var raid_portals: Array = []    # v0.9.4.2: {did, pos} — порталы групповых подземелий в мире
 var current_biome := -1
 var _spawn_check := 0.0
 var _wp_check := 0.0
@@ -140,6 +142,7 @@ func build(z) -> void:
 	feature_sink = map_features
 	for i in WorldData.TOWNS.size(): _town(i)
 	for p in WorldData.POIS: _poi(p)
+	for did in RaidDefs.ORDER: _raid_portal(did)
 	feature_sink = null
 	_world_spawners()
 	_world_edges()
@@ -712,7 +715,9 @@ func _town(i: int) -> void:
 	var mp := c + Vector3(-6.0, 0, -12.0)
 	merchant_points.append(mp)
 	_merchant(mp, c)
-	zone.spawn_stash(c + Vector3(6.5, 0, -12.5))
+	var sp := c + Vector3(6.5, 0, -12.5)
+	stash_points.append(sp)
+	zone.spawn_stash(sp)
 	var wp := c + Vector3(0, 0, 14.0)
 	_waypoint(t.id, t.name, wp, i)
 	if i == 0: _valley_portal(portal_point)
@@ -772,6 +777,24 @@ func _valley_portal(c: Vector3) -> void:
 	lbl.font = UIK.title_font(); lbl.text = "В Пепельную долину"; lbl.font_size = 56; lbl.pixel_size = 0.006
 	lbl.outline_size = 10; lbl.modulate = Color(0.7, 0.9, 1.0); lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	add_child(lbl); lbl.position = c + Vector3.UP * 5.4
+
+## v0.9.4.2: портал группового подземелья — настоящий объект в мире там же, где значок на карте
+func _raid_portal(did: String) -> void:
+	var p2: Vector2 = RaidDefs.portal_pos(did)
+	if p2 == Vector2.ZERO: return
+	var c := Vector3(p2.x, WorldData.height(p2.x, p2.y), p2.y)
+	raid_portals.append({"did": did, "pos": c})
+	for s in [-1, 1]: _add_world("nature_statue_column", c + Vector3(s * 2.2, 0, 0), 0, 4.6)
+	var plane := U.prim("box", self, c + Vector3.UP * 2.1, Vector3(3.4, 4.1, 0.1), Color(0.75, 0.5, 1))
+	plane.material_override = U.fx_mat(Color(0.75, 0.5, 1, 0.55))
+	_light(c + Vector3.UP * 2.5, Color(0.75, 0.5, 1), 2.0, 10)
+	var lbl := Label3D.new()
+	lbl.font = UIK.title_font(); lbl.text = "Портал: " + String(RaidDefs.DUNGEONS[did].name); lbl.font_size = 52; lbl.pixel_size = 0.006
+	lbl.outline_size = 10; lbl.modulate = Color(0.85, 0.7, 1.0); lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	lbl.visibility_range_end = 70.0
+	add_child(lbl); lbl.position = c + Vector3.UP * 5.4
+	zone.interactables.append({"pos": c, "r": 3.4, "text": "Портал подземелья", "icon": "magic-portal",
+		"cb": func(): zone.hud._open("map"); if zone.hud.window and zone.hud.window.has_method("focus_dungeon"): zone.hud.window.focus_dungeon(did)})
 
 func _add_world(key: String, p: Vector3, yaw: float, s: float) -> MeshInstance3D:
 	var mi := prop(self, key, p, yaw, s)

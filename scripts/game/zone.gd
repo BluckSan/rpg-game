@@ -158,8 +158,16 @@ func spawn_stash(p: Vector3) -> void:
 	l.visibility_range_end = 40.0
 	interactables.append({"pos": p, "r": 2.4, "text": "Сундук", "icon": "treasure-map", "cb": func(): hud._open("stash")})
 
+## v0.9.4.2: метка игрока (для тестов/кнопок)
+func add_user_marker(p: Vector2, name := "") -> bool: return MapMarks.add(data, p, name)
+
 func near_stash() -> bool:
-	return stash_point != Vector3.INF and player != null and U.flat_dist(player.global_position, stash_point) < 2.4
+	if player == null: return false
+	if builder is WorldBuilder:
+		for sp in builder.stash_points:
+			if U.flat_dist(player.global_position, sp) < 2.4: return true
+		return false
+	return stash_point != Vector3.INF and U.flat_dist(player.global_position, stash_point) < 2.4
 
 func is_dungeon() -> bool:
 	return builder is DungeonBuilder

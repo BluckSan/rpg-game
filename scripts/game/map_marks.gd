@@ -59,4 +59,4 @@ static func pos(m) -> Vector2: return Vector2(float(m.get("x", 0)), float(m.get(
 static func color(m) -> Color: return COLORS[int(m.get("c", 0)) % COLORS.size()]
 
 static func _save(data: Dictionary) -> void:
-	if data == Game.current and not data.is_empty(): Game.save_character(data)
+	if is_same(data, Game.current) and not data.is_empty(): Game.save_character(data)

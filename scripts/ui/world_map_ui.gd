@@ -10,6 +10,7 @@ const ZMAX := 10.0
 const CATS := {
 	"player": ["Вы", "", Color(1, 0.95, 0.5), 1.0],
 	"quest": ["Цель", "bullseye", Color(1, 0.85, 0.2), 1.0],
+	"mark": ["Мои метки", "", Color(0.3, 1.0, 0.55), 1.0],
 	"town": ["Города и лагеря", "village", Color(1, 0.88, 0.6), 1.0],
 	"waypoint": ["Путевые камни", "", Color(0.35, 0.8, 1.0), 1.0],
 	"boss": ["Боссы зон", "skull-crossed-bones", Color(1, 0.35, 0.3), 1.0],
@@ -50,6 +51,10 @@ var _touches := {}                  # индекс → позиция (щипо�
 var _pinch_d := 0.0
 var _tip_target := {}
 var markers: Array = []             # последний набор значков на экране (для касаний и тестов)
+var mark_mode := false              # v0.9.4.2: режим «поставить метку» (касание по пустому месту)
+var mark_btn: Button
+var _press_t := -1.0
+var _press_pos := Vector2.ZERO
 
 func setup(z) -> void:
 	zone = z
@@ -80,6 +85,9 @@ func setup(z) -> void:
 	var zb := VBoxContainer.new(); zb.name = "ZoomButtons"; zb.add_theme_constant_override("separation", 10)
 	map_rect.add_child(zb)
 	zb.anchor_left = 1; zb.anchor_right = 1; zb.offset_left = -96; zb.offset_right = -14; zb.offset_top = 14
+	mark_btn = UIK.button(zb, "⚑", func(): marker_mode(not mark_mode), UIK.BUTTON, 38)
+	mark_btn.name = "MarkMode"; mark_btn.tooltip_text = "Метка: коснитесь карты, чтобы поставить; касание метки — снять. На ПК — правый клик"
+	UIK.min_h(mark_btn, 76); mark_btn.custom_minimum_size.x = 82
 	for spec in [["+", func(): zoom_by(1.6)], ["−", func(): zoom_by(1.0 / 1.6)], ["◎", center_on_player]]:
 		var b := UIK.button(zb, spec[0], spec[1], UIK.BUTTON, 38)
 		b.name = "Zoom" + ("In" if spec[0] == "+" else ("Out" if spec[0] == "−" else "Center"))
@@ -222,7 +230,7 @@ func collect_markers() -> Array:
 	for i in WorldData.TOWNS.size():
 		var t: Dictionary = WorldData.TOWNS[i]
 		var b: Dictionary = WorldData.BIOMES[t.biome]
-		out.append({"cat": "town", "pos": t.pos, "name": t.name, "text": "%s · %s, ур. %d–%d\nТорговец, сундук-хранилище, путевой камень" % ["Город" if t.kind == "town" else "Лагерь", b.name, b.lv[0], b.lv[1]], "label": true})
+		out.append({"cat": "town", "pos": t.pos, "name": t.name, "text": "%s · %s, ур. %d–%d\n%s" % ["Город" if t.kind == "town" else "Лагерь", b.name, b.lv[0], b.lv[1], _town_services(wb, t.pos)], "label": true})
 	for wp in wb.waypoints:
 		var known: bool = open.has(wp.id)
 		var nt := false
@@ -237,11 +245,10 @@ func collect_markers() -> Array:
 			"text": "%s\nБосс зоны · ур. %d · рек. %d+\n%s" % [bs.poi, blv, Combat.boss_rec(kind, blv), "Повержен" if dead else Combat.resist_text(kind, "boss", true)], "sub": "рек. %d+" % Combat.boss_rec(kind, blv)})
 	for p in WorldData.POIS:
 		if p.has("boss"): continue
-		var cat := "dungeon" if p.kind == "crypt" else "poi"
-		out.append({"cat": cat, "pos": p.pos, "name": p.name, "text": ("Вход в склеп (подземелье)" if cat == "dungeon" else "Достопримечательность") + " · " + WorldData.BIOMES[WorldData.biome_at(p.pos.x, p.pos.y)].name, "label": true})
+		# v0.9.4.2: «Гнилой склеп» — достопримечательность с путевым камнем, а не вход в подземелье
+		out.append({"cat": "poi", "pos": p.pos, "name": p.name, "text": "Достопримечательность · " + WorldData.BIOMES[WorldData.biome_at(p.pos.x, p.pos.y)].name + ("\nРядом путевой камень" if p.kind in ["mill", "camp_ruin", "oasis", "crypt", "tower", "siege"] else ""), "label": true})
 	if wb.portal_point != Vector3.ZERO:
-		out.append({"cat": "portal", "pos": Vector2(wb.portal_point.x, wb.portal_point.z), "name": "Портал в Пепельную долину", "text": "Долина: Древний тролль, вход в Склеп Эфира"})
-		out.append({"cat": "dungeon", "pos": Vector2(wb.portal_point.x, wb.portal_point.z) + Vector2(14, 0), "name": "Склеп Эфира (через долину)", "text": "Подземелье с Хранителем — вход в Пепельной долине"})
+		out.append({"cat": "portal", "pos": Vector2(wb.portal_point.x, wb.portal_point.z), "name": "Портал в Пепельную долину", "text": "Долина: Древний тролль; там же вход в подземелье «Склеп Эфира»"})
 	for m in WorldData.minor_pois():
 		var res := RESOURCE_KINDS.has(m.kind)
 		out.append({"cat": "resource" if res else "minor", "pos": m.pos, "name": m.name, "kind": m.kind,
@@ -257,7 +264,9 @@ func collect_markers() -> Array:
 				"text": "Элита: %s\n%s" % [e.display_name, e.affix_text()]})
 	for mp in wb.merchant_points:
 		out.append({"cat": "merchant", "pos": Vector2(mp.x, mp.z), "name": "Торговец", "text": "Покупка и продажа снаряжения, зелья"})
-		out.append({"cat": "stash", "pos": Vector2(mp.x, mp.z) + Vector2(12.5, -0.5), "name": "Сундук-хранилище", "text": "Общий склад всех героев"})
+
+	for sp in wb.stash_points:
+		out.append({"cat": "stash", "pos": Vector2(sp.x, sp.z), "name": "Сундук-хранилище", "text": "Общий склад всех героев"})
 	for did in RaidDefs.ORDER:   # v0.9.3: порталы групповых подземелий
 		var d: Dictionary = RaidDefs.DUNGEONS[did]
 		var lk := DB.dungeon_lock(data, did)
@@ -265,7 +274,25 @@ func collect_markers() -> Array:
 			"text": "%s\n%s\nДобыча: «%s»" % [String(d.desc), DB.dungeon_info(data, did) if lk == "" else lk, Items.SETS[d.set].name]})
 	var q := _quest_marker()
 	if not q.is_empty(): out.append(q)
+	var ml := MapMarks.list(data, "global")
+	for i in ml.size():
+		out.append({"cat": "mark", "pos": MapMarks.pos(ml[i]), "name": str(ml[i].get("n", "Метка")), "text": "Ваша метка — видна на мини-карте", "mark": i, "col": MapMarks.color(ml[i]), "label": true})
 	return out
+
+## Что на самом деле есть в городе (по построенным объектам)
+func _town_services(wb: WorldBuilder, tp: Vector2) -> String:
+	var parts := []
+	var n := 0
+	for mp in wb.merchant_points: if Vector2(mp.x, mp.z).distance_to(tp) < 45.0: n += 1
+	if n > 0: parts.append("торговец")
+	n = 0
+	for sp in wb.stash_points: if Vector2(sp.x, sp.z).distance_to(tp) < 45.0: n += 1
+	if n > 0: parts.append("сундук-хранилище")
+	for wp in wb.waypoints: if Vector2(wp.pos.x, wp.pos.z).distance_to(tp) < 45.0: parts.append("путевой камень"); break
+	for did in RaidDefs.ORDER: if RaidDefs.portal_pos(did).distance_to(tp) < 80.0: parts.append("портал «%s»" % RaidDefs.DUNGEONS[did].name)
+	if wb.portal_point != Vector3.ZERO and Vector2(wb.portal_point.x, wb.portal_point.z).distance_to(tp) < 45.0: parts.append("портал в долину")
+	var txt := ", ".join(parts)
+	return txt.left(1).to_upper() + txt.substr(1)
 
 ## Цель: босс зоны по уровню героя (ещё не побеждённый)
 func _quest_marker() -> Dictionary:
@@ -277,7 +304,7 @@ func _quest_marker() -> Dictionary:
 		var b: Dictionary = WorldData.BIOMES[bs.biome]
 		if killed.has("boss_" + b.id): continue
 		if lvl <= int(b.lv[1]) + 2:
-			return {"cat": "quest", "pos": Vector2(bs.pos.x, bs.pos.z) + Vector2(0, -26), "name": "Цель: " + bs.name, "text": "Рекомендуемая цель для вашего уровня: победить босса зоны «%s»" % b.name}
+			return {"cat": "quest", "pos": Vector2(bs.pos.x, bs.pos.z), "name": "Цель: " + bs.name, "text": "Рекомендуемая цель для вашего уровня: победить босса зоны «%s»" % b.name}
 	return {}
 
 func _draw_symbol(ci: CanvasItem, cat: String, at: Vector2, mk) -> void:
@@ -289,6 +316,12 @@ func _draw_symbol(ci: CanvasItem, cat: String, at: Vector2, mk) -> void:
 			var known: bool = mk is Dictionary and mk.get("known", true) or not (mk is Dictionary)
 			ci.draw_circle(at, 11.0, Color(0.1, 0.1, 0.12, 0.85))
 			ci.draw_circle(at, 8.0, col if known else Color(0.4, 0.4, 0.4))
+		"mark":
+			var mc: Color = mk.get("col", col) if mk is Dictionary else col
+			ci.draw_line(at + Vector2(0, 6), at + Vector2(0, -22), Color(0, 0, 0, 0.9), 4.0)
+			ci.draw_line(at + Vector2(0, 6), at + Vector2(0, -22), Color.WHITE, 2.0)
+			ci.draw_colored_polygon(PackedVector2Array([at + Vector2(0, -22), at + Vector2(16, -15), at + Vector2(0, -8)]), mc)
+			ci.draw_circle(at + Vector2(0, 6), 4.0, mc)
 		"building":
 			ci.draw_rect(Rect2(at - Vector2(9, 7), Vector2(18, 14)), col.darkened(0.3))
 			ci.draw_rect(Rect2(at - Vector2(9, 7), Vector2(18, 14)), Color(0.2, 0.15, 0.1), false, 2.0)
@@ -382,12 +415,18 @@ func _on_map_input(ev: InputEvent) -> void:
 		var mb := ev as InputEventMouseButton
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_WHEEL_UP: zoom_by(1.2, mb.position); return
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_WHEEL_DOWN: zoom_by(1.0 / 1.2, mb.position); return
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT: mark_at(mb.position); return
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			if mb.pressed:
 				_drag = true; _drag_moved = 0.0
+				_press_t = Time.get_ticks_msec() / 1000.0; _press_pos = mb.position
 			else:
 				_drag = false
-				if _drag_moved < 10.0 and _touches.size() <= 1: tap(mb.position)
+				var was_long := _press_t < 0.0 and _drag_moved < 10.0
+				_press_t = -1.0
+				if _drag_moved < 10.0 and _touches.size() <= 1 and not was_long:
+					if mark_mode: mark_at(mb.position)
+					else: tap(mb.position)
 	elif ev is InputEventMouseMotion and _drag and _touches.size() <= 1:
 		var mm := ev as InputEventMouseMotion
 		_drag_moved += mm.relative.length()
@@ -409,6 +448,29 @@ func _on_map_input(ev: InputEvent) -> void:
 			if _pinch_d > 10.0 and d > 10.0: zoom_by(d / _pinch_d, _pinch_mid())
 			_pinch_d = d
 			_drag_moved = 99.0
+
+func _process(_d: float) -> void:
+	# долгое нажатие (0.5 с без сдвига) — поставить/снять метку (телефон и мышь)
+	if _press_t >= 0.0 and _drag and _drag_moved < 10.0 and _touches.size() <= 1 and Time.get_ticks_msec() / 1000.0 - _press_t >= 0.5:
+		_press_t = -1.0
+		mark_at(_press_pos)
+
+func marker_mode(on: bool) -> void:
+	mark_mode = on
+	if mark_btn: mark_btn.modulate = Color(0.5, 1, 0.6) if on else Color.WHITE
+	if on: Game.toast("Коснитесь карты, чтобы поставить метку; касание метки — снять", 2.0)
+
+## Поставить метку в точке окна карты или снять ближайшую (в 26 px)
+func mark_at(pos: Vector2) -> bool:
+	tip.visible = false
+	for mk in markers:
+		if mk.cat == "mark" and (mk.screen as Vector2).distance_to(pos + Vector2(0, -8)) < 28.0:
+			MapMarks.remove(data, int(mk.mark), "global"); Game.toast("Метка снята", 1.2)
+			map_rect.queue_redraw(); return false
+	var ok := MapMarks.add(data, to_world(pos), "", "global")
+	if ok: Game.toast("Метка поставлена — видна на мини-карте", 1.5)
+	map_rect.queue_redraw()
+	return ok
 
 func _pinch_dist() -> float:
 	if _touches.size() < 2: return 0.0
@@ -435,13 +497,14 @@ func tap(pos: Vector2) -> bool:
 func show_tip(mk: Dictionary) -> void:
 	_tip_target = mk
 	tip_label.text = "[b][color=#%s]%s[/color][/b]\n%s" % [(CATS[mk.cat][2] as Color).to_html(false), mk.name, mk.get("text", "")]
-	tip_btn.visible = mk.get("wp", "") != "" or mk.has("did")
+	tip_btn.visible = mk.get("wp", "") != "" or mk.has("did") or mk.has("mark")
 	tip_btn.disabled = false
 	if mk.has("did"):
 		var lk := DB.dungeon_lock(data, mk.did)
 		var can := not Net.in_game or not Net.in_party() or Net.is_leader()
 		tip_btn.text = ("Проверка готовности" if Net.in_game and Net.in_party() else "Войти в портал") if can else "Ведёт лидер"
 		tip_btn.disabled = lk != "" or not can or (zone.has_method("is_raid") and zone.is_raid())
+	elif mk.has("mark"): tip_btn.text = "Снять метку"
 	else: tip_btn.text = "Переместиться"
 	tip.visible = true
 	tip.reset_size()
@@ -449,7 +512,9 @@ func show_tip(mk: Dictionary) -> void:
 	tip.position = Vector2(clampf(p.x, 8, map_rect.size.x - tip.size.x - 8), clampf(p.y, 8, map_rect.size.y - tip.size.y - 8))
 
 func _tip_action() -> void:
-	if _tip_target.has("did"): enter_portal(str(_tip_target.did))
+	if _tip_target.has("mark"):
+		MapMarks.remove(data, int(_tip_target.mark), "global"); tip.visible = false; map_rect.queue_redraw()
+	elif _tip_target.has("did"): enter_portal(str(_tip_target.did))
 	elif _tip_target.get("wp", "") != "": travel(_tip_target.wp)
 
 ## v0.9.3: вход в подземелье через портал на карте (в группе — сначала проверка готовности)
@@ -489,6 +554,35 @@ func travel(id: String) -> bool:
 func _name_of(id: String) -> String:
 	for wp in _wb().waypoints: if wp.id == id: return wp.name
 	return id
+
+## v0.9.4.2: сверка значков карты с настоящими объектами мира (для тестов)
+func audit() -> Array:
+	var wb := _wb()
+	var res := []
+	if wb == null: return res
+	var all := collect_markers()
+	var dung := all.filter(func(m): return m.cat == "dungeon")
+	for m in dung:
+		var ok := false
+		for rp in wb.raid_portals: if Vector2(rp.pos.x, rp.pos.z).distance_to(m.pos) < 1.0: ok = true
+		res.append([ok, "карта: «%s» стоит на настоящем портале" % m.name])
+	for m in all.filter(func(m): return m.cat == "stash"):
+		var ok := false
+		for sp in wb.stash_points: if Vector2(sp.x, sp.z).distance_to(m.pos) < 1.0: ok = true
+		res.append([ok, "карта: сундук на месте настоящего"])
+	for m in all.filter(func(m): return m.cat == "boss"):
+		var ok := false
+		for bs in wb.bosses: if Vector2(bs.pos.x, bs.pos.z).distance_to(m.pos) < 1.0: ok = true
+		res.append([ok, "карта: босс «%s» на арене" % m.name])
+	for i in WorldData.BIOMES.size():
+		var sd: Vector2 = WorldData.BIOMES[i].seed
+		res.append([WorldData.biome_at(sd.x, sd.y) == i, "карта: подпись зоны «%s» внутри зоны" % WorldData.BIOMES[i].name])
+	var q := _quest_marker()
+	if not q.is_empty():
+		var ok := false
+		for bs in wb.bosses: if Vector2(bs.pos.x, bs.pos.z).distance_to(q.pos) < 1.0: ok = true
+		res.append([ok, "карта: цель указывает на босса"])
+	return res
 
 func _close() -> void:
 	zone.hud.close_window()
