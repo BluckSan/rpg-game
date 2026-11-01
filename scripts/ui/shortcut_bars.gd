@@ -1,13 +1,14 @@
 extends CanvasLayer
 class_name ShortcutBars
-## v0.9.3: панели ярлыков в стиле Lineage 2 (только ПК). Три панели:
-##  1 — клавиши 1…0 (10 ячеек), 2 — F1…F12 (12 ячеек), 3 — без клавиш (по щелчку), у каждой 5 страниц.
-## В ячейку перетаскиваются умения (окно «Умения»), вещи (инвентарь: щелчок — надеть), зелье, ярлыки с других ячеек.
-## Панели двигаются за ручку (если не закреплены), поворачиваются (горизонтально/вертикально), страницы — ▲▼ или «[» «]».
-## Раскладка и содержимое хранятся в user://ui_<герой>.cfg. Клавиши — из настроек управления (переназначаются).
+## v0.9.5.1: ОДНА панель ярлыков (ПК), 10 ячеек на клавишах 1…0 (переназначаются в настройках).
+## В ячейку перетаскиваются умения (окно «Умения»), вещи (инвентарь), зелье и ярлыки с других ячеек.
+## Панель двигается простым перетаскиванием (за рамку или пустую ячейку), если не закреплена.
+## Кнопки только две: поворот (горизонтально/вертикально) и замок. Набор умений (8) синхронизирован с панелью:
+## умение, выбранное в окне «Умения», сразу появляется на панели; умение, брошенное на панель, попадает в набор.
+## Раскладка и содержимое — в user://ui_<герой>.cfg.
 
-const PAGES := 5
-const SIZES := [10, 12, 12]
+const SIZE := 10
+const SIZES := [10]   # совместимость
 const CELL := 62.0
 const GAP := 4.0
 const PATH_FMT := "user://ui_%s.cfg"
@@ -16,17 +17,15 @@ var hud
 var player
 var data: Dictionary
 var root: Control
-var panels: Array = []        # Control на панель
-var slots: Array = []         # [bar] -> Array[ShortcutSlot]
-var pages := [0, 0, 0]
-var vertical := [false, false, true]
-var shown := [true, true, false]
-var pos: Array = []           # Vector2 на панель
+var panels: Array = []        # [Panel]
+var slots: Array = []         # [0] -> Array[ShortcutSlot]
+var vertical := false
+var pos := Vector2.ZERO
 var locked := false
-var sc: Array = []            # [bar][page][slot] -> Dictionary
-var _drag_bar := -1
+var sc: Array = []            # [slot] -> Dictionary
+var _dragging := false
 var _drag_off := Vector2.ZERO
-var _tip_t := 0.0
+var _last_lo: Array = []
 
 func setup(h) -> void:
 	hud = h; player = h.player; data = h.zone.data
@@ -34,196 +33,232 @@ func setup(h) -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	root = Control.new(); root.set_anchors_preset(Control.PRESET_FULL_RECT); root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
-	for b in 3:
-		var pg := []
-		for p in PAGES:
-			var row := []
-			for i in SIZES[b]: row.append({})
-			pg.append(row)
-		sc.append(pg)
+	sc = []
+	for i in SIZE: sc.append({})
 	_defaults()
 	load_cfg()
-	for b in 3: _build(b)
+	_build()
+	sync_loadout()
 	refresh_keys()
 	refresh_all()
 
 func _cfg_path() -> String:
 	return PATH_FMT % str(data.get("name", "hero")).md5_text().left(12)
 
-## По умолчанию: панель 1 стр. 1 — набор умений 1–8 и зелье на «9»
+## По умолчанию: умения набора 1–8 и зелье на «9»
 func _defaults() -> void:
 	var lo: Array = data.get("loadout", [])
 	for i in mini(8, lo.size()):
-		if str(lo[i]) != "": sc[0][0][i] = {"k": "skill", "id": str(lo[i])}
-	sc[0][0][8] = {"k": "potion"}
+		if str(lo[i]) != "": sc[i] = {"k": "skill", "id": str(lo[i])}
+	sc[8] = {"k": "potion"}
 	var vs := get_viewport().get_visible_rect().size if get_viewport() else Vector2(1920, 1080)
-	pos = [Vector2(vs.x / 2 - _len(0) / 2, vs.y - CELL - 46), Vector2(vs.x / 2 - _len(1) / 2, vs.y - 2 * CELL - 60), Vector2(vs.x - CELL - 70, vs.y * 0.3)]
+	pos = Vector2(vs.x / 2 - _len() / 2, vs.y - CELL - 46)
 
-func _len(b: int) -> float: return SIZES[b] * (CELL + GAP) + 40.0
+func _len() -> float: return SIZE * (CELL + GAP) + 40.0
 
 func load_cfg() -> void:
 	var cf := ConfigFile.new()
 	if cf.load(_cfg_path()) != OK: return
 	locked = bool(cf.get_value("bars", "locked", false))
-	for b in 3:
-		pos[b] = cf.get_value("bars", "pos%d" % b, pos[b])
-		vertical[b] = bool(cf.get_value("bars", "vert%d" % b, vertical[b]))
-		shown[b] = bool(cf.get_value("bars", "shown%d" % b, shown[b]))
-		pages[b] = clampi(int(cf.get_value("bars", "page%d" % b, 0)), 0, PAGES - 1)
-		var saved = cf.get_value("bars", "sc%d" % b, null)
-		if saved is Array and saved.size() == PAGES:
-			for p in PAGES:
-				if saved[p] is Array and saved[p].size() == SIZES[b]: sc[b][p] = saved[p]
+	pos = cf.get_value("bar", "pos", cf.get_value("bars", "pos0", pos))
+	vertical = bool(cf.get_value("bar", "vert", cf.get_value("bars", "vert0", vertical)))
+	var saved = cf.get_value("bar", "sc", null)
+	if saved == null:   # миграция со старых панелей (0.9.3–0.9.5): панель 1, страница 1
+		var old = cf.get_value("bars", "sc0", null)
+		if old is Array and old.size() > 0 and old[0] is Array: saved = old[0]
+	if saved is Array:
+		for i in mini(SIZE, saved.size()):
+			if saved[i] is Dictionary: sc[i] = saved[i]
 
 func save_cfg() -> void:
 	var cf := ConfigFile.new()
 	cf.load(_cfg_path())
+	if cf.has_section("bars"): cf.erase_section("bars")
 	cf.set_value("bars", "locked", locked)
-	for b in 3:
-		cf.set_value("bars", "pos%d" % b, pos[b]); cf.set_value("bars", "vert%d" % b, vertical[b])
-		cf.set_value("bars", "shown%d" % b, shown[b]); cf.set_value("bars", "page%d" % b, pages[b])
-		cf.set_value("bars", "sc%d" % b, sc[b])
+	cf.set_value("bar", "pos", pos); cf.set_value("bar", "vert", vertical)
+	cf.set_value("bar", "sc", sc)
 	cf.save(_cfg_path())
 
 # ---------- построение ----------
-func _build(b: int) -> void:
-	var p := Panel.new(); p.name = "Bar%d" % (b + 1)
+func _build() -> void:
+	var p := Panel.new(); p.name = "Bar1"
 	p.add_theme_stylebox_override("panel", UIK.frame("panel_dark", Color(1, 1, 1, 0.9), 4))
 	p.mouse_filter = Control.MOUSE_FILTER_STOP
+	p.gui_input.connect(_panel_input)
 	root.add_child(p)
 	panels.append(p)
-	# ручка: перетаскивание панели, номер страницы, кнопки
-	var grip := Control.new(); grip.name = "Grip"; grip.mouse_filter = Control.MOUSE_FILTER_STOP
-	grip.mouse_default_cursor_shape = Control.CURSOR_MOVE
-	grip.gui_input.connect(_grip_input.bind(b))
-	grip.draw.connect(func():
-		for k in 3: grip.draw_line(Vector2(6 + k * 6, 8), Vector2(6 + k * 6, grip.size.y - 8) if not vertical[b] else Vector2(grip.size.x - 8, 6 + k * 6), Color(1, 1, 1, 0.25 if locked else 0.5), 2.0)
-		if vertical[b]:
-			for k in 3: pass)
-	p.add_child(grip)
-	var pl := UIK.label(p, "", 16, UIK.MUTED, HORIZONTAL_ALIGNMENT_CENTER); pl.name = "Page"; pl.autowrap_mode = TextServer.AUTOWRAP_OFF
-	var up := _mini_btn(p, "▲", func(): page(b, -1)); up.name = "Up"
-	var dn := _mini_btn(p, "▼", func(): page(b, 1)); dn.name = "Down"
-	var rot := _mini_btn(p, "⟳", func(): vertical[b] = not vertical[b]; _layout(b); save_cfg()); rot.name = "Rot"
+	var rot := _mini_btn(p, "⟳", func(): rotate_bar()); rot.name = "Rot"
 	rot.tooltip_text = "Повернуть панель (горизонтально / вертикально)"
 	var lk := _mini_btn(p, "", func(): toggle_lock()); lk.name = "Lock"
-	lk.tooltip_text = "Закрепить панели (нельзя сдвинуть и вытащить ярлыки)"
+	lk.tooltip_text = "Закрепить панель (нельзя сдвинуть и вытащить ярлыки)"
 	var row := []
-	for i in SIZES[b]:
-		var s := ShortcutSlot.new(); s.bars = self; s.bar = b; s.idx = i; s.name = "S%d" % i
+	for i in SIZE:
+		var s := ShortcutSlot.new(); s.bars = self; s.bar = 0; s.idx = i; s.name = "S%d" % i
 		s.size = Vector2(CELL, CELL)
 		p.add_child(s); row.append(s)
 	slots.append(row)
-	_layout(b)
+	_layout()
 
 func _mini_btn(p: Control, t: String, cb: Callable) -> Button:
 	var bt := Button.new(); bt.text = t; bt.focus_mode = Control.FOCUS_NONE
-	bt.add_theme_font_size_override("font_size", 14)
-	var st := UIK.box(Color(0.12, 0.14, 0.2, 0.9), 6); st.content_margin_left = 2; st.content_margin_right = 2; st.content_margin_top = 0; st.content_margin_bottom = 0
+	bt.add_theme_font_size_override("font_size", 18)
+	var st := UIK.box(Color(0.12, 0.14, 0.2, 0.9), 6); st.content_margin_left = 0; st.content_margin_right = 0; st.content_margin_top = 0; st.content_margin_bottom = 0
 	bt.add_theme_stylebox_override("normal", st); bt.add_theme_stylebox_override("hover", UIK.box(Color(0.22, 0.26, 0.36, 0.95), 6))
 	bt.add_theme_stylebox_override("pressed", UIK.box(Color(0.3, 0.24, 0.12, 0.95), 6))
 	bt.pressed.connect(cb)
 	p.add_child(bt)
 	return bt
 
-func _layout(b: int) -> void:
-	var p: Panel = panels[b]
-	var n: int = SIZES[b]
-	var v: bool = vertical[b]
-	var head := 34.0
-	var body := n * (CELL + GAP) - GAP
-	p.size = Vector2(head + body + 12, CELL + 12) if not v else Vector2(CELL + 12, head + body + 12)
-	p.position = _clamp_pos(pos[b], p.size)
-	var g: Control = p.get_node("Grip")
-	g.position = Vector2(2, 2); g.size = Vector2(26, CELL + 8) if not v else Vector2(CELL + 8, 26)
-	g.queue_redraw()
-	var pl: Label = p.get_node("Page")
-	pl.text = "%d" % (pages[b] + 1)
-	var bw := Vector2(22, 18)
-	# кнопки на ручке: ▲, номер, ▼, поворот, замок
-	var items := [p.get_node("Up"), pl, p.get_node("Down"), p.get_node("Rot"), p.get_node("Lock")]
-	for k in items.size():
-		var c: Control = items[k]
-		c.size = bw
-		c.position = Vector2(5, 3 + k * 13) if not v else Vector2(3 + k * 13 + (CELL - 60) / 2, 6)
-		if v: c.size = Vector2(16, 22)
-		if not v: c.size = Vector2(24, 13)
-		(c as Control).add_theme_font_size_override("font_size", 11)
-	for i in n:
-		var s: ShortcutSlot = slots[b][i]
-		s.position = Vector2(6 + head + i * (CELL + GAP), 6) if not v else Vector2(6, 6 + head + i * (CELL + GAP))
+func _layout(_b: int = 0) -> void:
+	if panels.is_empty(): return
+	var p: Panel = panels[0]
+	var v := vertical
+	var head := 30.0
+	var body := SIZE * (CELL + GAP) - GAP
+	p.size = Vector2(head + body + 14, CELL + 12) if not v else Vector2(CELL + 12, head + body + 14)
+	pos = _clamp_pos(pos, p.size)
+	p.position = pos
+	var rot: Button = p.get_node("Rot"); var lk: Button = p.get_node("Lock")
+	if not v:
+		rot.position = Vector2(6, 6); rot.size = Vector2(26, (CELL - 4) / 2)
+		lk.position = Vector2(6, 6 + (CELL + 4) / 2); lk.size = Vector2(26, (CELL - 4) / 2)
+	else:
+		rot.position = Vector2(6, 6); rot.size = Vector2((CELL - 4) / 2, 26)
+		lk.position = Vector2(6 + (CELL + 4) / 2, 6); lk.size = Vector2((CELL - 4) / 2, 26)
+	for i in SIZE:
+		var s: ShortcutSlot = slots[0][i]
+		s.position = Vector2(8 + head + i * (CELL + GAP), 6) if not v else Vector2(6, 8 + head + i * (CELL + GAP))
 		s.size = Vector2(CELL, CELL)
-	p.visible = shown[b]
-	(p.get_node("Lock") as Button).text = "■" if locked else "□"
+	lk.text = "■" if locked else "□"
+	p.mouse_default_cursor_shape = Control.CURSOR_ARROW if locked else Control.CURSOR_MOVE
 
 func _clamp_pos(p: Vector2, sz: Vector2) -> Vector2:
 	var vs := get_viewport().get_visible_rect().size
 	return Vector2(clampf(p.x, 0, maxf(0, vs.x - sz.x)), clampf(p.y, 0, maxf(0, vs.y - sz.y)))
 
-func _grip_input(ev: InputEvent, b: int) -> void:
-	if locked: return
-	if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT:
-		if ev.pressed: _drag_bar = b; _drag_off = panels[b].get_global_mouse_position() - panels[b].position
-		else:
-			_drag_bar = -1; save_cfg()
-	elif ev is InputEventMouseMotion and _drag_bar == b:
-		move_bar(b, panels[b].get_global_mouse_position() - _drag_off)
+func rotate_bar() -> void:
+	vertical = not vertical
+	_layout(); save_cfg()
 
-func move_bar(b: int, p: Vector2) -> void:
-	pos[b] = _clamp_pos(p, panels[b].size)
-	panels[b].position = pos[b]
+## Перетаскивание панели: ЛКМ по рамке или пустой ячейке (если не закреплена)
+func begin_drag(at: Vector2) -> bool:
+	if locked or panels.is_empty(): return false
+	_dragging = true
+	_drag_off = at - panels[0].position
+	return true
+
+func _panel_input(ev: InputEvent) -> void:
+	if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and ev.pressed:
+		if begin_drag(ev.global_position): panels[0].accept_event()
+	else: drag_event(ev)
+
+## Движение/отпускание мыши во время перетаскивания панели (из gui_input панели/ячейки и из _input)
+func drag_event(ev: InputEvent) -> bool:
+	if not _dragging: return false
+	if ev is InputEventMouseMotion:
+		move_bar(0, (ev as InputEventMouse).global_position - _drag_off); return true
+	elif ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and not ev.pressed:
+		_dragging = false; save_cfg(); return true
+	return false
+
+func _input(ev: InputEvent) -> void:
+	if not _dragging: return
+	drag_event(ev)
+
+func move_bar(_b: int, p: Vector2) -> void:
+	pos = _clamp_pos(p, panels[0].size)
+	panels[0].position = pos
 
 func over(p: Vector2) -> bool:
-	if root == null or not root.visible: return false
-	for b in 3:
-		if shown[b] and panels[b].get_global_rect().has_point(p): return true
-	return false
+	if root == null or not root.visible or panels.is_empty(): return false
+	return panels[0].get_global_rect().has_point(p)
 
 func toggle_lock() -> void:
 	locked = not locked
-	for b in 3: _layout(b)
+	_dragging = false
+	_layout()
 	save_cfg()
-	Game.toast("Панели закреплены" if locked else "Панели можно двигать", 1.2)
-
-func page(b: int, d: int) -> void:
-	pages[b] = wrapi(pages[b] + d, 0, PAGES)
-	_layout(b); refresh_bar(b); save_cfg()
-
-func set_shown(b: int, v: bool) -> void:
-	shown[b] = v; _layout(b); save_cfg()
+	Game.toast("Панель закреплена" if locked else "Панель можно двигать", 1.2)
 
 # ---------- содержимое ----------
-func get_slot(b: int, i: int) -> Dictionary: return sc[b][pages[b]][i]
+func get_slot(_b: int, i: int) -> Dictionary: return sc[i]
 
-func set_slot(b: int, i: int, e: Dictionary) -> void:
-	sc[b][pages[b]][i] = e
-	refresh_bar(b); save_cfg()
+func set_slot(_b: int, i: int, e: Dictionary) -> void:
+	sc[i] = e
+	refresh_all(); save_cfg()
 
 ## Перетаскивание в ячейку: умение, вещь, зелье или ярлык из другой ячейки (меняются местами)
-func drop(b: int, i: int, d: Dictionary) -> void:
+func drop(_b: int, i: int, d: Dictionary) -> void:
+	if i < 0 or i >= SIZE: return
 	if d.has("sc"):
-		var fb := int(d.sc[0]); var fi := int(d.sc[1])
-		var a: Dictionary = sc[fb][pages[fb]][fi]
-		sc[fb][pages[fb]][fi] = sc[b][pages[b]][i]
-		sc[b][pages[b]][i] = a
+		var fi := int(d.sc[1])
+		var a: Dictionary = sc[fi]
+		sc[fi] = sc[i]
+		sc[i] = a
 		refresh_all(); save_cfg(); return
 	if d.has("skill"):
 		var id := str(d.skill)
-		if id == "" or DB.find_skill(data, id) == null: return
-		# умение не в наборе — ставим в свободный слот набора (ограничение 8 активных умений сохраняется)
-		if _loadout_index(id) < 0:
-			var lo: Array = data.get("loadout", [])
-			var free := lo.find("")
-			if free < 0:
-				Game.toast("Набор умений полон (8): освободите слот в окне «Умения»", 2.5); return
-			if not DB.set_loadout_slot(data, free, id):
-				Game.toast("Умение ещё не изучено", 1.6); return
-			hud.refresh_skill_buttons(); hud.zone.save()
-		set_slot(b, i, {"k": "skill", "id": id})
+		var s = DB.find_skill(data, id) if id != "" else null
+		if s == null: return
+		if DB.skill_lock(data, s) != "":
+			Game.toast("Умение ещё не изучено", 1.6); return
+		if _loadout_index(id) < 0 and not _put_in_loadout(id, i): return
+		# это умение уже на панели — переносим, а не дублируем
+		for k in SIZE:
+			if k != i and str(sc[k].get("k", "")) == "skill" and str(sc[k].get("id", "")) == id: sc[k] = {}
+		sc[i] = {"k": "skill", "id": id}
+		_last_lo = (data.get("loadout", []) as Array).duplicate()
+		refresh_all(); save_cfg()
 	elif d.has("item"):
-		set_slot(b, i, {"k": "item", "uid": str(d.item)})
+		set_slot(0, i, {"k": "item", "uid": str(d.item)})
 	elif d.has("potion"):
-		set_slot(b, i, {"k": "potion"})
+		set_slot(0, i, {"k": "potion"})
+
+## Умение не в наборе (8 активных): свободный слот набора, иначе заменяем умение из этой ячейки,
+## иначе — умение набора, которого нет на панели. Возвращает успех.
+func _put_in_loadout(id: String, cell: int) -> bool:
+	var lo: Array = data.get("loadout", [])
+	var slot := lo.find("")
+	if slot < 0 and str(sc[cell].get("k", "")) == "skill": slot = lo.find(str(sc[cell].get("id", "")))
+	if slot < 0:
+		for k in lo.size():
+			if not _on_bar(str(lo[k])): slot = k; break
+	if slot < 0:
+		Game.toast("Набор умений полон (8): перетащите умение на ячейку с другим умением", 2.5); return false
+	if not DB.set_loadout_slot(data, slot, id):
+		Game.toast("Умение ещё не изучено", 1.6); return false
+	hud.refresh_skill_buttons(); hud.zone.save()
+	return true
+
+func _on_bar(id: String) -> bool:
+	for e in sc:
+		if str(e.get("k", "")) == "skill" and str(e.get("id", "")) == id: return true
+	return false
+
+## Набор изменили в окне «Умения» (или изучили/разучили): умение, заменённое в наборе, заменяется и на панели;
+## новое умение набора, которого нет на панели, ставится в первую пустую ячейку.
+func sync_loadout() -> void:
+	var lo: Array = (data.get("loadout", []) as Array).duplicate()
+	if lo == _last_lo: return
+	var old := _last_lo
+	_last_lo = lo
+	for k in lo.size():
+		var nid := str(lo[k])
+		var oid := str(old[k]) if k < old.size() else ""
+		if oid != "" and oid != nid and lo.find(oid) < 0:
+			for c in SIZE:
+				if str(sc[c].get("k", "")) == "skill" and str(sc[c].get("id", "")) == oid:
+					sc[c] = {"k": "skill", "id": nid} if nid != "" and not _on_bar(nid) else {}
+	for k in lo.size():
+		var nid := str(lo[k])
+		if nid == "" or _on_bar(nid): continue
+		var free := -1
+		if k < SIZE and sc[k].is_empty(): free = k
+		if free < 0:
+			for c in SIZE:
+				if sc[c].is_empty(): free = c; break
+		if free >= 0: sc[free] = {"k": "skill", "id": nid}
+	save_cfg()
 
 func _loadout_index(id: String) -> int:
 	var lo: Array = data.get("loadout", [])
@@ -236,7 +271,7 @@ func _find_item(uid: String):
 
 ## Срабатывание ячейки (щелчок или клавиша)
 func activate(b: int, i: int) -> bool:
-	if b < 0 or b >= 3 or i < 0 or i >= SIZES[b]: return false
+	if b != 0 or i < 0 or i >= SIZE: return false
 	var e: Dictionary = get_slot(b, i)
 	var s: ShortcutSlot = slots[b][i]
 	s.flash = 0.6; s.queue_redraw()
@@ -261,12 +296,11 @@ func activate(b: int, i: int) -> bool:
 	return false
 
 func refresh_all() -> void:
-	for b in 3: refresh_bar(b)
+	refresh_bar(0)
 
-func refresh_bar(b: int) -> void:
-	if b >= slots.size(): return
-	(panels[b].get_node("Page") as Label).text = "%d" % (pages[b] + 1)
-	for i in SIZES[b]:
+func refresh_bar(b: int = 0) -> void:
+	if b != 0 or slots.is_empty(): return
+	for i in SIZE:
 		var s: ShortcutSlot = slots[b][i]
 		var e: Dictionary = get_slot(b, i)
 		s.empty = e.is_empty(); s.badge = ""
@@ -278,26 +312,23 @@ func refresh_bar(b: int) -> void:
 				s.icon = UIK.icon("health-potion"); s.tint = Color(1, 0.35, 0.4); s.badge = str(int(data.get("potions", 0)))
 			"item":
 				var it = _find_item(str(e.uid))
-				if it == null: s.empty = true; sc[b][pages[b]][i] = {}
+				if it == null: s.empty = true; sc[i] = {}
 				else: s.icon = UIK.icon(UIK.item_icon(it, data["class"])); s.tint = Items.rarity_color(it)
 		s.queue_redraw()
 
 func refresh_keys() -> void:
-	for b in 3:
-		for i in SIZES[b]:
-			var s: ShortcutSlot = slots[b][i]
-			s.key_hint = Controls.key_hint(action_for(b, i)) if action_for(b, i) != "" else ""
-			s.queue_redraw()
+	for i in SIZE:
+		var s: ShortcutSlot = slots[0][i]
+		s.key_hint = Controls.key_hint(action_for(0, i))
+		s.queue_redraw()
 
 static func action_for(b: int, i: int) -> String:
 	if b == 0: return "skill_%d" % (i + 1)
-	if b == 1: return "bar2_%d" % (i + 1)
 	return ""
 
 ## Действие клавиши → [панель, ячейка] или []
 static func slot_of_action(act: String) -> Array:
 	if act.begins_with("skill_"): return [0, int(act.substr(6)) - 1]
-	if act.begins_with("bar2_"): return [1, int(act.substr(5)) - 1]
 	return []
 
 var _hover: ShortcutSlot
@@ -318,9 +349,9 @@ func _process(_dt: float) -> void:
 	var dragging := get_viewport().gui_is_dragging()
 	root.visible = hud.window == null or dragging
 	if not root.visible: return
-	for b in 3:
-		if not shown[b]: continue
-		for i in SIZES[b]:
+	if lo_changed(): sync_loadout(); refresh_all()
+	for b in 1:
+		for i in SIZE:
 			var s: ShortcutSlot = slots[b][i]
 			var e: Dictionary = get_slot(b, i)
 			if str(e.get("k", "")) == "skill":
@@ -331,3 +362,6 @@ func _process(_dt: float) -> void:
 			elif str(e.get("k", "")) == "potion":
 				var bd := str(int(data.get("potions", 0)))
 				if s.badge != bd: s.badge = bd; s.queue_redraw()
+
+func lo_changed() -> bool:
+	return data.get("loadout", []) != _last_lo

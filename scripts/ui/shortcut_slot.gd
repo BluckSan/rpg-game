@@ -26,7 +26,11 @@ func _ready() -> void:
 	mouse_exited.connect(func(): if bars: bars.hover(null))
 
 func _input_ev(ev: InputEvent) -> void:
-	if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and not ev.pressed:
+	if bars._dragging and bars.drag_event(ev): accept_event(); return
+	if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and ev.pressed and empty:
+		if bars.begin_drag(ev.global_position): accept_event()   # пустая ячейка — тянем всю панель
+	elif ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and not ev.pressed:
+		if bars._dragging: return
 		bars.activate(bar, idx); accept_event()
 	elif ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_RIGHT and ev.pressed and ev.shift_pressed:
 		bars.set_slot(bar, idx, {}); accept_event()   # Shift+ПКМ — убрать ярлык

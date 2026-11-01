@@ -380,7 +380,7 @@ func refresh_key_hints() -> void:
 	var help = root.find_child("KeyHelp", false, false)
 	if help:
 		var K := func(a): return Controls.key_hint(a)
-		help.text = "%s%s%s%s — ход · %s — атака · 1…0, F1…F12 — ярлыки\n%s — цель · %s — сброс цели · ПКМ — камера\n%s — прыжок · %s — кувырок · %s — зелье · %s — герой\n%s — умения · %s — таланты · %s — карта · Esc — меню" % [
+		help.text = "%s%s%s%s — ход · %s — атака · 1…0 — панель умений\n%s — цель · %s — сброс цели · ПКМ — камера\n%s — прыжок · %s — кувырок · %s — зелье · %s — герой\n%s — умения · %s — таланты · %s — карта · Esc — меню" % [
 			K.call("move_up"), K.call("move_left"), K.call("move_down"), K.call("move_right"), K.call("attack"), K.call("target_next"), K.call("target_clear"),
 			K.call("jump"), K.call("roll"), K.call("potion"), K.call("hero"), K.call("skills"), K.call("talents"), K.call("map")]
 
@@ -437,9 +437,7 @@ func _hotkey_ev(ev: InputEvent) -> bool:
 			zone.target_ctl.clear(); return true
 		_open("pause"); return true
 	# v0.9.3: ПК — клавиши 1…0 и F1…F12 срабатывают по ячейкам панелей ярлыков
-	if bars != null and act.begins_with("bar_page_"):
-		bars.page(0, 1 if act == "bar_page_next" else -1); return true
-	if bars != null and (act.begins_with("skill_") or act.begins_with("bar2_")):
+	if bars != null and act.begins_with("skill_"):
 		var bs := ShortcutBars.slot_of_action(act)
 		bars.activate(int(bs[0]), int(bs[1]))
 		return true

@@ -21,6 +21,7 @@ func _ready() -> void:
 	roster.add_theme_constant_override("outline_size", 6)
 	roster.add_theme_color_override("font_outline_color", Color.BLACK)
 	roster.anchor_top = 0.36; roster.anchor_bottom = 0.36; roster.offset_left = 24; roster.offset_top = 0
+	roster.visible = false   # v0.9.5.1: панель «Онлайн» убрана с экрана (по просьбе игрока)
 	root.add_child(roster)
 	log_label = RichTextLabel.new()
 	log_label.bbcode_enabled = true; log_label.scroll_following = true
@@ -58,7 +59,7 @@ func _process(_d: float) -> void:
 
 func _refresh() -> void:
 	if not is_instance_valid(roster): return
-	roster.visible = not Net.in_party()   # в группе вместо списка — рамки группы (PartyUI)
+	roster.visible = false   # v0.9.5.1: список онлайна на экране больше не показываем
 	var names := Net.online_names()
 	roster.text = "Онлайн: %d/%d\n%s" % [names.size(), Net.MAX_PLAYERS, "\n".join(names.slice(0, 10))]
 	var t := ""

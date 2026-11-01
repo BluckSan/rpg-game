@@ -2,7 +2,7 @@ extends Node
 ## v0.9.3: проверка ПК-интерфейса в стиле L2 — панели ярлыков, переназначение клавиш, окно группы.
 ## xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 1920x1080 res://tests/l2ui_test.tscn [++ --touch]
 var is_runner := false
-var out := "/workspace/rpg-shots/v093"
+var out := "/workspace/rpg-shots/v0951"
 var errors := 0
 var checks := 0
 
@@ -25,6 +25,20 @@ func shot(n: String) -> void:
 func key(z, k: int) -> void:
 	var ev := InputEventKey.new(); ev.keycode = k; ev.physical_keycode = k; ev.pressed = true
 	z.hud._input(ev)
+
+func mouse_drag(a: Vector2, b: Vector2) -> void:
+	var vp := get_viewport()
+	var mm := InputEventMouseMotion.new(); mm.position = a; mm.global_position = a; vp.push_input(mm); await w(0.05)
+	var e := InputEventMouseButton.new(); e.button_index = MOUSE_BUTTON_LEFT; e.pressed = true; e.position = a; e.global_position = a
+	e.button_mask = MOUSE_BUTTON_MASK_LEFT
+	vp.push_input(e); await w(0.1)
+	for k in range(1, 21):
+		var m := InputEventMouseMotion.new(); m.position = a.lerp(b, k / 20.0); m.global_position = m.position
+		m.button_mask = MOUSE_BUTTON_MASK_LEFT; m.relative = (b - a) / 20.0
+		vp.push_input(m); await get_tree().process_frame
+	await w(0.1)
+	var r := InputEventMouseButton.new(); r.button_index = MOUSE_BUTTON_LEFT; r.pressed = false; r.position = b; r.global_position = b
+	vp.push_input(r); await w(0.2)
 
 func _ready() -> void:
 	if not is_runner:
@@ -54,70 +68,106 @@ func _ready() -> void:
 		await shot("l2_phone_hud")
 		_done(); return
 	var bars: ShortcutBars = z.hud.bars
-	check(bars != null and bars.panels.size() == 3, "ПК: 3 панели ярлыков")
+	check(bars != null and bars.panels.size() == 1 and bars.root.get_child_count() == 1, "ПК: ровно одна панель умений")
+	var btns := []
+	for ch in bars.panels[0].get_children(): if ch is Button: btns.append(String(ch.name))
+	check(btns.size() == 2 and "Rot" in btns and "Lock" in btns, "на панели только 2 кнопки: поворот и замок (%s)" % [btns])
 	check(not z.hud.skill_btns[1].visible, "ПК: старый ряд круглых кнопок скрыт")
-	check(bars.slots[0][0].key_hint == "1" and bars.slots[0][9].key_hint == "0", "панель 1: клавиши 1…0")
-	check(bars.slots[1][0].key_hint == "F1" and bars.slots[1][11].key_hint == "F12", "панель 2: клавиши F1…F12 (%s…%s)" % [bars.slots[1][0].key_hint, bars.slots[1][11].key_hint])
-	check(Controls.key_hint("target_self") == "F", "«Цель — я» перенесена с F1 на F")
+	check(bars.slots[0].size() == 10 and bars.slots[0][0].key_hint == "1" and bars.slots[0][9].key_hint == "0", "панель: 10 ячеек, клавиши 1…0")
+	check(Controls.key_hint("target_self") == "F", "«Цель — я» на F")
 	var lo: Array = z.data["loadout"]
-	check(bars.get_slot(0, 0).get("id", "") == str(lo[0]), "по умолчанию ячейка 1 = умение 1 набора")
-	# клавиша 1 → умение
+	var all8 := true
+	for i in 8: all8 = all8 and bars.get_slot(0, i).get("id", "") == str(lo[i])
+	check(all8 and bars.get_slot(0, 8).get("k", "") == "potion", "по умолчанию: 8 умений набора на 1…8, зелье на 9")
 	z.player.cooldowns.fill(0.0)
 	key(z, KEY_1); await w(0.2)
 	check(z.player.cooldowns[1] > 0.0, "клавиша 1 применила умение из ячейки (перезарядка %.1f)" % z.player.cooldowns[1])
-	# переназначение: ячейка 1 → Z, подсказки обновляются сразу
 	Controls.rebind("skill_1", 0, KEY_Z); Controls.save()
 	get_tree().call_group("hud_listeners", "refresh_key_hints")
 	check(bars.slots[0][0].key_hint == "Z", "после переназначения подсказка ячейки = Z (сразу)")
-	Controls.rebind("skills", 0, KEY_K + 0 if false else KEY_O)
+	Controls.rebind("skills", 0, KEY_O)
 	get_tree().call_group("hud_listeners", "refresh_key_hints")
 	check(z.hud.menu_items["skills"].text.contains("[O]"), "меню: подсказка «Умения [O]» обновилась (%s)" % z.hud.menu_items["skills"].text)
 	z.player.cooldowns.fill(0.0); await w(0.6)
 	key(z, KEY_Z); await w(0.2)
 	check(z.player.cooldowns[1] > 0.0, "новая клавиша Z применяет умение")
-	# перетаскивание умения на F1
-	var sid := str(lo[2])
-	bars.drop(1, 0, {"skill": sid, "from": -1})
-	check(bars.get_slot(1, 0).get("id", "") == sid, "умение перетащено в F1")
+	Controls.reset_defaults(); get_tree().call_group("hud_listeners", "refresh_key_hints")
+	# --- баг 0.9.5: выбранное умение не ставилось на панель ---
+	# 1) умение, которого нет в наборе (набор полон), бросаем на ячейку 0 → попадает и на панель, и в набор
+	var spare := ""
+	for s in DB.CLASSES[z.data["class"]].skills.slice(1):
+		if DB.skill_lock(z.data, s) == "" and lo.find(s.id) < 0: spare = s.id; break
+	if spare == "":   # все изучены и в наборе — освободим одно умение
+		var kk := 7
+		while kk > 0 and str(lo[kk]) == "": kk -= 1
+		spare = str(lo[kk]); DB.set_loadout_slot(z.data, kk, ""); await w(0.2)
+		check(not bars._on_bar(spare), "снятое с набора умение ушло с панели")
+	check(spare != "", "есть изученное умение вне набора (%s)" % spare)
+	bars.drop(0, 0, {"skill": spare, "from": -1})
+	check(bars.get_slot(0, 0).get("id", "") == spare and lo.find(spare) >= 0, "умение вне набора поставлено на ячейку 1 (и попало в набор)")
 	z.player.cooldowns.fill(0.0); await w(0.6)
-	key(z, KEY_F1); await w(0.2)
-	check(z.player.cooldowns[3] > 0.0, "F1 применяет перетащенное умение")
+	key(z, KEY_1); await w(0.2)
+	check(z.player.cooldowns[lo.find(spare) + 1] > 0.0, "клавиша 1 применяет поставленное умение")
+	# 2) выбор в окне «Умения» (слот набора) сразу отражается на панели
+	var other := str(lo[1])
+	z.hud._open("skills"); await w(0.4)
+	var sw = z.hud.window
+	var sl := lo.find(spare)
+	DB.set_loadout_slot(z.data, sl, "")
+	sw.drop_on_slot(other if false else spare, sl)
+	z.hud.close_window(); await w(0.3)
+	check(bars._on_bar(spare), "выбранное в окне «Умения» умение стоит на панели")
+	# 3) настоящая мышь: тянем умение из списка окна «Умения» на ячейку 10
+	var mv := str(lo[3])
+	bars.set_slot(0, 9, {}); for ci in 10: if bars.get_slot(0, ci).get("id", "") == mv: bars.set_slot(0, ci, {})
+	z.hud._open("skills"); await w(0.5)
+	sw = z.hud.window
+	var src: Control = sw.find_child("Skill_" + mv, true, false)
+	if src == null:
+		for n in sw.find_children("*", "Button", true, false):
+			if (n as Button).text.begins_with(DB.find_skill(z.data, mv).name): src = n; break
+	check(src != null, "кнопка умения в окне найдена")
+	if src:
+		var a0: Vector2 = src.get_global_rect().get_center()
+		var dst: Vector2 = bars.slots[0][9].get_global_rect().get_center()
+		await mouse_drag(a0, dst)
+		check(bars.get_slot(0, 9).get("id", "") == mv, "мышью: умение перетащено из окна «Умения» на ячейку 0 (%s)" % [bars.get_slot(0, 9)])
+		await shot("after_pc_skills_drag")
+	z.hud.close_window(); await w(0.3)
 	# зелье на 9
 	z.player.hp = z.player.stats.max_hp * 0.4
 	var pots := int(z.data["potions"])
 	key(z, KEY_9); await w(0.2)
 	check(int(z.data["potions"]) == pots - 1, "клавиша 9: зелье (%d → %d)" % [pots, int(z.data["potions"])])
 	# вещь на панель → надеть
-	bars.drop(1, 1, {"item": str(it.uid)})
-	key(z, KEY_F2); await w(0.3)
-	check(Items.find_uid(z.data["equipped"], str(it.uid)) != null, "F2: вещь с панели надета")
+	bars.drop(0, 9, {"item": str(it.uid)})
+	key(z, KEY_0); await w(0.3)
+	check(Items.find_uid(z.data["equipped"], str(it.uid)) != null, "клавиша 0: вещь с панели надета")
 	# обмен ячеек
-	bars.drop(1, 5, {"sc": [1, 0]})
-	check(bars.get_slot(1, 5).get("id", "") == sid and bars.get_slot(1, 0).is_empty(), "ярлык перенесён между ячейками")
-	# страницы
-	key(z, KEY_BRACKETRIGHT); await w(0.1)
-	check(bars.pages[0] == 1 and bars.get_slot(0, 1).is_empty(), "«]» — страница 2 панели 1 (пустая)")
-	bars.drop(0, 0, {"potion": true})
-	key(z, KEY_BRACKETLEFT); await w(0.1)
-	check(bars.pages[0] == 0 and bars.get_slot(0, 1).get("k", "") == "skill", "«[» — назад на страницу 1")
-	# перемещение, поворот, закрепление, сохранение
-	bars.move_bar(1, Vector2(300, 200))
-	bars.vertical[2] = false; bars.set_shown(2, true); bars._layout(2)
-	bars.move_bar(2, Vector2(1200, 150))
+	var e1 := bars.get_slot(0, 1)
+	bars.drop(0, 5, {"sc": [0, 1]})
+	check(bars.get_slot(0, 5) == e1, "ярлык перенесён между ячейками")
+	# перемещение мышью за пустую ячейку / рамку, поворот, закрепление, сохранение
+	bars.set_slot(0, 9, {})
+	var p0: Vector2 = bars.panels[0].position
+	await mouse_drag(bars.slots[0][9].get_global_rect().get_center(), bars.slots[0][9].get_global_rect().get_center() + Vector2(-300, -400))
+	check(bars.panels[0].position.distance_to(p0 + Vector2(-300, -400)) < 4, "панель перетащена мышью (%s → %s)" % [p0, bars.panels[0].position])
+	bars.rotate_bar()
+	check(bars.vertical and bars.panels[0].size.y > bars.panels[0].size.x, "поворот: вертикально")
+	bars.move_bar(0, Vector2(1700, 150))
+	await shot("after_pc_bar_vertical")
 	bars.toggle_lock()
-	check(bars.locked and bars.slots[1][5]._get_drag(Vector2.ZERO) == null, "закреплено: ярлык не вытаскивается")
+	var pl: Vector2 = bars.panels[0].position
+	await mouse_drag(bars.panels[0].get_global_rect().position + Vector2(4, 4), Vector2(400, 600))
+	check(bars.locked and bars.panels[0].position == pl and bars.slots[0][5]._get_drag(Vector2.ZERO) == null, "закреплено: панель не двигается, ярлык не вытаскивается")
 	bars.toggle_lock()
 	bars.save_cfg()
-	var b2 := ShortcutBars.new(); b2.data = z.data; b2.pos = [Vector2.ZERO, Vector2.ZERO, Vector2.ZERO]
-	for b in 3:
-		var pg := []
-		for p in ShortcutBars.PAGES:
-			var row := []; for i in ShortcutBars.SIZES[b]: row.append({})
-			pg.append(row)
-		b2.sc.append(pg)
+	var b2 := ShortcutBars.new(); b2.data = z.data
+	for i in 10: b2.sc.append({})
 	b2.load_cfg()
-	check(b2.pos[1] == Vector2(300, 200) and b2.shown[2] and b2.sc[1][0][5].get("id", "") == sid and b2.sc[0][1][0].get("k", "") == "potion", "раскладка и ярлыки сохраняются в файл")
+	check(b2.pos == bars.pos and b2.vertical and b2.sc[5] == e1, "положение, поворот и ярлыки сохраняются в файл")
 	b2.free()
+	bars.rotate_bar(); bars.move_bar(0, Vector2(560, 960)); bars.save_cfg()
 	# окно группы
 	PartyUI.preview = true
 	Net.party = {"id": 1, "leader": Net.my_id, "members": [
