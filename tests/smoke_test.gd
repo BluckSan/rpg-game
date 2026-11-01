@@ -399,7 +399,6 @@ func _layout_tests(z, p: Player, cls: String) -> void:
 		# v0.9.3: на ПК вместо круглых кнопок — панели ярлыков L2 (подробно — l2ui_test)
 		await frames(2)
 		check(h.bars != null and h.bars.root != null and h.bars.root.visible and not h.skill_btns[2].visible, "[%s] ПК: панели ярлыков вместо круглых кнопок" % cls)
-		h.bars.page(0, 0)
 		h.bars.set_slot(0, 1, {"k": "skill", "id": str(p.data["loadout"][1])})
 		var sc: Dictionary = h.bars.get_slot(0, 1)
 		check(str(sc.get("id", "")) == str(p.data["loadout"][1]) and str(sc.id) != "", "[%s] ПК: ячейка 2 панели = умение слота 2 (%s)" % [cls, str(sc)])

@@ -65,7 +65,18 @@ func _ready() -> void:
 	if not Game.desktop:
 		check(z.hud.bars == null, "телефон: панелей L2 нет (мобильный интерфейс без изменений)")
 		check(z.hud.skill_btns[1].visible, "телефон: круглые кнопки умений на месте")
-		await shot("l2_phone_hud")
+		var plo: Array = z.data["loadout"]
+		var kk := 7
+		while kk > 0 and str(plo[kk]) == "": kk -= 1
+		var ps := str(plo[kk]); DB.set_loadout_slot(z.data, kk, "")
+		z.hud._open("skills"); await w(0.5)
+		var ok_place: bool = z.hud.window.drop_on_slot(ps, 0)
+		z.hud.close_window(); await w(0.3)
+		check(ok_place and str(z.data["loadout"][0]) == ps and z.hud.skill_btns[1].text == DB.find_skill(z.data, ps).name, "телефон: выбранное умение встало на кнопку 1 (%s)" % z.hud.skill_btns[1].text)
+		z.player.cooldowns.fill(0.0); await w(0.4)
+		z.player.try_use(1); await w(0.2)
+		check(z.player.cooldowns[1] > 0.0, "телефон: кнопка 1 применяет выбранное умение")
+		await shot("after_phone_hud")
 		_done(); return
 	var bars: ShortcutBars = z.hud.bars
 	check(bars != null and bars.panels.size() == 1 and bars.root.get_child_count() == 1, "ПК: ровно одна панель умений")

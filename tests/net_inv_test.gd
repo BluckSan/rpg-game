@@ -274,6 +274,13 @@ func _manual_round(z, p, round: int, touch: bool) -> void:
 
 var full_tested := false
 func _finish() -> void:
+	# v0.9.5.1: панели «Онлайн» на экране нет, чат остаётся
+	var ov = Net._overlay if "_overlay" in Net else null
+	if ov != null and is_instance_valid(ov):
+		check(not ov.roster.visible, "онлайн: панели «Онлайн» на экране нет")
+		DirAccess.make_dir_recursive_absolute("/workspace/rpg-shots/v0951")
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("/workspace/rpg-shots/v0951/after_%s_online_%s.png" % ["phone" if not Game.desktop else "pc", args.get("user", "x")])
 	print("=== NET INV RESULT %s: %s (%d errors, %d checks) ===" % [args.get("user", "unit"), "PASS" if errors == 0 else "FAIL", errors, checks])
 	await get_tree().create_timer(1.0).timeout
 	if Net.in_game: await Net.leave()
