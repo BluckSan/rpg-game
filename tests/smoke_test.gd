@@ -213,6 +213,9 @@ func _ready() -> void:
 		for x in a.get("skills_extra", []): DB.learn_skill(pl.data, x.id)
 		check(DB.set_loadout_slot(pl.data, 2, a["skill"]["id"]), "умение пути изучено и поставлено в слот 3 вручную")
 		z2.hud.refresh_skill_buttons()
+		# v0.9.5.2: тест долго стоит среди мобов без лечения — к Некроманту (8-й путь) герой успевал погибнуть
+		if pl.dead: pl.respawn(pl.global_position)
+		pl.hp = pl.stats.max_hp
 		pl.cooldowns[3] = 0; pl.mp = pl.stats.max_mp
 		var e2 = _alive_enemy(z2)
 		pl.teleport(e2.global_position + Vector3(0, 0.1, -2))
@@ -223,6 +226,8 @@ func _ready() -> void:
 		var extra_ok := 0
 		for x in a.get("skills_extra", []):
 			DB.set_loadout_slot(pl.data, 0, x.id)
+			if pl.dead: pl.respawn(pl.global_position)
+			pl.hp = pl.stats.max_hp
 			pl.cooldowns[1] = 0; pl.mp = pl.stats.max_mp
 			var e3 = _alive_enemy(z2)
 			if e3: pl.teleport(e3.global_position + Vector3(0, 0.1, -2))

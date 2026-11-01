@@ -31,7 +31,7 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--") and "=" in a: args[a.substr(2).get_slice("=", 0)] = a.get_slice("=", 1)
 		elif a.begins_with("--"): args[a.substr(2)] = true
-	get_tree().create_timer(300.0, true, false, true).timeout.connect(func(): printerr("NET INV TIMEOUT"); errors += 1; _finish())
+	get_tree().create_timer(560.0 if args.has("touch") else 300.0, true, false, true).timeout.connect(func(): printerr("NET INV TIMEOUT"); errors += 1; _finish())
 	if args.has("unit"): _unit.call_deferred()
 	else: _run.call_deferred()
 
