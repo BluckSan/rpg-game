@@ -1334,7 +1334,29 @@ func c_wm_sub(key: String) -> void:
 	if not is_server: return
 	var id := multiplayer.get_remote_sender_id()
 	var p = _authed(id)
-	if p == null or not WM_ZONES.has(str(p.zone)) or not key.begins_with(str(p.zone) + ":") or key.length() > 64: return
+	if p == null or key.length() > 64: return
+	# v0.9.5.2: подписка (надёжная) обгоняет первый c_state (ненадёжный) из новой зоны — сервер ещё думает,
+	# что герой в долине. Раньше такие подписки молча терялись → в Склепе не было врагов. Теперь — ждут смены зоны.
+	if not key.begins_with(str(p.zone) + ":"):
+		if WM_ZONES.has(key.get_slice(":", 0)):
+			var pend: Dictionary = p.get("wm_pend", {})
+			if pend.size() < 64: pend[key] = _now()
+			p["wm_pend"] = pend
+		return
+	_wm_sub_do(id, p, key)
+
+## Подписки, пришедшие раньше смены зоны: применить, как только зона совпала (не дольше 15 с)
+func _wm_pend_flush(id: int, p: Dictionary) -> void:
+	var pend: Dictionary = p.get("wm_pend", {})
+	if pend.is_empty(): return
+	var now := _now()
+	for key in pend.keys():
+		if key.begins_with(str(p.zone) + ":"):
+			pend.erase(key); _wm_sub_do(id, p, key)
+		elif now - float(pend[key]) > 15.0: pend.erase(key)
+
+func _wm_sub_do(id: int, p: Dictionary, key: String) -> void:
+	if not WM_ZONES.has(str(p.zone)) or not key.begins_with(str(p.zone) + ":"): return
 	if str(p.zone) == "dungeon" and str(p.get("wm_zk", "")) != _wm_zk(p):
 		var old := str(p.get("wm_zk", ""))
 		if wsims.has(old): wsims[old].remove_player(id)
@@ -1361,6 +1383,7 @@ func c_wm_unsub(key: String) -> void:
 	var id := multiplayer.get_remote_sender_id()
 	var p = _authed(id)
 	if p == null: return
+	if p.has("wm_pend"): p.wm_pend.erase(key)
 	var sim = wsims.get(_wm_zk(p))
 	if sim != null and sim.spawners.has(key): sim.spawners[key].subs.erase(id)
 
@@ -1539,6 +1562,7 @@ func _wm_feed() -> void:
 	for id in players:
 		var p = players[id]
 		if not p.get("authed", false): continue
+		if p.has("wm_pend"): _wm_pend_flush(id, p)
 		var zk := _wm_zk(p) if WM_ZONES.has(str(p.zone)) else ""
 		var old := str(p.get("wm_zk", ""))
 		if old != zk:
