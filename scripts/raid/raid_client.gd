@@ -48,7 +48,7 @@ func send_hit(id: int, dmg: float, skill: bool) -> void:
 	else: Net.raid_hit(id, dmg, skill)
 
 func leave() -> void:
-	if Net.in_game: Net.raid_leave()
+	if Net.in_game: Net.dng_exit(); return   # v0.9.5.2: онлайн — выход решает сервер (к порталу в мире)
 	zone.save()
 	# v0.9.2: пройдено — к началу локации, откуда вошли; вышли раньше — туда же, где вошли
 	if done: Game.travel_start("starter")

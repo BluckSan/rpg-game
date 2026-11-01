@@ -113,6 +113,7 @@ func setup(z) -> void:
 
 	# --- v0.9.4: одна кнопка «Меню» (слева от карты) вместо ряда кнопок; панель со всеми окнами ---
 	_build_menu()
+	_build_exit()
 
 	# --- боевые кнопки (координаты от правого нижнего угла) ---
 	var cls: Dictionary = DB.CLASSES[zone.data["class"]]
@@ -249,6 +250,59 @@ func _build_menu() -> void:
 			else: skill_badge = bl
 	menu_panel.visible = false
 	blockers.append(menu_panel)
+
+# --- v0.9.5.2: «Выйти из подземелья» — заметная кнопка в любом подземелье (ПК и телефон), с подтверждением ---
+var exit_btn: Button
+var exit_confirm: Control
+
+func _build_exit() -> void:
+	if not Game.is_dungeon_zone(str(zone.data.get("zone", ""))): return
+	exit_btn = _top_button("Выйти из подземелья", ask_exit, Color(0.62, 0.16, 0.14), 1, 400 if Game.desktop else 430, "ui-exit")
+	exit_btn.name = "DungeonExitBtn"
+	exit_btn.tooltip_text = "Вернуться в мир к порталу этого подземелья"
+
+func ask_exit() -> void:
+	if exit_confirm != null and is_instance_valid(exit_confirm): return
+	close_menu(true)
+	var dim := ColorRect.new(); dim.name = "DungeonExitConfirm"
+	dim.color = Color(0, 0, 0, 0.55); UIK.full(dim); dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	dim.z_index = 40
+	root.add_child(dim)
+	exit_confirm = dim
+	var pn := PanelContainer.new()
+	pn.add_theme_stylebox_override("panel", UIK.frame("panel", Color(1, 1, 1, 0.98), 30))
+	pn.anchor_left = 0.5; pn.anchor_right = 0.5; pn.anchor_top = 0.5; pn.anchor_bottom = 0.5
+	var w := 760.0 if Game.desktop else 900.0
+	pn.offset_left = -w / 2; pn.offset_right = w / 2; pn.offset_top = -190; pn.offset_bottom = 190
+	dim.add_child(pn)
+	var vb := VBoxContainer.new(); vb.add_theme_constant_override("separation", 22); pn.add_child(vb)
+	UIK.label(vb, "Выйти из подземелья?", 36 if Game.desktop else 42, UIK.ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
+	var zid := str(zone.data.get("zone", ""))
+	var txt := "Вы вернётесь в мир к порталу «%s»." % str(DB.ZONES.get(zid, {}).get("name", "подземелья"))
+	if Net.in_game and not Net.party.is_empty() and (Net.party.get("members", []) as Array).size() > 1:
+		txt += "\nГруппа останется внутри — вы сможете вернуться к ней через портал."
+	var l := UIK.label(vb, txt, 26 if Game.desktop else 32, UIK.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var hb := HBoxContainer.new(); hb.alignment = BoxContainer.ALIGNMENT_CENTER
+	hb.add_theme_constant_override("separation", 30); vb.add_child(hb)
+	var yes := UIK.button(hb, "Выйти", _exit_yes, UIK.RED, 30 if Game.desktop else 36, "ui-exit"); yes.name = "ExitYes"
+	var no := UIK.button(hb, "Остаться", close_exit_confirm, UIK.BUTTON, 30 if Game.desktop else 36); no.name = "ExitNo"
+	for b in [yes, no]: b.custom_minimum_size = Vector2(280 if Game.desktop else 340, 76 if Game.desktop else 100)
+	blockers.append(dim)
+
+func close_exit_confirm() -> void:
+	if exit_confirm != null and is_instance_valid(exit_confirm):
+		blockers.erase(exit_confirm); exit_confirm.queue_free()
+	exit_confirm = null
+
+func _exit_yes() -> void:
+	close_exit_confirm()
+	if exit_btn: exit_btn.disabled = true
+	if Net.in_game and not Net.dng_exit_done.is_connected(_on_exit_done): Net.dng_exit_done.connect(_on_exit_done, CONNECT_ONE_SHOT)
+	Net.dng_exit()
+
+func _on_exit_done(ok: bool) -> void:
+	if not ok and is_instance_valid(exit_btn): exit_btn.disabled = false
 
 func toggle_menu() -> void:
 	if menu_open: close_menu()
@@ -425,6 +479,9 @@ const WINDOW_ACTIONS := {"Window_hero": "hero", "Window_talents": "talents", "Wi
 func _hotkey_ev(ev: InputEvent) -> bool:
 	var esc: bool = ev is InputEventKey and (ev as InputEventKey).keycode == KEY_ESCAPE
 	var act := Controls.action_of(ev)
+	if exit_confirm != null and is_instance_valid(exit_confirm):
+		if esc: close_exit_confirm()
+		return esc
 	if window != null:
 		if esc or (act != "" and WINDOW_ACTIONS.get(String(window.name), "") == act):
 			close_window(); return true

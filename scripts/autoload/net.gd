@@ -2013,3 +2013,77 @@ func _dng_admit(id: int, p: Dictionary) -> bool:
 	if wsims.has(zk) and wsims[zk].players.is_empty():
 		wsims.erase(zk); print("server: склеп %s — новый забег" % zk)
 	return true
+
+# ---------- v0.9.5.2: «Выйти из подземелья» — решает сервер ----------
+const DNG_EXIT_STARTER := Vector3(-23.5, 0.1, 53.0)   # у арки Склепа в долине (как zone.gd arrive=dungeon)
+signal dng_exit_done(ok: bool)
+var dng_exit_busy := false
+
+## Куда выходит герой из подземелья: [зона, точка] — у портала этого подземелья в мире
+static func dng_exit_point(zone_id: String) -> Array:
+	if zone_id == "dungeon": return ["starter", DNG_EXIT_STARTER]
+	var did := RaidDefs.by_zone(zone_id)
+	var p2: Vector2 = RaidDefs.portal_pos(did) if did != "" else Vector2.ZERO
+	if p2 == Vector2.ZERO: return ["starter", Vector3.INF]
+	var q := p2 + Vector2(0, 4.5)   # перед порталом, чтобы не войти обратно
+	return ["global", Vector3(q.x, WorldData.height(q.x, q.y) + 0.2, q.y)]
+
+## Клиент: попросить сервер вывести из подземелья (онлайн) или выйти сразу (одиночная игра)
+func dng_exit() -> void:
+	var z = get_tree().current_scene
+	if not Game.is_dungeon_zone(str(Game.current.get("zone", ""))): return
+	if in_game and _connected():
+		if dng_exit_busy: return
+		dng_exit_busy = true
+		if z and z.has_method("save"): z.save()
+		c_dng_exit.rpc_id(1)
+		get_tree().create_timer(6.0).timeout.connect(func():
+			if dng_exit_busy:
+				dng_exit_busy = false; Game.toast("Сервер не ответил — попробуйте ещё раз", 3.0); dng_exit_done.emit(false))
+		return
+	# одиночная игра
+	if z and "raid" in z and z.raid != null: z.raid.leave(); return
+	if z and z.has_method("save"): z.save()
+	_dng_exit_apply(dng_exit_point(str(Game.current.zone)))
+
+func _dng_exit_apply(ex: Array) -> void:
+	var pos: Vector3 = ex[1]
+	if pos.is_finite(): Game.current["ret"] = {"zone": ex[0], "pos": [pos.x, pos.y, pos.z]}
+	else: Game.current.erase("ret")
+	raid_iid = 0; raid_did = ""; raid_client = null
+	Game.travel_back(str(ex[0]))
+
+@rpc("any_peer", "call_remote", "reliable")
+func c_dng_exit() -> void:
+	if not is_server: return
+	var id := multiplayer.get_remote_sender_id()
+	var p = _authed(id)
+	if p == null: return
+	var z := str(p.zone)
+	if not Game.is_dungeon_zone(z):
+		s_dng_exit.rpc_id(id, "", Vector3.ZERO, "Вы не в подземелье"); return
+	var ex := dng_exit_point(z)
+	if RaidDefs.is_raid_zone(z): _srv_raid_remove(id)
+	var zk := str(p.get("wm_zk", ""))
+	if wsims.has(zk): wsims[zk].remove_player(id)
+	p["wm_zk"] = ""; p.erase("wm_pend")
+	# группа: остальные остаются внутри — им сообщение
+	var pt = parties.get(int(p.get("party", 0)))
+	if pt != null:
+		for m in pt.members:
+			if m != id and players.has(m) and str(players[m].zone) == z:
+				s_notice.rpc_id(m, "%s вышел из подземелья" % p.name)
+	var pos: Vector3 = ex[1] if (ex[1] as Vector3).is_finite() else Vector3(0, 0.1, 0)
+	p.zone = str(ex[0]); p.pos = pos; p.tp_until = _now() + 5.0
+	p.data["zone"] = p.zone; p.data["pos"] = [pos.x, pos.y, pos.z]; p.data["has_pos"] = true; p.data.erase("ret")
+	p.dirty = true
+	print("server: %s вышел из «%s» → %s %s" % [p.name, z, p.zone, pos])
+	s_dng_exit.rpc_id(id, p.zone, pos, "")
+
+@rpc("authority", "call_remote", "reliable")
+func s_dng_exit(zone_id: String, pos: Vector3, err: String) -> void:
+	dng_exit_busy = false
+	if err != "":
+		Game.toast(err, 3.0); dng_exit_done.emit(false); return
+	dng_exit_done.emit(true)
+	_dng_exit_apply([zone_id, pos])

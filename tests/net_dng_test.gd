@@ -7,6 +7,11 @@ var checks := 0
 var args := {}
 const FAKE := "/tmp/fake_internal/"
 const SHOTS := "/workspace/rpg-shots/v0952/"
+const SYNC := "/tmp/dg_"
+func wfile(n: String, v: String) -> void:
+	var f := FileAccess.open(SYNC + n, FileAccess.WRITE); f.store_string(v); f.close()
+func rfile(n: String) -> String:
+	return FileAccess.get_file_as_string(SYNC + n) if FileAccess.file_exists(SYNC + n) else ""
 
 func check(ok: bool, msg: String) -> void:
 	checks += 1
@@ -50,6 +55,7 @@ func _zone_is(id: String) -> bool:
 func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(SHOTS)
 	var user: String = args.get("user", "dg_a")
+	var ok := false
 	var touch := args.has("touch")
 	var c := DB.new_character("Тест_" + user, "warrior", CharAssets.random_look(0, RandomNumberGenerator.new()))
 	c["id"] = user; c["level"] = 10
@@ -61,11 +67,26 @@ func _run() -> void:
 	var f := FileAccess.open(FAKE + user + ".json", FileAccess.WRITE); f.store_string(JSON.stringify(c)); f.close()
 	Net.token = "tok_" + user; Net.username = user; Net.active = true; Net.chars = [c]
 	Game.play(c)
-	var ok := await wait_until(func(): return _zone_is("starter"), 40.0)
+	ok = await wait_until(func(): return _zone_is("starter"), 40.0)
 	check(ok, "в долине (локальный сервер)")
 	if not ok: _finish(); return
 	if touch: Game.desktop = false
 	await get_tree().create_timer(2.0).timeout
+	var lead := args.has("lead")
+	if lead:
+		check(Net.dng_exit_point("dungeon")[0] == "starter", "выход из Склепа — в долину")
+		for did in RaidDefs.DUNGEONS:
+			var ex: Array = Net.dng_exit_point(str(RaidDefs.DUNGEONS[did].zone))
+			check(ex[0] == "global" and (ex[1] as Vector3).is_finite() and (ex[1] as Vector3) != Vector3.ZERO, "выход из «%s» — к его порталу в Землях Эфира %s" % [did, ex[1]])
+		ok = await wait_until(func(): return Net.remotes.values().any(func(r): return str(r.name) == "Тест_dg_b"), 40.0)
+		Net.party_invite("Тест_dg_b")
+	else:
+		ok = await wait_until(func(): return not Net.party_invites.is_empty(), 60.0)
+		if ok: Net.party_accept(Net.party_invites.keys()[0])
+	ok = await wait_until(func(): return (Net.party.get("members", []) as Array).size() == 2, 40.0)
+	check(ok, "группа из двух собрана")
+	wfile("party_" + user, "1")
+	await wait_until(func(): return rfile("party_dg_a") != "" and rfile("party_dg_b") != "", 40.0)
 	var z = _zone()
 	# к порталу Склепа и внутрь — как игрок (через портал)
 	var portal = _find_portal(z)
@@ -92,12 +113,52 @@ func _run() -> void:
 			await get_tree().create_timer(0.25).timeout
 		var hit_ok: bool = not is_instance_valid(e) or not e.alive or float(e.hp) < hp0
 		check(hit_ok, "врага можно бить: здоровье %.0f → %s" % [hp0, ("убит" if (not is_instance_valid(e) or not e.alive) else "%.0f" % float(e.hp))])
-		await shot("dungeon_mobs")
-	await _exit_checks()
+		await shot("dungeon_mobs_" + user)
+	await _exit_checks(user)
 	_finish()
 
-func _exit_checks() -> void:
-	pass
+func _exit_checks(user: String) -> void:
+	var lead := args.has("lead")
+	var z = _zone()
+	var b = z.hud.exit_btn
+	check(b != null and is_instance_valid(b) and b.is_visible_in_tree(), "кнопка «Выйти из подземелья» видна")
+	if b == null: return
+	var vr := get_viewport().get_visible_rect()
+	check(vr.encloses(b.get_global_rect()), "кнопка целиком на экране %s" % b.get_global_rect())
+	await shot("exit_button_" + user)
+	if not lead:
+		# второй ждёт, пока лидер выйдет: остаётся внутри, враги на месте
+		await wait_until(func(): return rfile("lead_out") != "", 90.0)
+		await get_tree().create_timer(2.0).timeout
+		check(_zone_is("dungeon"), "лидер вышел — я остался в Склепе группы")
+		check(Net.wm_nodes.size() > 0, "враги Склепа у меня на месте (%d)" % Net.wm_nodes.size())
+		check(not Net.remotes.values().any(func(r): return str(r.name) == "Тест_dg_a" and r.node != null and is_instance_valid(r.node)), "вышедшего лидера в Склепе больше нет")
+	# «Остаться» — ничего не происходит
+	b.pressed.emit()
+	await get_tree().process_frame
+	var dlg = z.hud.exit_confirm
+	check(dlg != null and is_instance_valid(dlg), "нажатие — окно подтверждения")
+	await shot("exit_confirm_" + user)
+	if dlg: dlg.find_child("ExitNo", true, false).pressed.emit()
+	await get_tree().create_timer(1.0).timeout
+	check(_zone_is("dungeon") and (z.hud.exit_confirm == null), "«Остаться» — остаюсь в подземелье")
+	# «Выйти» — сервер выводит к арке Склепа
+	b.pressed.emit(); await get_tree().process_frame
+	z.hud.exit_confirm.find_child("ExitYes", true, false).pressed.emit()
+	var ok := await wait_until(func(): return _zone_is("starter"), 30.0)
+	check(ok, "«Выйти» — я в долине")
+	if not ok: return
+	await get_tree().create_timer(1.5).timeout
+	z = _zone()
+	var d: float = U.flat_dist(z.player.global_position, Net.DNG_EXIT_STARTER)
+	check(d < 4.0, "стою у портала Склепа (%.1f м от точки выхода)" % d)
+	check(z.hud.exit_btn == null, "в долине кнопки выхода нет")
+	await shot("after_exit_" + user)
+	if lead: wfile("lead_out", "1")
+	# сервер принимает движение после выхода (без отката)
+	var p0: Vector3 = z.player.global_position
+	await get_tree().create_timer(2.0).timeout
+	check(U.flat_dist(z.player.global_position, p0) < 1.0, "сервер не вернул назад после выхода")
 
 func _nearest(z):
 	var best = null; var bd := 1e9
